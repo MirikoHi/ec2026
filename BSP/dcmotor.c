@@ -3,7 +3,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include "dwt.h"
-DCMotorInstance dcmotor_instance[MOTOR_MAX_NUM] = {NULL};
+DCMotorInstance dcmotor_instance[MOTOR_MAX_NUM] = {0};
 uint8_t idx_dcmotor = 0;
 static float DCMotor_Speed_Filter(Motor_Speed_Filter_e *filter,float speed);
 

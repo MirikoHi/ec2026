@@ -4,7 +4,7 @@
 #include "string.h"
 #include "dwt.h"
 #include "NRF24L01.h"
-ENCODER_RES encoder_instance[MAX_ENCODER_NUM] = {NULL};
+ENCODER_RES encoder_instance[MAX_ENCODER_NUM] = {0};
 uint8_t idx_encoder = 0;
 uint32_t gpioA_Pin_registered = 0;
 uint32_t gpioB_Pin_registered = 0;
