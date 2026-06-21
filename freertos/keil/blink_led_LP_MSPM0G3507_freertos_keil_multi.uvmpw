@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<ProjectWorkspace xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="project_mpw.xsd">
+
+  <SchemaVersion>1.0</SchemaVersion>
+
+  <Header>### uVision Project, (C) Keil Software</Header>
+
+  <WorkspaceName>F:\Ti\mspm0_sdk_1_30_00_03\examples\rtos\LP_MSPM0G3507\kernel\blink_led1_pwm\freertos\keil\blink_led_LP_MSPM0G3507_freertos_keil_multi.uvmpw</WorkspaceName>
+
+  <project>
+    <PathAndName>..\..\..\..\..\..\..\kernel\freertos\builds\LP_MSPM0G3507\release\keil\freertos_builds_LP_MSPM0G3507_release_keil.uvprojx</PathAndName>
+  </project>
+
+  <project>
+    <PathAndName>.\blink_led_LP_MSPM0G3507_freertos_keil.uvprojx</PathAndName>
+    <NodeIsActive>1</NodeIsActive>
+    <NodeIsExpanded>1</NodeIsExpanded>
+  </project>
+
+</ProjectWorkspace>
