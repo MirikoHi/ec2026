@@ -194,12 +194,16 @@ set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/target/gcc/mspm0g3507.lds)
 target_link_options(${PROJECT_NAME} PRIVATE
     -Wl,-T,${LINKER_SCRIPT}
     -Wl,-Map,${PROJECT_BINARY_DIR}/${PROJECT_NAME}.map
+    -Wl,--gc-sections,--print-memory-usage
 )
 
 # ============================================================
 # Post-build: generate .hex and print size
 # ============================================================
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_OBJCOPY} -O elf32-littlearm
+        $<TARGET_FILE:${PROJECT_NAME}>
+        ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.elf
     COMMAND ${CMAKE_OBJCOPY} -O ihex
         $<TARGET_FILE:${PROJECT_NAME}>
         ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.hex

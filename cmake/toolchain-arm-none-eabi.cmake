@@ -5,9 +5,29 @@ set(CMAKE_SYSTEM_NAME               Generic)
 set(CMAKE_SYSTEM_PROCESSOR          arm)
 
 # Toolchain prefix
-set(TOOLCHAIN_ROOT                  "D:/arm-none-eabi/14.3")
-set(TOOLCHAIN_PREFIX                "${TOOLCHAIN_ROOT}/bin/arm-none-eabi-")
+# ----------------------------------------------------------------------
+# Locate arm-none-eabi-gcc
+# ----------------------------------------------------------------------
+if(DEFINED ENV{ARM_GCC_ROOT})
+    set(TOOLCHAIN_ROOT "$ENV{ARM_GCC_ROOT}")
+else()
+    # Try to find the compiler in PATH
+    find_program(CMAKE_C_COMPILER_FOUND arm-none-eabi-gcc)
+    if(CMAKE_C_COMPILER_FOUND)
+        get_filename_component(TOOLCHAIN_BIN_DIR ${CMAKE_C_COMPILER_FOUND} DIRECTORY)
+        get_filename_component(TOOLCHAIN_ROOT ${TOOLCHAIN_BIN_DIR} DIRECTORY)
+    else()
+        message(FATAL_ERROR
+                "arm-none-eabi-gcc not found. Please install the toolchain and add it to PATH, "
+                "or set the ARM_GCC_ROOT environment variable to its installation directory.")
+    endif()
+endif()
 
+set(TOOLCHAIN_PREFIX "${TOOLCHAIN_ROOT}/bin/arm-none-eabi-")
+
+# ----------------------------------------------------------------------
+# Compiler / tools
+# ----------------------------------------------------------------------
 set(CMAKE_TRY_COMPILE_TARGET_TYPE   STATIC_LIBRARY)
 
 set(CMAKE_C_COMPILER                "${TOOLCHAIN_PREFIX}gcc.exe")
