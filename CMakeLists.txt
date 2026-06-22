@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(blink_led_LP_MSPM0G3507_freertos C ASM)
+project(electric-competition-robot C ASM)
 
 # ============================================================
 # MCU and compiler flags
@@ -14,18 +14,24 @@ add_compile_definitions(__MSPM0G3507__)
 # ============================================================
 set(PROJECT_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}                          # .
-    ${CMAKE_CURRENT_SOURCE_DIR}/BSP                      # BSP headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/BSP/Motor                # BSP headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/BSP/Sensor
+    ${CMAKE_CURRENT_SOURCE_DIR}/BSP/Display
+    ${CMAKE_CURRENT_SOURCE_DIR}/BSP/Comm
+    ${CMAKE_CURRENT_SOURCE_DIR}/BSP/Control
+    ${CMAKE_CURRENT_SOURCE_DIR}/BSP/System
+    ${CMAKE_CURRENT_SOURCE_DIR}/BSP/UI
+    ${CMAKE_CURRENT_SOURCE_DIR}/BSP/Periph
     ${CMAKE_CURRENT_SOURCE_DIR}/APP                      # APP headers
-    ${CMAKE_CURRENT_SOURCE_DIR}/SEGGER/RTT               # SEGGER RTT
-    ${CMAKE_CURRENT_SOURCE_DIR}/SEGGER/Config            # SEGGER RTT config
-    ${CMAKE_CURRENT_SOURCE_DIR}/SEGGER/log               # SEGGER log
-    ${CMAKE_CURRENT_SOURCE_DIR}/freertos                 # FreeRTOS config ref
-    ${CMAKE_CURRENT_SOURCE_DIR}/source                   # TI SDK root
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/third_party/CMSIS/Core/Include
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/ti/posix/gcc      # POSIX compat headers
-    ${CMAKE_CURRENT_SOURCE_DIR}/kernel/freertos/Source/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/kernel/freertos/Source/portable/GCC/ARM_CM0
-    ${CMAKE_CURRENT_SOURCE_DIR}/kernel/freertos/builds/LP_MSPM0G3507/release
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/SEGGER/RTT          # SEGGER RTT
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/SEGGER/Config       # SEGGER RTT config
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/SEGGER/log          # SEGGER log
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mspm0_sdk           # TI SDK root
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mspm0_sdk/third_party/CMSIS/Core/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mspm0_sdk/ti/posix/gcc  # POSIX compat headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/FreeRTOS/Source/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/FreeRTOS/Source/portable/GCC/ARM_CM0
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/FreeRTOS/builds/LP_MSPM0G3507/release
 )
 
 # ============================================================
@@ -36,7 +42,7 @@ set(SYSCFG_OUTPUT
     ${CMAKE_CURRENT_SOURCE_DIR}/ti_msp_dl_config.h
 )
 
-# Optionally run SysConfig when blink_led.syscfg changes.
+# Optionally run SysConfig when robot.syscfg changes.
 # This requires TI SysConfig CLI to be installed and in PATH.
 # If SysConfig is not available, the previously-generated files are used as-is.
 find_program(SYSCONFIG_CLI sysconfig_cli.bat
@@ -50,8 +56,8 @@ if(SYSCONFIG_CLI)
             -o ${CMAKE_CURRENT_SOURCE_DIR}
             -s ${CMAKE_CURRENT_SOURCE_DIR}/.metadata/product.json
             --compiler gcc
-            ${CMAKE_CURRENT_SOURCE_DIR}/blink_led.syscfg
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/blink_led.syscfg
+            ${CMAKE_CURRENT_SOURCE_DIR}/robot.syscfg
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/robot.syscfg
         COMMENT "Running SysConfig to regenerate ti_msp_dl_config.c/h"
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
@@ -63,12 +69,12 @@ endif()
 # ============================================================
 # FreeRTOS kernel source files
 # ============================================================
-set(FREERTOS_CORE_DIR     kernel/freertos/Source)
-set(FREERTOS_PORT_DIR     kernel/freertos/Source/portable/GCC/ARM_CM0)
-set(FREERTOS_MEM_DIR      kernel/freertos/Source/portable/MemMang)
-set(FREERTOS_DPL_DIR      kernel/freertos/dpl)
-set(FREERTOS_BUILD_DIR    kernel/freertos/builds/LP_MSPM0G3507/release)
-set(FREERTOS_POSIX_DIR    source/ti/posix/freertos)
+set(FREERTOS_CORE_DIR     Vendor/FreeRTOS/Source)
+set(FREERTOS_PORT_DIR     Vendor/FreeRTOS/Source/portable/GCC/ARM_CM0)
+set(FREERTOS_MEM_DIR      Vendor/FreeRTOS/Source/portable/MemMang)
+set(FREERTOS_DPL_DIR      Vendor/FreeRTOS/dpl)
+set(FREERTOS_BUILD_DIR    Vendor/FreeRTOS/builds/LP_MSPM0G3507/release)
+set(FREERTOS_POSIX_DIR    Vendor/mspm0_sdk/ti/posix/freertos)
 
 set(FREERTOS_SOURCES
     # Core
@@ -115,41 +121,41 @@ set(FREERTOS_SOURCES
 # ============================================================
 set(APP_SOURCES
     # Startup (GCC version — C, not assembly)
-    freertos/gcc/startup_mspm0g350x_gcc.c
+    Vendor/target/gcc/startup_mspm0g350x_gcc.c
     # Main
     main.c
-    main-blinky.c
+    app_tasks.c
     board.c
     # SysConfig output
     ${SYSCFG_OUTPUT}
     # BSP
-    BSP/OLED.c
-    BSP/OLED_Data.c
-    BSP/KEY.c
-    BSP/trace.c
-    BSP/misc.c
-    BSP/PID.c
-    BSP/dwt.c
-    BSP/daemon.c
-    BSP/menu.c
-    BSP/fifo.c
-    BSP/ZDT_Motor.c
-    BSP/K230.c
-    BSP/icm42688.c
-    BSP/No_Mcu_Ganv_Grayscale_Sensor.c
-    BSP/encoder_timer.c
-    BSP/encoder.c
-    BSP/dcmotor.c
-    BSP/IMU.c
+    BSP/Display/OLED.c
+    BSP/Display/OLED_Data.c
+    BSP/Periph/KEY.c
+    BSP/Sensor/trace.c
+    BSP/System/misc.c
+    BSP/Control/PID.c
+    BSP/System/dwt.c
+    BSP/System/daemon.c
+    BSP/UI/menu.c
+    BSP/System/fifo.c
+    BSP/Motor/ZDT_Motor.c
+    BSP/Comm/K230.c
+    BSP/Sensor/icm42688.c
+    BSP/Sensor/No_Mcu_Ganv_Grayscale_Sensor.c
+    BSP/Motor/encoder_timer.c
+    BSP/Motor/encoder.c
+    BSP/Motor/dcmotor.c
+    BSP/Sensor/IMU.c
     # APP
     APP/Robot_Cmd.c
     APP/Chassis.c
     APP/Robot.c
     APP/Gimbal.c
     # SEGGER
-    SEGGER/RTT/SEGGER_RTT.c
-    SEGGER/RTT/SEGGER_RTT_printf.c
-    SEGGER/log/bsp_log.c
+    Vendor/SEGGER/RTT/SEGGER_RTT.c
+    Vendor/SEGGER/RTT/SEGGER_RTT_printf.c
+    Vendor/SEGGER/log/bsp_log.c
 )
 
 # ============================================================
@@ -166,7 +172,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_INCLUDE_DIRS})
 # Prebuilt DriverLib
 # ============================================================
 set(DRIVERLIB_PATH
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/ti/driverlib/lib/gcc/m0p/mspm0g1x0x_g3x0x/driverlib.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mspm0_sdk/ti/driverlib/lib/gcc/m0p/mspm0g1x0x_g3x0x/driverlib.a
 )
 set(SYSLIB_DIR
     ${TOOLCHAIN_ROOT}/arm-none-eabi/lib/thumb/v6-m/nofp
@@ -182,7 +188,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 # ============================================================
 # Linker configuration
 # ============================================================
-set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/freertos/gcc/mspm0g3507.lds)
+set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/target/gcc/mspm0g3507.lds)
 
 target_link_options(${PROJECT_NAME} PRIVATE
     -Wl,-T,${LINKER_SCRIPT}

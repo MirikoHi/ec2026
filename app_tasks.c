@@ -36,21 +36,21 @@
  * required to configure the hardware, are defined in main.c.
  ******************************************************************************
  *
- * main_blinky() creates one queue, and two tasks.  It then starts the
+ * app_tasks_init() creates one queue, and two tasks.  It then starts the
  * scheduler.
  *
  * The Queue Send Task:
  * The queue send task is implemented by the prvQueueSendTask() function in
  * this file.  prvQueueSendTask() sits in a loop that causes it to repeatedly
  * block for 1 second, before sending the value 100 to the queue that
- * was created within main_blinky().  Once the value is sent, the task loops
+ * was created within app_tasks_init().  Once the value is sent, the task loops
  * back around to block for another 1 second.
  *
  * The Queue Receive Task:
  * The queue receive task is implemented by the prvQueueReceiveTask() function
  * in this file.  prvQueueReceiveTask() sits in a loop where it repeatedly
  * blocks on attempts to read data from the queue that was created within
- * main_blinky().  When data is received, the task checks the value of the
+ * app_tasks_init().  When data is received, the task checks the value of the
  * data, and if the value equals the expected 100, toggles the LED.  The 'block
  * time' parameter passed to the queue receive function specifies that the
  * task should be held in the Blocked state indefinitely to wait for data to
@@ -130,8 +130,8 @@ static void DaemonTask(void *pvParameters);
 static void NRF24L01Task(void *pvParameters);
 static void GimbalTask(void *pvParameters);
 static void StepMotorTask(void *pvParameters);
-/* Called by main() to create the simply blinky style application */
-void main_blinky(void);
+/* Called by Robot_Init() to create all application tasks.
+ * Defined in APP/app_tasks.h */
 /*-----------------------------------------------------------*/
 
 /* The queue used by both tasks. */
@@ -139,7 +139,7 @@ static QueueHandle_t xQueue = NULL;
 
 /*-----------------------------------------------------------*/
 
-void main_blinky(void)
+void app_tasks_init(void)
 {
     /* Create the queue. */
 		BaseType_t xResult;
@@ -332,8 +332,8 @@ static void HwMotorTask(void *pvParameters)
     configASSERT(
         ((unsigned long) pvParameters) == HwMotor_PARAMETER);
 	vTaskDelay(1000);
-		encoder_interrupt_begin();
-		timer_init();
+		Encoder_InterruptBegin();
+		EncoderTimer_Init();
 		static float DCMotor_dt;
     static float DCMotor_start;
 		for (;;){

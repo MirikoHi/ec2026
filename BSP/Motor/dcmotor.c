@@ -15,7 +15,7 @@ DCMotorInstance* DCMotor_Init(DCMotorInitConfig_s *config)
 	iiii=sizeof(DCMotor_PortPin_s);
 	PID_init(&instance->speed_pid,&config->speed_pid_config);
 	PID_init(&instance->position_pid,&config->position_pid_config);
-	instance->encoder = encoder_init(&config->encoder_config);
+	instance->encoder = Encoder_Init(&config->encoder_config);
 	instance->PortPin = config->PortPin;
 	instance->Input_Dir = config->Input_Dir;
 	instance->Output_Dir = config->Output_Dir;
@@ -82,7 +82,7 @@ void Hw_Motor_Task(void)
 	static float last_control_s=0;
 	static float now_control_s=0;
 	static float control_period=0;
-	//encoder_update();
+	//Encoder_Update();
 	now_control_s = DWT_GetTimeline_s();
 	control_period = now_control_s-last_control_s;
 	last_control_s = now_control_s;

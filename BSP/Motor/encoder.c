@@ -9,7 +9,7 @@ uint8_t idx_encoder = 0;
 uint32_t gpioA_Pin_registered = 0;
 uint32_t gpioB_Pin_registered = 0;
 
-void encoder_interrupt_begin(void)
+void Encoder_InterruptBegin(void)
 {
 	bool GPIOA_falg=0;
 	bool GPIOB_flag=0;
@@ -37,7 +37,7 @@ void encoder_interrupt_begin(void)
 
 }
 
-ENCODER_RES* encoder_init(encoder_PortPin_s* init)
+ENCODER_RES* Encoder_Init(encoder_PortPin_s* init)
 {
 	ENCODER_RES* encoder=&encoder_instance[idx_encoder++];
 	
@@ -66,7 +66,7 @@ ENCODER_RES* encoder_init(encoder_PortPin_s* init)
 }
 
 
-void encoder_update(void)
+void Encoder_Update(void)
 {
 	for(uint8_t i=0;i<idx_encoder;i++)
 	{

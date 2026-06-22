@@ -33,7 +33,7 @@ void OnProjectLoad (void) {
   //
   // User settings
   //
-  File.Open ("$(ProjectDir)/cmake-build-debug/blink_led_LP_MSPM0G3507_freertos");
+  File.Open ("$(ProjectDir)/cmake-build-debug/electric-competition-robot");
 }
 
 /*********************************************************************

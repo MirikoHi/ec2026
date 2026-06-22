@@ -1,7 +1,7 @@
 #ifndef _GIMBAL_H_
 #define _GIMBAL_H_
 
-#define LengthToCenter 0.66 //单位米
+#define GIMBAL_LENGTH_TO_CENTER 0.66 //锟斤拷位锟斤拷
 
 
 

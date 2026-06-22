@@ -2,7 +2,7 @@
 #define _CHASSIS_H_
 
 #include "ti_msp_dl_config.h"
-#define LENGTH_TO_CENTER 0.166 //PAW3395到两轮中心距离,单位m
+#define CHASSIS_LENGTH_TO_CENTER 0.166 //PAW3395鍒拌溅浣撲腑蹇冪殑璺濈,鍗曚綅m //PAW3395锟斤拷锟斤拷锟斤拷锟斤拷锟侥撅拷锟斤拷,锟斤拷位m
 void Chassis(void);
 void Chassis_Init(void);
 

@@ -27,9 +27,9 @@ typedef struct {
 } ENCODER_RES;
 
 
-ENCODER_RES* encoder_init(encoder_PortPin_s* init);
-int get_encoder_count(void);
-ENCODER_DIR get_encoder_dir(void);
-void encoder_update(void);
-void encoder_interrupt_begin(void);
+ENCODER_RES* Encoder_Init(encoder_PortPin_s* init);
+int Encoder_GetCount(void);
+ENCODER_DIR Encoder_GetDir(void);
+void Encoder_Update(void);
+void Encoder_InterruptBegin(void);
 #endif

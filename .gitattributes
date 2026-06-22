@@ -1,0 +1,47 @@
+# Auto-detect text files, convert to LF on commit
+* text=auto
+
+# C/C++ source and headers — always LF for GCC cross-compiler
+*.c    text eol=lf
+*.h    text eol=lf
+
+# Assembly
+*.s    text eol=lf
+*.S    text eol=lf
+
+# Build system
+*.cmake          text eol=lf
+CMakeLists.txt   text eol=lf
+*.txt            text eol=lf
+
+# Linker scripts
+*.lds   text eol=lf
+
+# SysConfig
+*.syscfg text eol=lf
+
+# Scripts
+*.sh    text eol=lf
+*.py    text eol=lf
+
+# Documentation
+*.md    text eol=lf
+
+# YAML/JSON config
+*.json  text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+
+# J-Link / debugger configs
+*.jdebug text eol=lf
+
+# Binary files
+*.a     binary
+*.o     binary
+*.bin   binary
+*.hex   binary
+*.axf   binary
+*.elf   binary
+*.png   binary
+*.jpg   binary
+*.pdf   binary

@@ -2,7 +2,7 @@
 #include "encoder.h"
 #include "dwt.h"
 
-void timer_init(void)
+void EncoderTimer_Init(void)
 {
 	NVIC_ClearPendingIRQ(TIMER_TICK_INST_INT_IRQN);
 	NVIC_EnableIRQ(TIMER_TICK_INST_INT_IRQN);
@@ -15,7 +15,7 @@ void TIMER_TICK_INST_IRQHandler(void)
 	{
 		
 		
-		encoder_update();
+		Encoder_Update();
 
 	}
 }

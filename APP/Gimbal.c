@@ -72,8 +72,8 @@ void Gimbal_Attitude_Solving(void)
 {
 	float aim_x = gimbal_cmd_receive.aim_x;
 	float aim_y = gimbal_cmd_receive.aim_y;
-	gimbal_cmd_receive.yaw = -atan2f(aim_x,LengthToCenter)*180.0f/PI;
-	gimbal_cmd_receive.pitch = atan2f(aim_y,sqrtf(LengthToCenter*LengthToCenter+aim_x*aim_x))*180.0f/PI;
+	gimbal_cmd_receive.yaw = -atan2f(aim_x,GIMBAL_LENGTH_TO_CENTER)*180.0f/PI;
+	gimbal_cmd_receive.pitch = atan2f(aim_y,sqrtf(GIMBAL_LENGTH_TO_CENTER*GIMBAL_LENGTH_TO_CENTER+aim_x*aim_x))*180.0f/PI;
 }
 
 void Gimbal_task_2(void)

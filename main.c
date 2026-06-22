@@ -27,7 +27,7 @@
 
 /******************************************************************************
  * This project provides a simple blinky style project.
- * The simply blinky demo is implemented and described in main_blinky.c.
+ * The application tasks are created in app_tasks.c (app_tasks_init).
  *
  * The blinky demo uses FreeRTOS's tickless idle mode to reduce power
  * consumption.

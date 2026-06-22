@@ -8,7 +8,6 @@
 #include "JY901S.h"
 #include "tjc.h"
 #include "K230.h"
-extern void main_blinky(void);
 void Robot_Init(void)
 {
 	__disable_irq();
@@ -17,7 +16,7 @@ void Robot_Init(void)
 	Chassis_Init();
 //	Trace_Init();
 	RobotCmd_Init();
-	main_blinky();
+	app_tasks_init();
 	K230_Init();
 	vTaskStartScheduler();
 }

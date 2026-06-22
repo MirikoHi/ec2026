@@ -4,6 +4,6 @@
 #include "ti_msp_dl_config.h"
 
 
-void timer_init(void);
+void EncoderTimer_Init(void);
 
 #endif
