@@ -59,9 +59,10 @@ electric-competition-training/
 ├── README.md                   # TI 官方 Blinky 示例说明（已过时）
 ├── robot.syscfg            # TI SysConfig 项目配置（引脚/时钟/外设）
 ├── ti_msp_dl_config.c/.h       # SysConfig 生成的驱动库配置
-├── main.c                      # 程序入口 (main 函数)
-├── app_tasks.c               # FreeRTOS 任务创建（主应用）
-├── board.c / board.h           # 板级初始化与延时函数
+├── Core/                        # 程序核心（入口 & 板级初始化）
+│   ├── main.c                  # 程序入口 (main 函数)
+│   ├── Core/app_tasks.c             # FreeRTOS 任务创建（主应用）
+│   └── board.c / board.h       # 板级初始化与延时函数
 │
 ├── APP/                        # 应用层
 │   ├── Robot.c / Robot.h       # 系统初始化总入口
@@ -138,7 +139,6 @@ electric-competition-training/
 │   └── toolchain-arm-none-eabi.cmake # CMake 工具链文件
 │
 ├── Clion_project.jdebug        # SEGGER Ozone 调试配置 (CLion)
-├── car.jdebug                  # SEGGER Ozone 调试配置 (Keil)
 └── .idea/                      # CLion IDE 配置
 ```
 
@@ -164,7 +164,7 @@ electric-competition-training/
 ### 3.2 main() → 调度器启动
 
 ```
-main()                                    [main.c]
+main()                                    [Core/main.c]
   │
   ├─ prvSetupHardware()
   │   └─ SYSCFG_DL_init()                [SysConfig 生成]
@@ -179,7 +179,7 @@ main()                                    [main.c]
       ├─ MenuInit()                      # 三级菜单初始化
       ├─ Chassis_Init()                  # 底盘初始化（电机+IMU）
       ├─ RobotCmd_Init()                 # 命令队列创建 + PID 初始化
-      ├─ main_blinky()                   # 创建所有 FreeRTOS 任务 [app_tasks.c]
+      ├─ main_blinky()                   # 创建所有 FreeRTOS 任务 [Core/app_tasks.c]
       ├─ K230_Init()                     # AI 视觉模块初始化
       └─ vTaskStartScheduler()           # 启动 FreeRTOS 调度器 (永不返回)
 ```
@@ -355,7 +355,7 @@ Flash (0x00000000 - 0x00020000, 128KB):
 
 ### 6.2 任务列表
 
-所有任务在 `app_tasks.c` 的 `main_blinky()` 中创建。
+所有任务在 `Core/app_tasks.c` 的 `main_blinky()` 中创建。
 
 | 任务名 | 入口函数 | 优先级 | 栈 (字) | 周期 | 说明 |
 |--------|----------|--------|---------|------|------|

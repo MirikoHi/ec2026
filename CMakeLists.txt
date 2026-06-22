@@ -14,6 +14,7 @@ add_compile_definitions(__MSPM0G3507__)
 # ============================================================
 set(PROJECT_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}                          # .
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core                     # Core (main, board, tasks)
     ${CMAKE_CURRENT_SOURCE_DIR}/BSP/Motor                # BSP headers
     ${CMAKE_CURRENT_SOURCE_DIR}/BSP/Sensor
     ${CMAKE_CURRENT_SOURCE_DIR}/BSP/Display
@@ -123,9 +124,9 @@ set(APP_SOURCES
     # Startup (GCC version — C, not assembly)
     Vendor/target/gcc/startup_mspm0g350x_gcc.c
     # Main
-    main.c
-    app_tasks.c
-    board.c
+    Core/main.c
+    Core/app_tasks.c
+    Core/board.c
     # SysConfig output
     ${SYSCFG_OUTPUT}
     # BSP
