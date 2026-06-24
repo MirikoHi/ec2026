@@ -43,11 +43,11 @@ void BSPLogInit();
 #define LOGERROR(format, ...) 
 #else
 // information level
-#define LOGINFO(format, ...) LOG_PROTO("I:", RTT_CTRL_TEXT_BRIGHT_GREEN, format, ##__VA_ARGS__)
+#define LOGINFO(format, ...) LOG_PROTO("I:", RTT_CTRL_TEXT_BRIGHT_BLACK, format, ##__VA_ARGS__)
 // warning level
-#define LOGWARNING(format, ...) LOG_PROTO("W:", RTT_CTRL_TEXT_BRIGHT_YELLOW, format, ##__VA_ARGS__)
+#define LOGWARNING(format, ...) LOG_PROTO("W:", RTT_CTRL_BG_YELLOW, format, ##__VA_ARGS__)
 // error level
-#define LOGERROR(format, ...) LOG_PROTO("E:", RTT_CTRL_TEXT_BRIGHT_RED, format, ##__VA_ARGS__)
+#define LOGERROR(format, ...) LOG_PROTO("E:", RTT_CTRL_BG_RED, format, ##__VA_ARGS__)
 #endif //  DISABLE_LOG_SYSTEM
 
 /**

@@ -37,6 +37,7 @@
 
 /* Standard includes. */
 #include <stdio.h>
+#include "SEGGER_SYSVIEW.h"
 
 /* Kernel includes. */
 #include "FreeRTOS.h"
@@ -46,6 +47,7 @@
 #include "dcmotor.h"
 #include "encoder.h"
 /* TI includes */
+#include "bsp_log.h"
 #include "ti_msp_dl_config.h"
 //ababababaabababab
 /*-----------------------------------------------------------*/
@@ -55,7 +57,34 @@
  */
 static void prvSetupHardware(void);
 
+/* 全局 64 位计数器（用于 SystemView 时间戳） */
+volatile uint64_t sysview_tick_count = 0;
 
+// /* Tick Hook：每个 tick 中断都会调用（在 xTaskIncrementTick 之后） */
+// void vApplicationTickHook( void )
+// {
+//     // 每次 tick，高 32 位加 1
+//     sysview_tick_count += 0x100000000ULL;
+// }
+/*********************************************************************
+*       SEGGER_SYSVIEW_X_GetTimestamp
+*
+*  Function description
+*    Returns the current timestamp in ticks using the SysTick counter.
+*/
+U32 SEGGER_SYSVIEW_X_GetTimestamp(void) {
+    U64 ts;
+    U32 cnt_now;
+
+    // // 1. 读取当前的 SysTick 计数值
+    // cnt_now = SysTick->VAL;
+    //
+    // // 2. 组合成64位时间戳 (高32位 + 低32位)
+    // //    注意：此处无需关中断，因为此函数本身就在中断屏蔽状态下被调用。
+    // ts = sysview_tick_count + (SysTick->LOAD - cnt_now);
+
+    return SysTick->VAL;
+}
 
 /*-----------------------------------------------------------*/
 
@@ -63,8 +92,12 @@ int main(void)
 {
     /* Prepare the hardware to run this demo. */
     prvSetupHardware();
-
+    LOGINFO("Hardware init");
+    SEGGER_SYSVIEW_Conf();
+    SEGGER_SYSVIEW_Start();
+    LOGINFO("systemview start");
 		Robot_Init();
+    LOGERROR("unknow error");
     return 0;
 }
 /*-----------------------------------------------------------*/

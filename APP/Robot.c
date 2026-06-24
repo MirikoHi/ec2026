@@ -18,5 +18,6 @@ void Robot_Init(void)
 	RobotCmd_Init();
 	app_tasks_init();
 	K230_Init();
+	__enable_irq();
 	vTaskStartScheduler();
 }
