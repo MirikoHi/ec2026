@@ -138,13 +138,13 @@ static void StepMotorTask(void *pvParameters);
 static QueueHandle_t xQueue = NULL;
 
 /*-----------------------------------------------------------*/
-
+static volatile size_t free_heap ;
 void app_tasks_init(void)
 {
     /* Create the queue. */
 		BaseType_t xResult;
     xQueue = xQueueCreate(mainQUEUE_LENGTH, sizeof(uint32_t));
-		size_t free_heap = xPortGetFreeHeapSize();
+
     if (xQueue != NULL) {
         /*
          * Start the two tasks as described in the comments at the top of this
@@ -162,46 +162,56 @@ void app_tasks_init(void)
 //        xTaskCreate(prvQueueSendTask, "TX", configMINIMAL_STACK_SIZE,
 //            (void *) mainQUEUE_SEND_PARAMETER, mainQUEUE_SEND_TASK_PRIORITY,
 //            NULL);
-				xResult=xTaskCreate(KeyTask, "Key", configMINIMAL_STACK_SIZE,
+        /* Start the tasks. */
+    }
+	
+			xResult=xTaskCreate(KeyTask, "Key", configMINIMAL_STACK_SIZE,
             (void *) Key_PARAMETER, tskIDLE_PRIORITY+1,
             NULL);
-				free_heap = xPortGetFreeHeapSize();
-				xResult=xTaskCreate(HwMotorTask, "HwMotor", 256,
-            (void *) HwMotor_PARAMETER, tskIDLE_PRIORITY+2,
-            NULL);
-				free_heap = xPortGetFreeHeapSize();
-//						xResult=xTaskCreate(StepMotorTask, "StepMotor", 128,
+			configASSERT(xResult == pdPASS);
+
+			// xResult=xTaskCreate(HwMotorTask, "HwMotor", 256,
+   //          (void *) HwMotor_PARAMETER, tskIDLE_PRIORITY+2,
+   //          NULL);
+			// configASSERT(xResult == pdPASS);
+
+//			xResult=xTaskCreate(StepMotorTask, "StepMotor", 128,
 //            (void *) StepMotor_PARAMETER, tskIDLE_PRIORITY+2,
 //            NULL);
-//				free_heap = xPortGetFreeHeapSize();
-//				xResult=xTaskCreate(TraceTask, "Trace", configMINIMAL_STACK_SIZE,
+// 			configASSERT(xResult == pdPASS);
+
+//			xResult=xTaskCreate(TraceTask, "Trace", configMINIMAL_STACK_SIZE,
 //            (void *) Trace_PARAMETER, tskIDLE_PRIORITY+2,
 //            NULL);
-//				free_heap = xPortGetFreeHeapSize();
-				xResult=xTaskCreate(RobotCmdTask, "RobotCmd", configMINIMAL_STACK_SIZE,
+//			configASSERT(xResult == pdPASS);	
+
+			xResult=xTaskCreate(RobotCmdTask, "RobotCmd", configMINIMAL_STACK_SIZE,
             (void *) RobotCmd_PARAMETER, tskIDLE_PRIORITY+2,
             NULL);
-				free_heap = xPortGetFreeHeapSize();
-				xResult=xTaskCreate(ChassisTask, "Chassis", 256,
+			configASSERT(xResult == pdPASS);
+
+			xResult=xTaskCreate(ChassisTask, "Chassis", 256,
             (void *) Chassis_PARAMETER, tskIDLE_PRIORITY+2,
             NULL);
-				free_heap = xPortGetFreeHeapSize();
-				xResult=xTaskCreate(GimbalTask, "Gimbal", 128,
+			configASSERT(xResult == pdPASS);
+
+			xResult=xTaskCreate(GimbalTask, "Gimbal", 128,
             (void *) Gimbal_PARAMETER, tskIDLE_PRIORITY+2,
             NULL);
-				free_heap = xPortGetFreeHeapSize();
-				xResult=xTaskCreate(DaemonTask, "Daemon", configMINIMAL_STACK_SIZE,
+			configASSERT(xResult == pdPASS);
+
+			xResult=xTaskCreate(DaemonTask, "Daemon", configMINIMAL_STACK_SIZE,
             (void *) Daemon_PARAMETER, tskIDLE_PRIORITY,
             NULL);
-				free_heap = xPortGetFreeHeapSize();
-//				xResult=xTaskCreate(NRF24L01Task, "NRF24L01", configMINIMAL_STACK_SIZE+3,
+			configASSERT(xResult == pdPASS);
+
+//			xResult=xTaskCreate(NRF24L01Task, "NRF24L01", configMINIMAL_STACK_SIZE+3,
 //            (void *) NRF24L01_PARAMETER, tskIDLE_PRIORITY,
 //            NULL);
-//				free_heap = xPortGetFreeHeapSize();
-        /* Start the tasks. */
-        
-    }
+//			configASSERT(xResult == pdPASS);
 
+			free_heap = xPortGetFreeHeapSize();
+			LOGINFO("free heap: %u", (uint32_t)free_heap);
 //    /*
 //     * If all is well, the scheduler will now be running, and the following
 //     * line will never be reached.  If the following line does execute, then
