@@ -72,7 +72,7 @@
           <BeforeMake>
             <RunUserProg1>1</RunUserProg1>
             <RunUserProg2>0</RunUserProg2>
-            <UserProg1Name>cmd.exe /C "$P..\..\syscfg.bat  '$P' blink_led.syscfg"</UserProg1Name>
+            <UserProg1Name>cmd.exe /C "$P..\..\..\syscfg.bat  '$P' robot.syscfg"</UserProg1Name>
             <UserProg2Name></UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>__MSPM0G3507__</Define>
               <Undefine></Undefine>
-              <IncludePath>../../../../../../../source/third_party/CMSIS/Core/Include;../../../../../../../kernel/freertos/Source/include;../../../../../../../source;../../../../../../../kernel/freertos/Source/portable/GCC/ARM_CM0;../../../../../../../kernel/freertos/builds/LP_MSPM0G3507/release;..\..\freertos;..\..\BSP;..\..\APP;..\..\SEGGER\RTT;..\..\SEGGER\Config;..\..\SEGGER\log;..\..\..\blink_led1_pwm;..\..\source\third_party\CMSIS\Core\Include;..\..\kernel\freertos\Source\include;..\..\source;..\..\kernel\freertos\Source\portable\GCC\ARM_CM0;..\..\kernel\freertos\builds\LP_MSPM0G3507\release;..\..\..\electric-competition-training</IncludePath>
+              <IncludePath>..\..\..\;..\..\..\Core;..\..\..\BSP\Motor;..\..\..\BSP\Sensor;..\..\..\BSP\Display;..\..\..\BSP\Comm;..\..\..\BSP\Control;..\..\..\BSP\System;..\..\..\BSP\UI;..\..\..\BSP\Periph;..\..\..\APP;..\..\SEGGER\RTT;..\..\SEGGER\Config;..\..\SEGGER\log;..\..\mspm0_sdk;..\..\mspm0_sdk\third_party\CMSIS\Core\Include;..\..\FreeRTOS\Source\include;..\..\FreeRTOS\Source\portable\GCC\ARM_CM0;..\..\FreeRTOS\builds\LP_MSPM0G3507\release</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -387,17 +387,17 @@
             <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../main.c</FilePath>
+              <FilePath>..\..\..\Core\main.c</FilePath>
             </File>
             <File>
-              <FileName>main-blinky.c</FileName>
+              <FileName>app_tasks.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../main-blinky.c</FilePath>
+              <FilePath>..\..\..\Core\app_tasks.c</FilePath>
             </File>
             <File>
-              <FileName>blink_led.syscfg</FileName>
+              <FileName>robot.syscfg</FileName>
               <FileType>5</FileType>
-              <FilePath>../../blink_led.syscfg</FilePath>
+              <FilePath>..\..\..\robot.syscfg</FilePath>
             </File>
             <File>
               <FileName>startup_mspm0g350x_uvision.s</FileName>
@@ -407,22 +407,22 @@
             <File>
               <FileName>ti_msp_dl_config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>../../ti_msp_dl_config.h</FilePath>
+              <FilePath>..\..\..\ti_msp_dl_config.h</FilePath>
             </File>
             <File>
               <FileName>ti_msp_dl_config.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../ti_msp_dl_config.c</FilePath>
+              <FilePath>..\..\..\ti_msp_dl_config.c</FilePath>
             </File>
             <File>
               <FileName>board.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\board.c</FilePath>
+              <FilePath>..\..\..\Core\board.c</FilePath>
             </File>
             <File>
               <FileName>board.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\board.h</FilePath>
+              <FilePath>..\..\..\Core\board.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -432,7 +432,7 @@
             <File>
               <FileName>driverlib.a</FileName>
               <FileType>4</FileType>
-              <FilePath>D:\Code\ElectricCompetitionProject\electric-competition-training\source\ti\driverlib\lib\keil\m0p\mspm0g1x0x_g3x0x/driverlib.a</FilePath>
+              <FilePath>D:\Code\ElectricCompetitionProject\electric-competition-training\Vendor\mspm0_sdk\ti\driverlib\lib\keil\m0p\mspm0g1x0x_g3x0x\driverlib.a</FilePath>
             </File>
           </Files>
         </Group>
@@ -442,7 +442,7 @@
             <File>
               <FileName>freertos_builds_LP_MSPM0G3507_release_keil.lib</FileName>
               <FileType>4</FileType>
-              <FilePath>D:\Code\ElectricCompetitionProject\electric-competition-training\kernel\freertos\builds\LP_MSPM0G3507\release\keil\Objects/freertos_builds_LP_MSPM0G3507_release_keil.lib</FilePath>
+              <FilePath>D:\Code\ElectricCompetitionProject\electric-competition-training\Vendor\FreeRTOS\builds\LP_MSPM0G3507\release\keil\Objects\freertos_builds_LP_MSPM0G3507_release_keil.lib</FilePath>
             </File>
           </Files>
         </Group>
@@ -472,187 +472,187 @@
             <File>
               <FileName>OLED.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\OLED.c</FilePath>
+              <FilePath>..\..\..\BSP\Display\OLED.c</FilePath>
             </File>
             <File>
               <FileName>OLED.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\OLED.h</FilePath>
+              <FilePath>..\..\..\BSP\Display\OLED.h</FilePath>
             </File>
             <File>
               <FileName>oledfont.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\oledfont.h</FilePath>
+              <FilePath>..\..\..\BSP\Display\oledfont.h</FilePath>
             </File>
             <File>
               <FileName>OLED_Data.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\OLED_Data.c</FilePath>
+              <FilePath>..\..\..\BSP\Display\OLED_Data.c</FilePath>
             </File>
             <File>
               <FileName>OLED_Data.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\OLED_Data.h</FilePath>
+              <FilePath>..\..\..\BSP\Display\OLED_Data.h</FilePath>
             </File>
             <File>
               <FileName>KEY.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\KEY.c</FilePath>
+              <FilePath>..\..\..\BSP\Periph\KEY.c</FilePath>
             </File>
             <File>
               <FileName>KEY.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\KEY.h</FilePath>
+              <FilePath>..\..\..\BSP\Periph\KEY.h</FilePath>
             </File>
             <File>
               <FileName>trace.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\trace.c</FilePath>
+              <FilePath>..\..\..\BSP\Sensor\trace.c</FilePath>
             </File>
             <File>
               <FileName>trace.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\trace.h</FilePath>
+              <FilePath>..\..\..\BSP\Sensor\trace.h</FilePath>
             </File>
             <File>
               <FileName>misc.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\misc.c</FilePath>
+              <FilePath>..\..\..\BSP\System\misc.c</FilePath>
             </File>
             <File>
               <FileName>misc.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\misc.h</FilePath>
+              <FilePath>..\..\..\BSP\System\misc.h</FilePath>
             </File>
             <File>
               <FileName>PID.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\PID.c</FilePath>
+              <FilePath>..\..\..\BSP\Control\PID.c</FilePath>
             </File>
             <File>
               <FileName>PID.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\PID.h</FilePath>
+              <FilePath>..\..\..\BSP\Control\PID.h</FilePath>
             </File>
             <File>
               <FileName>dwt.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\dwt.c</FilePath>
+              <FilePath>..\..\..\BSP\System\dwt.c</FilePath>
             </File>
             <File>
               <FileName>dwt.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\dwt.h</FilePath>
+              <FilePath>..\..\..\BSP\System\dwt.h</FilePath>
             </File>
             <File>
               <FileName>daemon.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\daemon.c</FilePath>
+              <FilePath>..\..\..\BSP\System\daemon.c</FilePath>
             </File>
             <File>
               <FileName>daemon.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\daemon.h</FilePath>
+              <FilePath>..\..\..\BSP\System\daemon.h</FilePath>
             </File>
             <File>
               <FileName>menu.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\menu.h</FilePath>
+              <FilePath>..\..\..\BSP\UI\menu.h</FilePath>
             </File>
             <File>
               <FileName>menu.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\menu.c</FilePath>
+              <FilePath>..\..\..\BSP\UI\menu.c</FilePath>
             </File>
             <File>
               <FileName>fifo.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\fifo.c</FilePath>
+              <FilePath>..\..\..\BSP\System\fifo.c</FilePath>
             </File>
             <File>
               <FileName>fifo.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\fifo.h</FilePath>
+              <FilePath>..\..\..\BSP\System\fifo.h</FilePath>
             </File>
             <File>
               <FileName>ZDT_Motor.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\ZDT_Motor.c</FilePath>
+              <FilePath>..\..\..\BSP\Motor\ZDT_Motor.c</FilePath>
             </File>
             <File>
               <FileName>ZDT_Motor.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\ZDT_Motor.h</FilePath>
+              <FilePath>..\..\..\BSP\Motor\ZDT_Motor.h</FilePath>
             </File>
             <File>
               <FileName>K230.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\K230.c</FilePath>
+              <FilePath>..\..\..\BSP\Comm\K230.c</FilePath>
             </File>
             <File>
               <FileName>K230.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\K230.h</FilePath>
+              <FilePath>..\..\..\BSP\Comm\K230.h</FilePath>
             </File>
             <File>
               <FileName>icm42688.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\icm42688.c</FilePath>
+              <FilePath>..\..\..\BSP\Sensor\icm42688.c</FilePath>
             </File>
             <File>
               <FileName>icm42688.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\icm42688.h</FilePath>
+              <FilePath>..\..\..\BSP\Sensor\icm42688.h</FilePath>
             </File>
             <File>
               <FileName>No_Mcu_Ganv_Grayscale_Sensor.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\No_Mcu_Ganv_Grayscale_Sensor.c</FilePath>
+              <FilePath>..\..\..\BSP\Sensor\No_Mcu_Ganv_Grayscale_Sensor.c</FilePath>
             </File>
             <File>
               <FileName>No_Mcu_Ganv_Grayscale_Sensor_Config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\No_Mcu_Ganv_Grayscale_Sensor_Config.h</FilePath>
+              <FilePath>..\..\..\BSP\Sensor\No_Mcu_Ganv_Grayscale_Sensor_Config.h</FilePath>
             </File>
             <File>
               <FileName>encoder_timer.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\encoder_timer.c</FilePath>
+              <FilePath>..\..\..\BSP\Motor\encoder_timer.c</FilePath>
             </File>
             <File>
               <FileName>encoder_timer.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\encoder_timer.h</FilePath>
+              <FilePath>..\..\..\BSP\Motor\encoder_timer.h</FilePath>
             </File>
             <File>
               <FileName>encoder.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\encoder.c</FilePath>
+              <FilePath>..\..\..\BSP\Motor\encoder.c</FilePath>
             </File>
             <File>
               <FileName>encoder.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\encoder.h</FilePath>
+              <FilePath>..\..\..\BSP\Motor\encoder.h</FilePath>
             </File>
             <File>
               <FileName>dcmotor.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\dcmotor.c</FilePath>
+              <FilePath>..\..\..\BSP\Motor\dcmotor.c</FilePath>
             </File>
             <File>
               <FileName>dcmotor.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\dcmotor.h</FilePath>
+              <FilePath>..\..\..\BSP\Motor\dcmotor.h</FilePath>
             </File>
             <File>
               <FileName>IMU.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\IMU.c</FilePath>
+              <FilePath>..\..\..\BSP\Sensor\IMU.c</FilePath>
             </File>
             <File>
               <FileName>IMU.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\BSP\IMU.h</FilePath>
+              <FilePath>..\..\..\BSP\Sensor\IMU.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -662,42 +662,42 @@
             <File>
               <FileName>Robot_Cmd.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\APP\Robot_Cmd.c</FilePath>
+              <FilePath>..\..\..\APP\Robot_Cmd.c</FilePath>
             </File>
             <File>
               <FileName>Robot_Cmd.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\APP\Robot_Cmd.h</FilePath>
+              <FilePath>..\..\..\APP\Robot_Cmd.h</FilePath>
             </File>
             <File>
               <FileName>Chassis.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\APP\Chassis.c</FilePath>
+              <FilePath>..\..\..\APP\Chassis.c</FilePath>
             </File>
             <File>
               <FileName>Chassis.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\APP\Chassis.h</FilePath>
+              <FilePath>..\..\..\APP\Chassis.h</FilePath>
             </File>
             <File>
               <FileName>Robot.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\APP\Robot.c</FilePath>
+              <FilePath>..\..\..\APP\Robot.c</FilePath>
             </File>
             <File>
               <FileName>Robot.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\APP\Robot.h</FilePath>
+              <FilePath>..\..\..\APP\Robot.h</FilePath>
             </File>
             <File>
               <FileName>Gimbal.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\APP\Gimbal.c</FilePath>
+              <FilePath>..\..\..\APP\Gimbal.c</FilePath>
             </File>
             <File>
               <FileName>Gimbal.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\APP\Gimbal.h</FilePath>
+              <FilePath>..\..\..\APP\Gimbal.h</FilePath>
             </File>
           </Files>
         </Group>
