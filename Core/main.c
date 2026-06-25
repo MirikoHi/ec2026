@@ -136,21 +136,13 @@ static void prvSetupHardware(void)
      *  weak, and will be used by default, unless the application specifically
      *  provides its own hook function.
      */
-#if defined(__IAR_SYSTEMS_ICC__)
-__weak void vApplicationStackOverflowHook(
-    TaskHandle_t pxTask, char *pcTaskName)
-#elif (defined(__TI_COMPILER_VERSION__))
-#pragma WEAK(vApplicationStackOverflowHook)
 void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
-#elif (defined(__GNUC__) || defined(__ti_version__))
-void __attribute__((weak))
-vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
-#endif
 {
     (void)pxTask;
-    SEGGER_RTT_WriteString(0, "\r\n[FreeRTOS] Stack overflow detected in task: ");
+    SEGGER_RTT_WriteString(0, "\r\n" RTT_CTRL_TEXT_BRIGHT_WHITE RTT_CTRL_BG_RED
+                              "[FreeRTOS] Stack overflow detected in task: ");
     SEGGER_RTT_WriteString(0, pcTaskName != NULL ? pcTaskName : "(unnamed)");
-    SEGGER_RTT_WriteString(0, "\r\n");
+    SEGGER_RTT_WriteString(0, "\r\n" RTT_CTRL_RESET);
 
     __disable_irq();
     while (1) {
