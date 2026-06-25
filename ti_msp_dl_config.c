@@ -64,12 +64,14 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_K230_init();
     SYSCFG_DL_ICM42688_init();
     SYSCFG_DL_ADC1_init();
+    SYSCFG_DL_MCAN0_init();
     /* Ensure backup structures have no valid state */
 
 	gTIMER_TICKBackup.backupRdy 	= false;
 	gZDT_MOTOR_TICKBackup.backupRdy 	= false;
 	gUART_0Backup.backupRdy 	= false;
 	gICM42688Backup.backupRdy 	= false;
+
 
 }
 /*
@@ -114,6 +116,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_reset(K230_INST);
     DL_SPI_reset(ICM42688_INST);
     DL_ADC12_reset(ADC1_INST);
+    DL_MCAN_reset(MCAN0_INST);
 
     DL_GPIO_enablePower(GPIOA);
     DL_GPIO_enablePower(GPIOB);
@@ -126,6 +129,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_enablePower(K230_INST);
     DL_SPI_enablePower(ICM42688_INST);
     DL_ADC12_enablePower(ADC1_INST);
+    DL_MCAN_enablePower(MCAN0_INST);
     delay_cycles(POWER_STARTUP_DELAY);
 }
 
@@ -282,6 +286,11 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		ENCODER_ENC_B2_PIN |
 		ENCODER_ENC_A1_PIN |
 		ENCODER_ENC_B1_PIN);
+
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_MCAN0_IOMUX_CAN_TX, GPIO_MCAN0_IOMUX_CAN_TX_FUNC);
+    DL_GPIO_initPeripheralInputFunction(
+        GPIO_MCAN0_IOMUX_CAN_RX, GPIO_MCAN0_IOMUX_CAN_RX_FUNC);
 
 }
 
@@ -725,5 +734,172 @@ SYSCONFIG_WEAK void SYSCFG_DL_ADC1_init(void)
     DL_ADC12_clearInterruptStatus(ADC1_INST,(DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED));
     DL_ADC12_enableInterrupt(ADC1_INST,(DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED));
     DL_ADC12_enableConversions(ADC1_INST);
+}
+
+static const DL_MCAN_ClockConfig gMCAN0ClockConf = {
+    .clockSel = DL_MCAN_FCLK_HFCLK,
+    .divider  = DL_MCAN_FCLK_DIV_1,
+};
+
+static const DL_MCAN_InitParams gMCAN0InitParams= {
+
+/* Initialize MCAN Init parameters.    */
+    .fdMode            = false,
+    .brsEnable         = false,
+    .txpEnable         = false,
+    .efbi              = false,
+    .pxhddisable       = false,
+    .darEnable         = false,
+    .wkupReqEnable     = true,
+    .autoWkupEnable    = true,
+    .emulationEnable   = true,
+    .tdcEnable         = false,
+    .wdcPreload        = 255,
+
+/* Transmitter Delay Compensation parameters. */
+    .tdcConfig.tdcf    = 10,
+    .tdcConfig.tdco    = 6,
+};
+
+static const DL_MCAN_ConfigParams gMCAN0ConfigParams={
+    /* Initialize MCAN Config parameters. */
+    .monEnable         = false,
+    .asmEnable         = false,
+    .tsPrescalar       = 15,
+    .tsSelect          = 0,
+    .timeoutSelect     = DL_MCAN_TIMEOUT_SELECT_CONT,
+    .timeoutPreload    = 65535,
+    .timeoutCntEnable  = false,
+    .filterConfig.rrfs = true,
+    .filterConfig.rrfe = true,
+    .filterConfig.anfe = 0,
+    .filterConfig.anfs = 0,
+};
+
+static const DL_MCAN_MsgRAMConfigParams gMCAN0MsgRAMConfigParams ={
+
+    /* Standard ID Filter List Start Address. */
+    .flssa                = MCAN0_INST_MCAN_STD_ID_FILT_START_ADDR,
+    /* List Size: Standard ID. */
+    .lss                  = MCAN0_INST_MCAN_STD_ID_FILTER_NUM,
+    /* Extended ID Filter List Start Address. */
+    .flesa                = MCAN0_INST_MCAN_EXT_ID_FILT_START_ADDR,
+    /* List Size: Extended ID. */
+    .lse                  = MCAN0_INST_MCAN_EXT_ID_FILTER_NUM,
+    /* Tx Buffers Start Address. */
+    .txStartAddr          = MCAN0_INST_MCAN_TX_BUFF_START_ADDR,
+    /* Number of Dedicated Transmit Buffers. */
+    .txBufNum             = MCAN0_INST_MCAN_TX_BUFF_SIZE,
+    .txFIFOSize           = 0,
+    /* Tx Buffer Element Size. */
+    .txBufMode            = 0,
+    .txBufElemSize        = DL_MCAN_ELEM_SIZE_64BYTES,
+    /* Tx Event FIFO Start Address. */
+    .txEventFIFOStartAddr = MCAN0_INST_MCAN_TX_EVENT_START_ADDR,
+    /* Event FIFO Size. */
+    .txEventFIFOSize      = MCAN0_INST_MCAN_TX_EVENT_SIZE,
+    /* Level for Tx Event FIFO watermark interrupt. */
+    .txEventFIFOWaterMark = 3,
+    /* Rx FIFO0 Start Address. */
+    .rxFIFO0startAddr     = MCAN0_INST_MCAN_FIFO_0_START_ADDR,
+    /* Number of Rx FIFO elements. */
+    .rxFIFO0size          = MCAN0_INST_MCAN_FIFO_0_NUM,
+    /* Rx FIFO0 Watermark. */
+    .rxFIFO0waterMark     = 3,
+    .rxFIFO0OpMode        = 0,
+    /* Rx FIFO1 Start Address. */
+    .rxFIFO1startAddr     = MCAN0_INST_MCAN_FIFO_1_START_ADDR,
+    /* Number of Rx FIFO elements. */
+    .rxFIFO1size          = MCAN0_INST_MCAN_FIFO_1_NUM,
+    /* Level for Rx FIFO 1 watermark interrupt. */
+    .rxFIFO1waterMark     = 3,
+    /* FIFO blocking mode. */
+    .rxFIFO1OpMode        = 0,
+    /* Rx Buffer Start Address. */
+    .rxBufStartAddr       = MCAN0_INST_MCAN_RX_BUFF_START_ADDR,
+    /* Rx Buffer Element Size. */
+    .rxBufElemSize        = DL_MCAN_ELEM_SIZE_64BYTES,
+    /* Rx FIFO0 Element Size. */
+    .rxFIFO0ElemSize      = DL_MCAN_ELEM_SIZE_64BYTES,
+    /* Rx FIFO1 Element Size. */
+    .rxFIFO1ElemSize      = DL_MCAN_ELEM_SIZE_64BYTES,
+};
+
+
+
+static const DL_MCAN_BitTimingParams   gMCAN0BitTimes = {
+    /* Arbitration Baud Rate Pre-scaler. */
+    .nomRatePrescalar   = 0,
+    /* Arbitration Time segment before sample point. */
+    .nomTimeSeg1        = 30,
+    /* Arbitration Time segment after sample point. */
+    .nomTimeSeg2        = 7,
+    /* Arbitration (Re)Synchronization Jump Width Range. */
+    .nomSynchJumpWidth  = 7,
+    /* Data Baud Rate Pre-scaler. */
+    .dataRatePrescalar  = 0,
+    /* Data Time segment before sample point. */
+    .dataTimeSeg1       = 0,
+    /* Data Time segment after sample point. */
+    .dataTimeSeg2       = 0,
+    /* Data (Re)Synchronization Jump Width.   */
+    .dataSynchJumpWidth = 0,
+};
+
+
+SYSCONFIG_WEAK void SYSCFG_DL_MCAN0_init(void) {
+    DL_MCAN_RevisionId revid_MCAN0;
+
+    DL_MCAN_enableModuleClock(MCAN0_INST);
+
+    DL_MCAN_setClockConfig(MCAN0_INST, (DL_MCAN_ClockConfig *) &gMCAN0ClockConf);
+
+    /* Get MCANSS Revision ID. */
+    DL_MCAN_getRevisionId(MCAN0_INST, &revid_MCAN0);
+
+    /* Wait for Memory initialization to be completed. */
+    while(false == DL_MCAN_isMemInitDone(MCAN0_INST));
+
+    /* Put MCAN in SW initialization mode. */
+
+    DL_MCAN_setOpMode(MCAN0_INST, DL_MCAN_OPERATION_MODE_SW_INIT);
+
+    /* Wait till MCAN is not initialized. */
+    while (DL_MCAN_OPERATION_MODE_SW_INIT != DL_MCAN_getOpMode(MCAN0_INST));
+
+    /* Initialize MCAN module. */
+    DL_MCAN_init(MCAN0_INST, (DL_MCAN_InitParams *) &gMCAN0InitParams);
+
+    /* Configure MCAN module. */
+    DL_MCAN_config(MCAN0_INST, (DL_MCAN_ConfigParams*) &gMCAN0ConfigParams);
+
+    /* Configure Bit timings. */
+    DL_MCAN_setBitTime(MCAN0_INST, (DL_MCAN_BitTimingParams*) &gMCAN0BitTimes);
+
+    /* Configure Message RAM Sections */
+    DL_MCAN_msgRAMConfig(MCAN0_INST, (DL_MCAN_MsgRAMConfigParams*) &gMCAN0MsgRAMConfigParams);
+
+
+
+    /* Set Extended ID Mask. */
+    DL_MCAN_setExtIDAndMask(MCAN0_INST, MCAN0_INST_MCAN_EXT_ID_AND_MASK );
+
+    /* Loopback mode */
+
+    /* Take MCAN out of the SW initialization mode */
+    DL_MCAN_setOpMode(MCAN0_INST, DL_MCAN_OPERATION_MODE_NORMAL);
+
+    while (DL_MCAN_OPERATION_MODE_NORMAL != DL_MCAN_getOpMode(MCAN0_INST));
+
+    /* Enable MCAN mopdule Interrupts */
+    DL_MCAN_enableIntr(MCAN0_INST, MCAN0_INST_MCAN_INTERRUPTS, 1U);
+
+    DL_MCAN_selectIntrLine(MCAN0_INST, DL_MCAN_INTR_MASK_ALL, DL_MCAN_INTR_LINE_NUM_1);
+    DL_MCAN_enableIntrLine(MCAN0_INST, DL_MCAN_INTR_LINE_NUM_1, 1U);
+
+    /* Enable MSPM0 MCAN interrupt */
+    DL_MCAN_clearInterruptStatus(MCAN0_INST,(DL_MCAN_MSP_INTERRUPT_LINE1));
+    DL_MCAN_enableInterrupt(MCAN0_INST,(DL_MCAN_MSP_INTERRUPT_LINE1));
+
 }
 
