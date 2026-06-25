@@ -37,6 +37,8 @@
 
 /* Standard includes. */
 #include <stdio.h>
+#include "SEGGER_SYSVIEW.h"
+#include "SEGGER_RTT.h"
 
 /* Kernel includes. */
 #include "FreeRTOS.h"
@@ -46,6 +48,7 @@
 #include "dcmotor.h"
 #include "encoder.h"
 /* TI includes */
+#include "bsp_log.h"
 #include "ti_msp_dl_config.h"
 //ababababaabababab
 /*-----------------------------------------------------------*/
@@ -55,7 +58,43 @@
  */
 static void prvSetupHardware(void);
 
+static volatile U32 ulSysViewTickBase;
 
+void vApplicationTickHook(void) {
+    ulSysViewTickBase += (SysTick->LOAD + 1U);
+}
+
+/*********************************************************************
+*       SEGGER_SYSVIEW_X_GetTimestamp
+*
+*  Function description
+*    Returns a monotonic timestamp in CPU cycles.
+*/
+U32 SEGGER_SYSVIEW_X_GetTimestamp(void) {
+    U32 base;
+    U32 base_check;
+    U32 systick_val;
+    U32 cycles_per_tick;
+
+    do {
+        base = ulSysViewTickBase;
+        systick_val = SysTick->VAL;
+        base_check = ulSysViewTickBase;
+    } while (base != base_check);
+
+    cycles_per_tick = SysTick->LOAD + 1U;
+    return base + (cycles_per_tick - systick_val);
+}
+
+/*********************************************************************
+*       SEGGER_SYSVIEW_X_GetInterruptId
+*
+*  Function description
+*    Returns the currently active exception number on Cortex-M0+.
+*/
+U32 SEGGER_SYSVIEW_X_GetInterruptId(void) {
+    return __get_IPSR();
+}
 
 /*-----------------------------------------------------------*/
 
@@ -63,8 +102,13 @@ int main(void)
 {
     /* Prepare the hardware to run this demo. */
     prvSetupHardware();
-
+    SEGGER_RTT_Init();
+    LOGINFO("Hardware init");
+    SEGGER_SYSVIEW_Conf();
+    SEGGER_SYSVIEW_Start();
+    LOGINFO("systemview start");
 		Robot_Init();
+    LOGERROR("unknow error");
     return 0;
 }
 /*-----------------------------------------------------------*/
@@ -74,43 +118,6 @@ static void prvSetupHardware(void)
     SYSCFG_DL_init();
 }
 /*-----------------------------------------------------------*/
-
-// #if (configSUPPORT_STATIC_ALLOCATION == 1)
-// /*
-//  *  ======== vApplicationGetIdleTaskMemory ========
-//  *  When static allocation is enabled, the app must provide this callback
-//  *  function for use by the Idle task.
-//  */
-// void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer,
-//     StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize)
-// {
-//     static StaticTask_t xIdleTaskTCB;
-//     static StackType_t uxIdleTaskStack[configIDLE_TASK_STACK_DEPTH];
-
-//     *ppxIdleTaskTCBBuffer   = &xIdleTaskTCB;
-//     *ppxIdleTaskStackBuffer = uxIdleTaskStack;
-//     *pulIdleTaskStackSize   = configIDLE_TASK_STACK_DEPTH;
-// }
-
-// #if (configUSE_TIMERS == 1)
-// /*
-//  *  ======== vApplicationGetTimerTaskMemory ========
-//  *  When static allocation is enabled, and timers are used, the app must provide
-//  *  this callback function for use by the Timer Service task.
-//  */
-// void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer,
-//     StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
-// {
-//     static StaticTask_t xTimerTaskTCB;
-//     static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
-
-//     *ppxTimerTaskTCBBuffer   = &xTimerTaskTCB;
-//     *ppxTimerTaskStackBuffer = uxTimerTaskStack;
-//     *pulTimerTaskStackSize   = configTIMER_TASK_STACK_DEPTH;
-// }
-// #endif
-
-// #endif
 
 #if (configCHECK_FOR_STACK_OVERFLOW)
 /*
@@ -136,8 +143,5 @@ vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
     }
 }
 #endif
-
-
-
 
 /*-----------------------------------------------------------*/

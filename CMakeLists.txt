@@ -141,6 +141,7 @@ file(GLOB_RECURSE APP_SOURCES_RECURSE
         "${CMAKE_CURRENT_SOURCE_DIR}/APP/*.c"
         #"${CMAKE_CURRENT_SOURCE_DIR}/APP/*.s"
         "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/SEGGER/*.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/SYSVIEWFreeRTOSV11/*.c"
 )
 
 # 添加启动文件（特殊）
@@ -180,6 +181,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 include_sub_directories_recursively(${CMAKE_CURRENT_SOURCE_DIR}/BSP)
 include_sub_directories_recursively(${CMAKE_CURRENT_SOURCE_DIR}/APP)
 include_sub_directories_recursively(${CMAKE_CURRENT_SOURCE_DIR}/Core)
+include_sub_directories_recursively(${CMAKE_CURRENT_SOURCE_DIR}/Vendor/SYSVIEWFreeRTOSV11)
 # 也可以包含 Vendor/mspm0_sdk 下的某些目录，但可能会很多，建议只包含必要的，或者按需添加。
 # 如果您的代码引用了 mspm0_sdk 内部头文件，可以递归包含它，但会拉入很多。
 # 这里我们保守一些，只包含上面已列出的。

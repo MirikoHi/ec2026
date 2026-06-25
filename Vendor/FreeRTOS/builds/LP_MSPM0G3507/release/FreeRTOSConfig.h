@@ -43,6 +43,8 @@
 #ifndef FREERTOS_CONFIG_H
 #define FREERTOS_CONFIG_H
 
+#include "SEGGER_SYSVIEW_FreeRTOS.h"
+
 /******************************************************************************/
 /* Hardware description related definitions. **********************************/
 /******************************************************************************/
@@ -52,7 +54,7 @@
  * The default value is set to 32MHz and matches the QEMU demo settings.  Your
  * application will certainly need a different value so set this correctly.
  * This is very often, but not always, equal to the main system clock frequency. */
-#define configCPU_CLOCK_HZ    ( ( unsigned long ) 32000000 )
+#define configCPU_CLOCK_HZ    ( ( unsigned long ) 80000000 )
 
 /* configSYSTICK_CLOCK_HZ is an optional parameter for ARM Cortex-M ports only.
  *
@@ -404,7 +406,7 @@
  * build.  The application writer is responsible for providing the hook function
  * for any set to 1.  See https://www.freertos.org/a00016.html. */
 #define configUSE_IDLE_HOOK                   0
-#define configUSE_TICK_HOOK                   0
+#define configUSE_TICK_HOOK                   1
 #define configUSE_MALLOC_FAILED_HOOK          0
 #define configUSE_DAEMON_TASK_STARTUP_HOOK    0
 
@@ -603,7 +605,7 @@
 #define INCLUDE_xTaskGetSchedulerState         1
 #define INCLUDE_xTaskGetCurrentTaskHandle      1
 #define INCLUDE_uxTaskGetStackHighWaterMark    0
-#define INCLUDE_xTaskGetIdleTaskHandle         0
+#define INCLUDE_xTaskGetIdleTaskHandle         1
 #define INCLUDE_eTaskGetState                  1
 #define INCLUDE_xEventGroupSetBitFromISR       1
 #define INCLUDE_xTimerPendFunctionCall         0

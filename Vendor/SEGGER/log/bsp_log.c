@@ -7,7 +7,9 @@
 
 void BSPLogInit()
 {
-    SEGGER_RTT_Init();
+    if (_SEGGER_RTT.acID[0] != 'S') {
+        SEGGER_RTT_Init();
+    }
 }
 
 int PrintLog(const char *fmt, ...)
@@ -31,4 +33,3 @@ void Float2Str(char *str, float va)
     else
         sprintf(str, "%d.%d", head, point);
 }
-
