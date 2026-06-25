@@ -14,7 +14,7 @@
 #include "misc.h"
 #include "IMU.h"
 chassis_cmd_q chassis_cmd_receive={0};
-DCMotorInstance *motor_l,*motor_r;
+//DCMotorInstance *motor_l,*motor_r;
 Chassis_Move_State_e Chassis_Move_State;
 float trace_dt;
 float trace_starttime;
@@ -65,7 +65,7 @@ void Chassis_Init(void)
 //		.feedforward = 85,
 	};
 	size_t free_heap = xPortGetFreeHeapSize();
-	motor_l = DCMotor_Init(&motor_l_config);
+	//motor_l = DCMotor_Init(&motor_l_config);
 	free_heap = xPortGetFreeHeapSize();
 	DCMotorInitConfig_s motor_r_config ={
 		.Input_Dir = MOTOR_NORMAL,
@@ -102,7 +102,7 @@ void Chassis_Init(void)
 		},
 //		.feedforward = 140,
 	};
-	motor_r = DCMotor_Init(&motor_r_config);
+	//motor_r = DCMotor_Init(&motor_r_config);
 	//PAW3395_Init();
 	IMU_init();
 	DWT_Delay(1);
@@ -124,8 +124,8 @@ void Chassis(void)
 			trace_starttime = DWT_GetTimeline_ms();
 			trace_compensation=Trace_task();
 			trace_dt = DWT_GetTimeline_ms() - trace_starttime;
-			DCMotor_SetTraceCompensation(motor_l,-trace_compensation);
-			DCMotor_SetTraceCompensation(motor_r,trace_compensation);
+			//DCMotor_SetTraceCompensation(motor_l,-trace_compensation);
+			//DCMotor_SetTraceCompensation(motor_r,trace_compensation);
 			Stop_Detect();
 			break;
 		case IMU_MODE:
@@ -151,13 +151,13 @@ void Motor_Cmd_CallBack(uint8_t i)
 {
 	if(i ==0)
 	{
-		DCMotor_Cmd(motor_l,ENABLE);
-		DCMotor_Cmd(motor_r,ENABLE);
+		// DCMotor_Cmd(motor_l,ENABLE);
+		// DCMotor_Cmd(motor_r,ENABLE);
 	}
 	else if(i == 1)
 	{
-		DCMotor_Cmd(motor_l,DISABLE);
-		DCMotor_Cmd(motor_r,DISABLE);
+		// DCMotor_Cmd(motor_l,DISABLE);
+		// DCMotor_Cmd(motor_r,DISABLE);
 	}
 	
 }
@@ -306,75 +306,75 @@ void Stop_Detect(void)
 {
 	if(Line_flag)
 		{
-				if((abs_out(motor_l->position_ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_ref-motor_r->position_measure)<0.008f))
-				{
-						stop_count++;
-						if(stop_count >= 40)
-						{
-								Line_flag = 0;
-								Stop_Flag = 1; //这个标志位可以用来判断是否执行下一阶段任务
-								stop_count = 0;
-								motor_l->State = DISABLE;
-								motor_r->State = DISABLE;
-//								ctrl_mode = MOTOR_CTRL_STOP;
-						}
-				}
-				else
-				{
-						Stop_Flag = 0;  
-						stop_count = 0;  
-				}
+// 				if((abs_out(motor_l->position_ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_ref-motor_r->position_measure)<0.008f))
+// 				{
+// 						stop_count++;
+// 						if(stop_count >= 40)
+// 						{
+// 								Line_flag = 0;
+// 								Stop_Flag = 1; //这个标志位可以用来判断是否执行下一阶段任务
+// 								stop_count = 0;
+// 								// motor_l->State = DISABLE;
+// 								// motor_r->State = DISABLE;
+// //								ctrl_mode = MOTOR_CTRL_STOP;
+// 						}
+// 				}
+// 				else
+// 				{
+// 						Stop_Flag = 0;
+// 						stop_count = 0;
+// 				}
 		}
 		if(Spin_start_flag)
 		{
 			spin_count++;
-			if(spin_count >= 200 &&(abs_out(motor_l->position_ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_ref-motor_r->position_measure)<0.008f))
-			{
-					Spin_start_flag = 0;
-					spin_count = 0;
-					Spin_succeed_flag = 1;  
-					motor_l->State = DISABLE;
-					motor_r->State = DISABLE;
-			}
+			// if(spin_count >= 200 &&(abs_out(motor_l->position_ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_ref-motor_r->position_measure)<0.008f))
+			// {
+			// 		Spin_start_flag = 0;
+			// 		spin_count = 0;
+			// 		Spin_succeed_flag = 1;
+			// 		// motor_l->State = DISABLE;
+			// 		// motor_r->State = DISABLE;
+			// }
 		}
 	
 }
 void Chassis_Set_Turn(void)
 {
-	motor_l->State = ENABLE;
-	motor_r->State = ENABLE;
-	Line_flag = 0;  //不进行巡线的补偿了
-	Stop_Flag = 0;   //执行转弯时，将直走完成的标志位清零. 即如果上一次是直行，
-	Spin_start_flag = 1;   
-	Spin_succeed_flag = 0;  
-	motor_l->encoder->total_count = 0;
-	motor_r->encoder->total_count = 0;
-	motor_l->position_pid.max_out = 0.08;
-	motor_l->position_pid.max_iout = 0.05;
-	motor_r->position_pid.max_out = 0.08;
-	motor_r->position_pid.max_iout = 0.05;
-	
-	motor_l->position_ref = -0.01;
-	motor_r->position_ref = 0.01;
+	// motor_l->State = ENABLE;
+	// motor_r->State = ENABLE;
+	// Line_flag = 0;  //不进行巡线的补偿了
+	// Stop_Flag = 0;   //执行转弯时，将直走完成的标志位清零. 即如果上一次是直行，
+	// Spin_start_flag = 1;
+	// Spin_succeed_flag = 0;
+	// motor_l->encoder->total_count = 0;
+	// motor_r->encoder->total_count = 0;
+	// motor_l->position_pid.max_out = 0.08;
+	// motor_l->position_pid.max_iout = 0.05;
+	// motor_r->position_pid.max_out = 0.08;
+	// motor_r->position_pid.max_iout = 0.05;
+	//
+	// motor_l->position_ref = -0.01;
+	// motor_r->position_ref = 0.01;
 	
 }
 void Chassis_Set_Line(float position)
 {
-	motor_l->State = ENABLE;
-	motor_r->State = ENABLE;
-	Line_flag = 1;   
-	Stop_Flag = 0;
-	Spin_start_flag = 0;
-	Spin_succeed_flag = 0; 	
-	motor_l->encoder->total_count = 0;
-	motor_r->encoder->total_count = 0;
-	motor_l->position_pid.max_out = 0.03;
-	motor_l->position_pid.max_iout = 0.0;
-	motor_r->position_pid.max_out = 0.03;
-	motor_r->position_pid.max_iout = 0.0;
-	
-	motor_l->position_ref = position;
-	motor_r->position_ref = position;
+	// motor_l->State = ENABLE;
+	// motor_r->State = ENABLE;
+	// Line_flag = 1;
+	// Stop_Flag = 0;
+	// Spin_start_flag = 0;
+	// Spin_succeed_flag = 0;
+	// motor_l->encoder->total_count = 0;
+	// motor_r->encoder->total_count = 0;
+	// motor_l->position_pid.max_out = 0.03;
+	// motor_l->position_pid.max_iout = 0.0;
+	// motor_r->position_pid.max_out = 0.03;
+	// motor_r->position_pid.max_iout = 0.0;
+	//
+	// motor_l->position_ref = position;
+	// motor_r->position_ref = position;
 }
 
 

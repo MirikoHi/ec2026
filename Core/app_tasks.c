@@ -117,13 +117,15 @@
 #define NRF24L01_PARAMETER (0x12UL)
 #define Gimbal_PARAMETER (0x13UL)
 #define StepMotor_PARAMETER (0x14UL)
+#define MotorTask_PARAMETER (0x15UL)
 
 #define KEY_TASK_STACK_DEPTH       192
 #define ROBOTCMD_TASK_STACK_DEPTH  256
 #define CHASSIS_TASK_STACK_DEPTH   384
 #define GIMBAL_TASK_STACK_DEPTH    256
-#define DAEMON_TASK_STACK_DEPTH    256
-#define MotorTask_PARAMETER (0x15UL)
+#define DAEMON_TASK_STACK_DEPTH    192
+#define MOTOR_TASK_STACK_DEPTH	   320
+
 /*-----------------------------------------------------------*/
 
 /* The tasks as described in the comments at the top of this file. */
@@ -209,7 +211,7 @@ void app_tasks_init(void)
             NULL);
 			configASSERT(xResult == pdPASS);
 
-			xResult=xTaskCreate(MotorTask, "Motor", 512,
+			xResult=xTaskCreate(MotorTask, "Motor", MOTOR_TASK_STACK_DEPTH,
             (void *) MotorTask_PARAMETER, tskIDLE_PRIORITY+2,
             NULL);
 			configASSERT(xResult == pdPASS);
