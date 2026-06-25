@@ -730,6 +730,14 @@ static void _SendSyncInfo(void) {
 static void _SendPacket(U8* pStartPacket, U8* pEndPacket, unsigned int EventId) {
   unsigned int  NumBytes;
   //
+  // Keep standard SystemView events only. This drops the verbose OS-definable
+  // FreeRTOS API enter/return packets (EventId >= 32) while preserving task
+  // scheduling/lifecycle events and the existing 1 kHz tick behavior.
+  //
+  if (EventId >= 32u) {
+    return;
+  }
+  //
   // Check if event is disabled from being recorded.
   //
   if (EventId < 32) {

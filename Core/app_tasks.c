@@ -211,7 +211,7 @@ void app_tasks_init(void)
 //			configASSERT(xResult == pdPASS);
 
 			free_heap = xPortGetFreeHeapSize();
-			LOGINFO("free heap: %u", (uint32_t)free_heap);
+			LOGWARNING("free heap: %u", (uint32_t)free_heap);
 //    /*
 //     * If all is well, the scheduler will now be running, and the following
 //     * line will never be reached.  If the following line does execute, then

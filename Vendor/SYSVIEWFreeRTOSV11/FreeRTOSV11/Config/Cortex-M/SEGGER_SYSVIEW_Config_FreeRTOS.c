@@ -97,6 +97,11 @@ void SEGGER_SYSVIEW_Conf(void) {
   SEGGER_SYSVIEW_Init(SYSVIEW_TIMESTAMP_FREQ, SYSVIEW_CPU_FREQ, 
                       &SYSVIEW_X_OS_TraceAPI, _cbSendSystemDesc);
   SEGGER_SYSVIEW_SetRAMBase(SYSVIEW_RAM_BASE);
+  SEGGER_SYSVIEW_DisableEvents(SYSVIEW_EVTMASK_ALL_INTERRUPTS
+                             | SYSVIEW_EVTMASK_END_CALL
+                             | SYSVIEW_EVTMASK_SYSTIME_CYCLES
+                             | SYSVIEW_EVTMASK_SYSTIME_US
+                             | SYSVIEW_EVTMASK_PRINT_FORMATTED);
 
 #if SEGGER_SYSVIEW_START_ON_INIT
   SEGGER_SYSVIEW_Start();

@@ -58,10 +58,11 @@
  */
 static void prvSetupHardware(void);
 
-static volatile U32 ulSysViewTickBase;
+static volatile U32 ulSysViewTickBaseCycles;
+static U32 ulSysViewLastTimestamp;
 
 void vApplicationTickHook(void) {
-    ulSysViewTickBase += (SysTick->LOAD + 1U);
+    ulSysViewTickBaseCycles += (SysTick->LOAD + 1U);
 }
 
 /*********************************************************************
@@ -71,19 +72,28 @@ void vApplicationTickHook(void) {
 *    Returns a monotonic timestamp in CPU cycles.
 */
 U32 SEGGER_SYSVIEW_X_GetTimestamp(void) {
-    U32 base;
-    U32 base_check;
+    U32 base_cycles;
+    U32 base_cycles_check;
     U32 systick_val;
     U32 cycles_per_tick;
+    U32 timestamp_cycles;
 
     do {
-        base = ulSysViewTickBase;
+        base_cycles = ulSysViewTickBaseCycles;
         systick_val = SysTick->VAL;
-        base_check = ulSysViewTickBase;
-    } while (base != base_check);
+        base_cycles_check = ulSysViewTickBaseCycles;
+    } while (base_cycles != base_cycles_check);
 
     cycles_per_tick = SysTick->LOAD + 1U;
-    return base + (cycles_per_tick - systick_val);
+    timestamp_cycles = base_cycles + (cycles_per_tick - systick_val);
+
+    if (timestamp_cycles < ulSysViewLastTimestamp) {
+        timestamp_cycles = ulSysViewLastTimestamp;
+    } else {
+        ulSysViewLastTimestamp = timestamp_cycles;
+    }
+
+    return timestamp_cycles;
 }
 
 /*********************************************************************
@@ -105,7 +115,6 @@ int main(void)
     SEGGER_RTT_Init();
     LOGINFO("Hardware init");
     SEGGER_SYSVIEW_Conf();
-    SEGGER_SYSVIEW_Start();
     LOGINFO("systemview start");
 		Robot_Init();
     LOGERROR("unknow error");
