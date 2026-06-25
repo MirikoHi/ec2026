@@ -327,6 +327,41 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define Gray_Address_PIN_2_IOMUX                                 (IOMUX_PINCM52)
 
 
+/* Defines for MCAN0 */
+#define MCAN0_INST                                                        CANFD0
+#define GPIO_MCAN0_CAN_TX_PORT                                             GPIOA
+#define GPIO_MCAN0_CAN_TX_PIN                                     DL_GPIO_PIN_12
+#define GPIO_MCAN0_IOMUX_CAN_TX                                  (IOMUX_PINCM34)
+#define GPIO_MCAN0_IOMUX_CAN_TX_FUNC               IOMUX_PINCM34_PF_CANFD0_CANTX
+#define GPIO_MCAN0_CAN_RX_PORT                                             GPIOA
+#define GPIO_MCAN0_CAN_RX_PIN                                     DL_GPIO_PIN_13
+#define GPIO_MCAN0_IOMUX_CAN_RX                                  (IOMUX_PINCM35)
+#define GPIO_MCAN0_IOMUX_CAN_RX_FUNC               IOMUX_PINCM35_PF_CANFD0_CANRX
+#define MCAN0_INST_IRQHandler                                 CANFD0_IRQHandler
+#define MCAN0_INST_INT_IRQN                                     CANFD0_INT_IRQn
+
+
+/* Defines for MCAN0 MCAN RAM configuration */
+#define MCAN0_INST_MCAN_STD_ID_FILT_START_ADDR     (0)
+#define MCAN0_INST_MCAN_STD_ID_FILTER_NUM          (1)
+#define MCAN0_INST_MCAN_EXT_ID_FILT_START_ADDR     (48)
+#define MCAN0_INST_MCAN_EXT_ID_FILTER_NUM          (1)
+#define MCAN0_INST_MCAN_TX_BUFF_START_ADDR         (148)
+#define MCAN0_INST_MCAN_TX_BUFF_SIZE               (2)
+#define MCAN0_INST_MCAN_FIFO_1_START_ADDR          (192)
+#define MCAN0_INST_MCAN_FIFO_1_NUM                 (2)
+#define MCAN0_INST_MCAN_TX_EVENT_START_ADDR        (164)
+#define MCAN0_INST_MCAN_TX_EVENT_SIZE              (2)
+#define MCAN0_INST_MCAN_EXT_ID_AND_MASK            (0x1FFFFFFFU)
+#define MCAN0_INST_MCAN_RX_BUFF_START_ADDR         (208)
+#define MCAN0_INST_MCAN_FIFO_0_START_ADDR          (172)
+#define MCAN0_INST_MCAN_FIFO_0_NUM                 (3)
+
+#define MCAN0_INST_MCAN_INTERRUPTS (DL_MCAN_INTERRUPT_RF0N)
+
+
+
+
 /* clang-format on */
 
 void SYSCFG_DL_init(void);
@@ -345,6 +380,7 @@ void SYSCFG_DL_K230_init(void);
 void SYSCFG_DL_ICM42688_init(void);
 void SYSCFG_DL_ADC1_init(void);
 
+void SYSCFG_DL_MCAN0_init(void);
 
 bool SYSCFG_DL_saveConfiguration(void);
 bool SYSCFG_DL_restoreConfiguration(void);

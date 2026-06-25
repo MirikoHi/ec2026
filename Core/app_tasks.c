@@ -81,6 +81,7 @@
 #include "NRF24L01.h"
 #include "Gimbal.h"
 #include "ZDT_Motor.h"
+#include "motor_task.h"
 /* TI includes. */
 #include "ti_msp_dl_config.h"
 
@@ -122,6 +123,7 @@
 #define CHASSIS_TASK_STACK_DEPTH   384
 #define GIMBAL_TASK_STACK_DEPTH    256
 #define DAEMON_TASK_STACK_DEPTH    256
+#define MotorTask_PARAMETER (0x15UL)
 /*-----------------------------------------------------------*/
 
 /* The tasks as described in the comments at the top of this file. */
@@ -136,6 +138,7 @@ static void DaemonTask(void *pvParameters);
 static void NRF24L01Task(void *pvParameters);
 static void GimbalTask(void *pvParameters);
 static void StepMotorTask(void *pvParameters);
+static void MotorTask(void *pvParameters);
 /* Called by Robot_Init() to create all application tasks.
  * Defined in APP/app_tasks.h */
 /*-----------------------------------------------------------*/
@@ -203,6 +206,11 @@ void app_tasks_init(void)
 
 			xResult=xTaskCreate(GimbalTask, "Gimbal", GIMBAL_TASK_STACK_DEPTH,
             (void *) Gimbal_PARAMETER, tskIDLE_PRIORITY+2,
+            NULL);
+			configASSERT(xResult == pdPASS);
+
+			xResult=xTaskCreate(MotorTask, "Motor", 512,
+            (void *) MotorTask_PARAMETER, tskIDLE_PRIORITY+2,
             NULL);
 			configASSERT(xResult == pdPASS);
 
@@ -442,9 +450,17 @@ static void DaemonTask(void *pvParameters)
 	vTaskDelay(1000);
 	static float Daemon_dt;
   static float Daemon_start;
+  static uint16_t led_tick = 0;
 	for (;;){
 			Daemon_start = DWT_GetTimeline_ms();
 			Daemon_Task();
+			
+			/* 修改：PA14 引脚做 LED 闪烁指示 (每500ms翻转一次即1Hz闪烁) */
+			if (++led_tick >= 50) {
+				led_tick = 0;
+				DL_GPIO_togglePins(GPIOA, DL_GPIO_PIN_14);
+			}
+
 			Daemon_dt = DWT_GetTimeline_ms() - Daemon_start;
 			if (Daemon_dt > 10)
           LOGERROR("[freeRTOS] Daemon Task is being DELAY! dt = [%f]", Daemon_dt);
@@ -452,26 +468,47 @@ static void DaemonTask(void *pvParameters)
 			
 		}
 }
+//
+// static void NRF24L01Task(void *pvParameters)
+// {
+// 	configASSERT(
+//         ((unsigned long) pvParameters) == NRF24L01_PARAMETER);
+// 	NRF24L01_Init();
+// 	vTaskDelay(1000);
+// 	static float NRF24L01_dt;
+//   static float NRF24L01_start;
+// 	for (;;){
+// 			NRF24L01_start = DWT_GetTimeline_ms();
+//
+// 			NRF24L01_Task();
+//
+// 			NRF24L01_dt = DWT_GetTimeline_ms() - NRF24L01_start;
+// 			if (NRF24L01_dt > 1)
+//           LOGERROR("[freeRTOS] NRF24L01 Task is being DELAY! dt = [%f]", &NRF24L01_dt);
+//
+// 			vTaskDelay(pdMS_TO_TICKS(1));
+//
+// 		}
+// }
+/*-----------------------------------------------------------*/
 
-static void NRF24L01Task(void *pvParameters)
+/**
+ * @brief 电机运行任务，目前以500Hz频率运行
+ * @param pvParameters
+ */
+static void MotorTask(void *pvParameters)
 {
 	configASSERT(
-        ((unsigned long) pvParameters) == NRF24L01_PARAMETER);
-	NRF24L01_Init();
+        ((unsigned long) pvParameters) == MotorTask_PARAMETER);
 	vTaskDelay(1000);
-	static float NRF24L01_dt;
-  static float NRF24L01_start;
+	static float Motor_dt;
+	static float Motor_start;
 	for (;;){
-			NRF24L01_start = DWT_GetTimeline_ms();
-			
-			NRF24L01_Task();
-			
-			NRF24L01_dt = DWT_GetTimeline_ms() - NRF24L01_start;
-			if (NRF24L01_dt > 1)
-          LOGERROR("[freeRTOS] NRF24L01 Task is being DELAY! dt = [%f]", NRF24L01_dt);
-			
-			vTaskDelay(pdMS_TO_TICKS(1));
-			
+			Motor_start = DWT_GetTimeline_ms();
+			MotorControlTask();
+			Motor_dt = DWT_GetTimeline_ms() - Motor_start;
+			if (Motor_dt > 2)
+	          LOGERROR("[freeRTOS] Motor Task is being DELAY! dt = [%f]", &Motor_dt);
+			vTaskDelay(pdMS_TO_TICKS(2));
 		}
 }
-/*-----------------------------------------------------------*/
