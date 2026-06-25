@@ -116,6 +116,12 @@
 #define NRF24L01_PARAMETER (0x12UL)
 #define Gimbal_PARAMETER (0x13UL)
 #define StepMotor_PARAMETER (0x14UL)
+
+#define KEY_TASK_STACK_DEPTH       192
+#define ROBOTCMD_TASK_STACK_DEPTH  192
+#define CHASSIS_TASK_STACK_DEPTH   320
+#define GIMBAL_TASK_STACK_DEPTH    192
+#define DAEMON_TASK_STACK_DEPTH    192
 /*-----------------------------------------------------------*/
 
 /* The tasks as described in the comments at the top of this file. */
@@ -165,7 +171,7 @@ void app_tasks_init(void)
         /* Start the tasks. */
     }
 	
-			xResult=xTaskCreate(KeyTask, "Key", configMINIMAL_STACK_SIZE,
+			xResult=xTaskCreate(KeyTask, "Key", KEY_TASK_STACK_DEPTH,
             (void *) Key_PARAMETER, tskIDLE_PRIORITY+1,
             NULL);
 			configASSERT(xResult == pdPASS);
@@ -185,22 +191,22 @@ void app_tasks_init(void)
 //            NULL);
 //			configASSERT(xResult == pdPASS);	
 
-			xResult=xTaskCreate(RobotCmdTask, "RobotCmd", configMINIMAL_STACK_SIZE,
+			xResult=xTaskCreate(RobotCmdTask, "RobotCmd", ROBOTCMD_TASK_STACK_DEPTH,
             (void *) RobotCmd_PARAMETER, tskIDLE_PRIORITY+2,
             NULL);
 			configASSERT(xResult == pdPASS);
 
-			xResult=xTaskCreate(ChassisTask, "Chassis", 256,
+			xResult=xTaskCreate(ChassisTask, "Chassis", CHASSIS_TASK_STACK_DEPTH,
             (void *) Chassis_PARAMETER, tskIDLE_PRIORITY+2,
             NULL);
 			configASSERT(xResult == pdPASS);
 
-			xResult=xTaskCreate(GimbalTask, "Gimbal", 128,
+			xResult=xTaskCreate(GimbalTask, "Gimbal", GIMBAL_TASK_STACK_DEPTH,
             (void *) Gimbal_PARAMETER, tskIDLE_PRIORITY+2,
             NULL);
 			configASSERT(xResult == pdPASS);
 
-			xResult=xTaskCreate(DaemonTask, "Daemon", configMINIMAL_STACK_SIZE,
+			xResult=xTaskCreate(DaemonTask, "Daemon", DAEMON_TASK_STACK_DEPTH,
             (void *) Daemon_PARAMETER, tskIDLE_PRIORITY,
             NULL);
 			configASSERT(xResult == pdPASS);

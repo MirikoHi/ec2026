@@ -147,7 +147,12 @@ void __attribute__((weak))
 vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
 #endif
 {
-    /* default to spin upon stack overflow */
+    (void)pxTask;
+    SEGGER_RTT_WriteString(0, "\r\n[FreeRTOS] Stack overflow detected in task: ");
+    SEGGER_RTT_WriteString(0, pcTaskName != NULL ? pcTaskName : "(unnamed)");
+    SEGGER_RTT_WriteString(0, "\r\n");
+
+    __disable_irq();
     while (1) {
     }
 }
