@@ -3,6 +3,7 @@
 
 #include "SEGGER_RTT.h"
 #include "SEGGER_RTT_Conf.h"
+#include <stdarg.h>
 #include <stdio.h>
 
 #define BUFFER_INDEX 0
@@ -12,17 +13,15 @@
  *
  */
 void BSPLogInit();
+int BSPLogPrintf(const char *type, const char *color, const char *fmt, ...);
+int BSPLogVPrintf(const char *type, const char *color, const char *fmt, va_list args);
 
 /**
  * @brief 日志功能原型,供下面的LOGI,LOGW,LOGE等使用
  *
  */
-#define LOG_PROTO(type, color, format, ...)                       \
-        SEGGER_RTT_printf(BUFFER_INDEX, "  %s%s" format "\r\n%s", \
-                          color,                                  \
-                          type,                                   \
-                          ##__VA_ARGS__,                          \
-                          RTT_CTRL_RESET)
+#define LOG_PROTO(type, color, format, ...) \
+        BSPLogPrintf(type, color, format, ##__VA_ARGS__)
 
 /*----------------------------------------下面是日志输出的接口-------------------------------------------------*/
 

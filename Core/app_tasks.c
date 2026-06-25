@@ -306,7 +306,7 @@ static void KeyTask(void *pvParameters)
 			Key_Tick();
 			Key_dt = DWT_GetTimeline_ms() - Key_start;
 			if (Key_dt > 1)
-            LOGERROR("[freeRTOS] Key Task is being DELAY! dt = [%f]", &Key_dt);
+            LOGERROR("[freeRTOS] Key Task is being DELAY! dt = [%f]", Key_dt);
 			task_count++;
 			if(task_count>=100)
 			{
@@ -331,7 +331,7 @@ static void TraceTask(void *pvParameters)
 			Trace_task();
 			Trace_dt = DWT_GetTimeline_ms() - Trace_start;
 			if (Trace_dt > 5)
-            LOGERROR("[freeRTOS] Trace Task is being DELAY! dt = [%f]", &Trace_dt);
+            LOGERROR("[freeRTOS] Trace Task is being DELAY! dt = [%f]", Trace_dt);
 			vTaskDelay(pdMS_TO_TICKS(5));
 			
 		}
@@ -351,7 +351,7 @@ static void HwMotorTask(void *pvParameters)
 			Hw_Motor_Task();
 			DCMotor_dt = DWT_GetTimeline_ms() - DCMotor_start;
 			if (DCMotor_dt > Control_Period)
-            LOGERROR("[freeRTOS] DCMotor Task is being DELAY! dt = [%f]", &DCMotor_dt);
+            LOGERROR("[freeRTOS] DCMotor Task is being DELAY! dt = [%f]", DCMotor_dt);
 			vTaskDelay(pdMS_TO_TICKS(Control_Period));//Control_Period
 			
 		}
@@ -369,7 +369,7 @@ static void StepMotorTask(void *pvParameters)
 			ZDT_Motor();
 			StepMotor_dt = DWT_GetTimeline_ms() - StepMotor_start;
 			if (StepMotor_dt > Control_Period)
-            LOGERROR("[freeRTOS] StepMotor Task is being DELAY! dt = [%f]", &StepMotor_dt);
+            LOGERROR("[freeRTOS] StepMotor Task is being DELAY! dt = [%f]", StepMotor_dt);
 
 			vTaskDelay(pdMS_TO_TICKS(1));
 			
@@ -387,7 +387,7 @@ static void RobotCmdTask(void *pvParameters)
 			Robot_Cmd();
 			RobotCmd_dt = DWT_GetTimeline_ms() - RobotCmd_start;
 			if (RobotCmd_dt > 5)
-          LOGERROR("[freeRTOS] RobotCmd Task is being DELAY! dt = [%f]", &RobotCmd_dt);
+          LOGERROR("[freeRTOS] RobotCmd Task is being DELAY! dt = [%f]", RobotCmd_dt);
 			vTaskDelay(pdMS_TO_TICKS(5));
 			
 		}
@@ -405,7 +405,7 @@ static void ChassisTask(void *pvParameters)
 			Chassis();
 			Chassis_dt = DWT_GetTimeline_ms() - Chassis_start;
 			if (Chassis_dt > 5)
-          LOGERROR("[freeRTOS] Chassis Task is being DELAY! dt = [%f]", &Chassis_dt);
+          LOGERROR("[freeRTOS] Chassis Task is being DELAY! dt = [%f]", Chassis_dt);
 			vTaskDelay(pdMS_TO_TICKS(5));
 			
 		}
@@ -424,7 +424,7 @@ static void GimbalTask(void *pvParameters)
 			Gimbal();
 			Gimbal_dt = DWT_GetTimeline_ms() - Gimbal_start;
 			if (Gimbal_dt > 5)
-          LOGERROR("[freeRTOS] Gimbal Task is being DELAY! dt = [%f]", &Gimbal_dt);
+          LOGERROR("[freeRTOS] Gimbal Task is being DELAY! dt = [%f]", Gimbal_dt);
 			vTaskDelay(pdMS_TO_TICKS(5));
 			
 		}
@@ -441,7 +441,7 @@ static void DaemonTask(void *pvParameters)
 			Daemon_Task();
 			Daemon_dt = DWT_GetTimeline_ms() - Daemon_start;
 			if (Daemon_dt > 10)
-          LOGERROR("[freeRTOS] Daemon Task is being DELAY! dt = [%f]", &Daemon_dt);
+          LOGERROR("[freeRTOS] Daemon Task is being DELAY! dt = [%f]", Daemon_dt);
 			vTaskDelay(pdMS_TO_TICKS(10));
 			
 		}
@@ -462,7 +462,7 @@ static void NRF24L01Task(void *pvParameters)
 			
 			NRF24L01_dt = DWT_GetTimeline_ms() - NRF24L01_start;
 			if (NRF24L01_dt > 1)
-          LOGERROR("[freeRTOS] NRF24L01 Task is being DELAY! dt = [%f]", &NRF24L01_dt);
+          LOGERROR("[freeRTOS] NRF24L01 Task is being DELAY! dt = [%f]", NRF24L01_dt);
 			
 			vTaskDelay(pdMS_TO_TICKS(1));
 			
