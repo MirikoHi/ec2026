@@ -101,7 +101,10 @@ void SEGGER_SYSVIEW_Conf(void) {
                              | SYSVIEW_EVTMASK_END_CALL
                              | SYSVIEW_EVTMASK_SYSTIME_CYCLES
                              | SYSVIEW_EVTMASK_SYSTIME_US
-                             | SYSVIEW_EVTMASK_PRINT_FORMATTED);
+                             | SYSVIEW_EVTMASK_PRINT_FORMATTED
+                             | SYSVIEW_EVTMASK_TASK_START_READY
+                             | SYSVIEW_EVTMASK_TASK_STOP_READY
+                             | SYSVIEW_EVTMASK_STACK_INFO);
 
 #if SEGGER_SYSVIEW_START_ON_INIT
   SEGGER_SYSVIEW_Start();
