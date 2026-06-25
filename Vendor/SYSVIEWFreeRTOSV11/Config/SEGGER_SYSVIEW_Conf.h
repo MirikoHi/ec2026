@@ -59,6 +59,7 @@ Additional information:
 */
 #define SEGGER_SYSVIEW_APP_NAME                 "MSPM03507 Application"
 #define SEGGER_SYSVIEW_DEVICE_NAME              "Cortex-M0+"
+#define SEGGER_SYSVIEW_RTT_BUFFER_SIZE 4096
 
 #endif  // SEGGER_SYSVIEW_CONF_H
 

@@ -38,6 +38,7 @@
 /* Standard includes. */
 #include <stdio.h>
 #include "SEGGER_SYSVIEW.h"
+#include "SEGGER_RTT.h"
 
 /* Kernel includes. */
 #include "FreeRTOS.h"
@@ -57,33 +58,42 @@
  */
 static void prvSetupHardware(void);
 
-/* 全局 64 位计数器（用于 SystemView 时间戳） */
-volatile uint64_t sysview_tick_count = 0;
+static volatile U32 ulSysViewTickBase;
 
-// /* Tick Hook：每个 tick 中断都会调用（在 xTaskIncrementTick 之后） */
-// void vApplicationTickHook( void )
-// {
-//     // 每次 tick，高 32 位加 1
-//     sysview_tick_count += 0x100000000ULL;
-// }
+void vApplicationTickHook(void) {
+    ulSysViewTickBase += (SysTick->LOAD + 1U);
+}
+
 /*********************************************************************
 *       SEGGER_SYSVIEW_X_GetTimestamp
 *
 *  Function description
-*    Returns the current timestamp in ticks using the SysTick counter.
+*    Returns a monotonic timestamp in CPU cycles.
 */
 U32 SEGGER_SYSVIEW_X_GetTimestamp(void) {
-    U64 ts;
-    U32 cnt_now;
+    U32 base;
+    U32 base_check;
+    U32 systick_val;
+    U32 cycles_per_tick;
 
-    // // 1. 读取当前的 SysTick 计数值
-    // cnt_now = SysTick->VAL;
-    //
-    // // 2. 组合成64位时间戳 (高32位 + 低32位)
-    // //    注意：此处无需关中断，因为此函数本身就在中断屏蔽状态下被调用。
-    // ts = sysview_tick_count + (SysTick->LOAD - cnt_now);
+    do {
+        base = ulSysViewTickBase;
+        systick_val = SysTick->VAL;
+        base_check = ulSysViewTickBase;
+    } while (base != base_check);
 
-    return SysTick->VAL;
+    cycles_per_tick = SysTick->LOAD + 1U;
+    return base + (cycles_per_tick - systick_val);
+}
+
+/*********************************************************************
+*       SEGGER_SYSVIEW_X_GetInterruptId
+*
+*  Function description
+*    Returns the currently active exception number on Cortex-M0+.
+*/
+U32 SEGGER_SYSVIEW_X_GetInterruptId(void) {
+    return __get_IPSR();
 }
 
 /*-----------------------------------------------------------*/
@@ -92,6 +102,7 @@ int main(void)
 {
     /* Prepare the hardware to run this demo. */
     prvSetupHardware();
+    SEGGER_RTT_Init();
     LOGINFO("Hardware init");
     SEGGER_SYSVIEW_Conf();
     SEGGER_SYSVIEW_Start();
@@ -107,43 +118,6 @@ static void prvSetupHardware(void)
     SYSCFG_DL_init();
 }
 /*-----------------------------------------------------------*/
-
-// #if (configSUPPORT_STATIC_ALLOCATION == 1)
-// /*
-//  *  ======== vApplicationGetIdleTaskMemory ========
-//  *  When static allocation is enabled, the app must provide this callback
-//  *  function for use by the Idle task.
-//  */
-// void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer,
-//     StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize)
-// {
-//     static StaticTask_t xIdleTaskTCB;
-//     static StackType_t uxIdleTaskStack[configIDLE_TASK_STACK_DEPTH];
-
-//     *ppxIdleTaskTCBBuffer   = &xIdleTaskTCB;
-//     *ppxIdleTaskStackBuffer = uxIdleTaskStack;
-//     *pulIdleTaskStackSize   = configIDLE_TASK_STACK_DEPTH;
-// }
-
-// #if (configUSE_TIMERS == 1)
-// /*
-//  *  ======== vApplicationGetTimerTaskMemory ========
-//  *  When static allocation is enabled, and timers are used, the app must provide
-//  *  this callback function for use by the Timer Service task.
-//  */
-// void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer,
-//     StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
-// {
-//     static StaticTask_t xTimerTaskTCB;
-//     static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
-
-//     *ppxTimerTaskTCBBuffer   = &xTimerTaskTCB;
-//     *ppxTimerTaskStackBuffer = uxTimerTaskStack;
-//     *pulTimerTaskStackSize   = configTIMER_TASK_STACK_DEPTH;
-// }
-// #endif
-
-// #endif
 
 #if (configCHECK_FOR_STACK_OVERFLOW)
 /*
@@ -169,8 +143,5 @@ vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
     }
 }
 #endif
-
-
-
 
 /*-----------------------------------------------------------*/
