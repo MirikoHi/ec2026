@@ -118,12 +118,14 @@
 #define Gimbal_PARAMETER (0x13UL)
 #define StepMotor_PARAMETER (0x14UL)
 #define MotorTask_PARAMETER (0x15UL)
+#define Menu_PARAMETER       (0x16UL)
 
-#define KEY_TASK_STACK_DEPTH       192
+#define KEY_TASK_STACK_DEPTH       160
+#define MENU_TASK_STACK_DEPTH      256
 #define ROBOTCMD_TASK_STACK_DEPTH  256
 #define CHASSIS_TASK_STACK_DEPTH   384
-#define GIMBAL_TASK_STACK_DEPTH    256
-#define DAEMON_TASK_STACK_DEPTH    192
+#define GIMBAL_TASK_STACK_DEPTH    192
+#define DAEMON_TASK_STACK_DEPTH    160
 #define MOTOR_TASK_STACK_DEPTH	   320
 
 /*-----------------------------------------------------------*/
@@ -141,6 +143,7 @@ static void NRF24L01Task(void *pvParameters);
 static void GimbalTask(void *pvParameters);
 static void StepMotorTask(void *pvParameters);
 static void MotorTask(void *pvParameters);
+static void MenuTask(void *pvParameters);
 /* Called by Robot_Init() to create all application tasks.
  * Defined in APP/app_tasks.h */
 /*-----------------------------------------------------------*/
@@ -211,13 +214,18 @@ void app_tasks_init(void)
             NULL);
 			configASSERT(xResult == pdPASS);
 
-			xResult=xTaskCreate(MotorTask, "Motor", MOTOR_TASK_STACK_DEPTH,
-            (void *) MotorTask_PARAMETER, tskIDLE_PRIORITY+2,
-            NULL);
-			configASSERT(xResult == pdPASS);
+			// xResult=xTaskCreate(MotorTask, "Motor", MOTOR_TASK_STACK_DEPTH,
+   //          (void *) MotorTask_PARAMETER, tskIDLE_PRIORITY+2,
+   //          NULL);
+			// configASSERT(xResult == pdPASS);
 
 			xResult=xTaskCreate(DaemonTask, "Daemon", DAEMON_TASK_STACK_DEPTH,
             (void *) Daemon_PARAMETER, tskIDLE_PRIORITY,
+            NULL);
+			configASSERT(xResult == pdPASS);
+
+			xResult=xTaskCreate(MenuTask, "Menu", MENU_TASK_STACK_DEPTH,
+            (void *) Menu_PARAMETER, tskIDLE_PRIORITY + 1,
             NULL);
 			configASSERT(xResult == pdPASS);
 
@@ -312,9 +320,8 @@ static void KeyTask(void *pvParameters)
     configASSERT(
         ((unsigned long) pvParameters) == Key_PARAMETER);
 	vTaskDelay(1000);
-		static float Key_dt;
+	static float Key_dt;
     static float Key_start;
-		static uint8_t task_count;
 		for (;;){
 			
 			Key_start = DWT_GetTimeline_ms();
@@ -323,13 +330,6 @@ static void KeyTask(void *pvParameters)
 			Key_dt = DWT_GetTimeline_ms() - Key_start;
 			if (Key_dt > 1)
             LOGERROR("[freeRTOS] Key Task is being DELAY! dt = [%f]", Key_dt);
-			task_count++;
-			if(task_count>=100)
-			{
-				task_count=0;
-				menu_task();
-				//uint8_t cost=sizeof(MenuInstance);
-			}
 			vTaskDelay(pdMS_TO_TICKS(1));
 			
 		}
@@ -513,4 +513,29 @@ static void MotorTask(void *pvParameters)
 	          LOGERROR("[freeRTOS] Motor Task is being DELAY! dt = [%f]", &Motor_dt);
 			vTaskDelay(pdMS_TO_TICKS(2));
 		}
+}
+
+/**
+ * @brief 菜单显示任务，以 10Hz 频率刷新 OLED 菜单界面
+ */
+static void MenuTask(void *pvParameters)
+{
+    configASSERT(
+        ((unsigned long) pvParameters) == Menu_PARAMETER);
+    vTaskDelay(1000);
+
+    static float Menu_dt;
+    static float Menu_start;
+    TickType_t xNextWakeTime = xTaskGetTickCount();
+
+    for (;;) {
+        Menu_start = DWT_GetTimeline_ms();
+        menu_task();
+        Menu_dt = DWT_GetTimeline_ms() - Menu_start;
+        if (Menu_dt > 10)
+            LOGERROR("[freeRTOS] Menu Task is being DELAY! dt = [%f]", &Menu_dt);
+
+    	//10Hz固定频率刷新屏幕显示
+        vTaskDelayUntil(&xNextWakeTime, pdMS_TO_TICKS(100));
+    }
 }

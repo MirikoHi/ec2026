@@ -14,6 +14,9 @@ uint8_t Key_Flag[KEY_COUNT];
 
 
 
+/**
+ * @brief 读取指定按键当前电平状态，低电平表示按下
+ */
 uint8_t Key_GetState(uint8_t n)
 {
 	if(n == 0)
@@ -47,6 +50,9 @@ uint8_t Key_GetState(uint8_t n)
 	return KEY_UNPRESSED;	
 }
 
+/**
+ * @brief 查询按键事件标志，非保持类事件读取后会自动清除
+ */
 uint8_t Key_Check(uint8_t n,uint8_t Flag)
 {
 		if(Key_Flag[n] & Flag)
@@ -62,6 +68,9 @@ uint8_t Key_Check(uint8_t n,uint8_t Flag)
 
 
 
+/**
+ * @brief 按键扫描任务,周期性更新按键状态、消抖及单双击/长按/连发事件
+ */
 void Key_Tick(void)
 {
 		static uint8_t Count,i;
@@ -159,6 +168,10 @@ void Key_Tick(void)
 		}
 	}
 }
+/**
+ *  @brief 清除所有按键事件标志
+ * 
+ */
 void Key_ClearAllFlags(void)
 {
     for(uint8_t i = 0; i < KEY_COUNT; i++) 
@@ -166,7 +179,6 @@ void Key_ClearAllFlags(void)
         Key_Flag[i] = 0;  
     }
 }
-
 
 
 

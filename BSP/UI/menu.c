@@ -1,3 +1,18 @@
+/**
+ * @file    menu.c
+ * @brief   多级OLED菜单系统实现
+ * @details 实现了基于递归初始化的多级菜单框架，支持导航（前/后/上/下）、
+ *          动态翻页（菜单项>4时）以及回调函数绑定。菜单通过 FreeRTOS 任务
+ *          menu_task() 周期轮询按键输入。
+ *
+ *          菜单数据结构说明：
+ *          - MenuInitConfig_s：静态配置结构体，编译期定义菜单层级与回调
+ *          - MenuInstance：运行时菜单实例，含前后级指针、显示字符串、回调等
+ *          - 初始化时 single_menu_init() 递归遍历配置树，构建实例链表
+ *          - 每屏最多显示 4 行（row_max_idx = 0~3），超出通过上下界索引翻页
+ *
+ */
+
 #include "menu.h"
 #include "KEY.h"
 #include "OLED.h"
@@ -9,16 +24,47 @@
 #include "Chassis.h"
 #include "Robot_Cmd.h"
 #include "Gimbal.h"
+
+//当前激活的菜单实例指针（指向 ALL_Menu_Instance 中的某一项） */
 MenuInstance* now_menu;
-uint8_t row_idx=0;//屏幕上选中行
-uint8_t row_max_idx=0;//当前屏幕最高行数（0-3）
-uint8_t upper_limit_row_idx;//上界在string中的索引
+
+//屏幕光标所在行索引（0~3，对应 OLED 的第 0~3 行） */
+uint8_t row_idx = 0;
+
+//当前屏幕可显示的最高行索引（0~3），用于边界判定 */
+uint8_t row_max_idx = 0;
+
+//当前显示窗口在 now_menu->string[] 数组中的起始索引 */
+uint8_t upper_limit_row_idx;
+
+//当前显示窗口在 now_menu->string[] 数组中的末尾索引（闭区间） */
 uint8_t lower_limit_row_idx;
-static MenuInstance* single_menu_init(MenuInitConfig_s *config,MenuInstance *pre_menu);
-MenuInstance ALL_Menu_Instance[MAX_ALL_MENU_NUM]={0};
-uint8_t idx_ALL_Menu=0;
+
+//所有菜单实例的静态存储池，避免动态内存分配 */
+MenuInstance ALL_Menu_Instance[MAX_ALL_MENU_NUM] = {0};
+
+//已分配的菜单实例计数，single_menu_init() 调用时自增 */
+uint8_t idx_ALL_Menu = 0;
+
+static MenuInstance* single_menu_init(MenuInitConfig_s *config, MenuInstance *pre_menu);
 int count_chars(const char *str);
 
+/**
+ * @brief  菜单系统总初始化函数
+ * @details 按树形结构定义三级菜单配置（一级→二级→三级），调用
+ *          single_menu_init() 递归构建 MenuInstance 链表，完成 OLED
+ *          初始化并绘制首屏界面动画。
+ *
+ *          菜单结构（实际项目）：
+ *          - 一级菜单：电机控制 / 控制方式 / 任务
+ *          - 二级菜单[0]：使能 / 失能 → Motor_Cmd_CallBack()
+ *          - 二级菜单[1]：程序控制 / 按键控制 → Control_Switch_Callback()
+ *            - 三级菜单[1]：普通 / 巡线 / 陀螺仪 / 位置 → Chassis_Mode_Switch_Callback()
+ *          - 二级菜单[2]：任务一 / 任务二 → Task_Callback()
+ *
+ * @note   本函数在系统启动时调用一次，不应重复调用
+ * @note   字符串以 UTF-8 编码存储，CharNum 字段记录实际字符数（而非字节数）
+ */
 void MenuInit(void)
 {
 MenuInitConfig_s third_menu_config[1] = {
@@ -181,6 +227,22 @@ MenuInitConfig_s first_menu_config={
 			0,0,16*now_menu->CharNum[row_idx+upper_limit_row_idx],16);
 	OLED_Update();
 }
+
+/**
+ * @brief  统计 UTF-8 字符串中的实际字符数（而非字节数）
+ * @param  str 以 NULL 结尾的 UTF-8 编码字符串
+ * @return 字符串中的 Unicode 字符个数，若 str 为 NULL 则返回 0
+ *
+ * @details 手动解析 UTF-8 编码规则：
+ *          - 0xxxxxxx（1 字节）→ ASCII / 单字节字符
+ *          - 110xxxxx（2 字节）→ 拉丁扩展、希腊字母等
+ *          - 1110xxxx（3 字节）→ 中日韩统一表意文字（CJK）
+ *          - 11110xxx（4 字节）→ emoji、罕见汉字等
+ *          - 非法序列字节跳过 1 字节并计为 1 字符
+ *
+ * @note   该函数用于计算菜单字符串在 OLED 上显示的字符宽度，
+ *         与 CharNum[] 字段配套使用
+ */
 int count_chars(const char *str) {
     if (str == NULL) return 0;
     
@@ -205,6 +267,24 @@ int count_chars(const char *str) {
     return char_count;
 }
 
+/**
+ * @brief  递归创建单个菜单实例（内部静态函数）
+ * @param  config   指向菜单初始化配置结构体的指针，包含菜单项字符串、回调和下级菜单指针
+ * @param  pre_menu 指向前一级菜单实例的指针，用于构建返回链（首级菜单传入 NULL）
+ * @return 指向新创建的 MenuInstance 的指针，若 ALL_Menu_Instance 池已满则可能异常
+ *
+ * @details 从编译期静态配置 MenuInitConfig_s 转换为运行时 MenuInstance 链表：
+ *          1. 从全局池 ALL_Menu_Instance 中分配一个新实例
+ *          2. 遍历 config->string[] 数组，逐项拷贝字符串指针、回调函数、前置索引
+ *          3. 调用 count_chars() 计算每个菜单项的显示字符宽度
+ *          4. 若当前项存在下级菜单配置（next_menu_config[i] != NULL），递归调用自身
+ *             构建子树，并将返回的实例指针存入 next_menu[i]
+ *          5. 返回构建完成的实例指针，供父级链接
+ *
+ * @note   该函数为 static 限定，仅在本文件内使用
+ * @note   实例从 ALL_Menu_Instance 静态数组中分配，idx_ALL_Menu 单调递增，无释放机制
+ * @warning 若菜单总数超过 MAX_ALL_MENU_NUM，将导致数组越界，需确保配置总数在限制内
+ */
 static MenuInstance* single_menu_init(MenuInitConfig_s *config,MenuInstance *pre_menu)
 {
 
@@ -229,6 +309,33 @@ static MenuInstance* single_menu_init(MenuInitConfig_s *config,MenuInstance *pre
 	}
 	return menu;
 }
+
+/**
+ * @brief  菜单任务处理函数（由 FreeRTOS 周期性调度）
+ * @details 轮询四个按键输入并执行对应的菜单导航逻辑：
+ *
+ *          | 按键 | 功能 | 行为 |
+ *          |------|------|------|
+ *          | KEY0 | 前进 / 确认 | 有下级菜单→进入下级；无下级但有回调→执行回调 |
+ *          | KEY3 | 后退 / 返回 | 有上级菜单→返回上级并恢复上次选中行；顶级→无操作 |
+ *          | KEY2 | 向上 | 光标上移；已在顶部则向上翻页 |
+ *          | KEY1 | 向下 | 光标下移；已在底部则向下翻页 |
+ *
+ *          **翻页机制：**
+ *          当菜单项超过 4 条时，屏幕仅显示 4 行（row 0~3），通过
+ *          upper_limit_row_idx / lower_limit_row_idx 维护滑动窗口。
+ *          窗口大小 = lower_limit_row_idx - upper_limit_row_idx + 1 ≤ 4
+ *
+ *          **动画处理：**
+ *          每次导航操作前调用 OLED_AnimUpdate() 保存当前帧，
+ *          操作后调用 OLED_Animation() 执行平滑过渡动画，
+ *          最终调用 OLED_Update() 刷新显示。
+ *
+ *          所有按键检测均支持 KEY_SINGLE（单击），方向键另外支持 KEY_REPEAT（长按连发）。
+ *
+ * @note   该函数应由 FreeRTOS 任务周期调用，典型调度周期为 10~20ms
+ * @note   按键索引映射：0=前进, 1=向下, 2=向上, 3=后退（由 Key_Check 参数决定）
+ */
 void menu_task(void)
 {
 	
@@ -390,6 +497,3 @@ void menu_task(void)
 	
 	OLED_Update();
 }
-
-
-	
