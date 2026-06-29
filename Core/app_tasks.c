@@ -482,7 +482,7 @@ static void DaemonTask(void *pvParameters)
 			/* 修改：PA14 引脚做 LED 闪烁指示 (每500ms翻转一次即1Hz闪烁) */
 			if (++led_tick >= 50) {
 				led_tick = 0;
-				DL_GPIO_togglePins(GPIOA, DL_GPIO_PIN_14);
+				DL_GPIO_togglePins(User_LED_PORT, User_LED_User_led_PIN);
 			}
 #if ENABLE_STACK_MONITOR
 			//每 10 秒打印一次各任务剩余栈空间，注意单位为words

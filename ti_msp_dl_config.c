@@ -176,6 +176,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
 		 DL_GPIO_DRIVE_STRENGTH_LOW, DL_GPIO_HIZ_DISABLE);
 
+    DL_GPIO_initDigitalOutput(User_LED_User_led_IOMUX);
+
     DL_GPIO_initDigitalOutput(OLED_SCL_IOMUX);
 
     DL_GPIO_initDigitalOutput(OLED_SDA_IOMUX);
@@ -267,10 +269,12 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		ZDT_Motor_Pitch_Stp_PIN |
 		Gray_Address_PIN_0_PIN);
     DL_GPIO_clearPins(GPIOB, RELAY_Control_PIN |
+		User_LED_User_led_PIN |
 		Motor_dir_EN2_B_PIN |
 		Gray_Address_PIN_1_PIN |
 		Gray_Address_PIN_2_PIN);
     DL_GPIO_enableOutput(GPIOB, RELAY_Control_PIN |
+		User_LED_User_led_PIN |
 		Motor_dir_EN2_B_PIN |
 		Gray_Address_PIN_1_PIN |
 		Gray_Address_PIN_2_PIN);

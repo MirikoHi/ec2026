@@ -25,6 +25,7 @@ const GPIO6         = GPIO.addInstance();
 const GPIO7         = GPIO.addInstance();
 const GPIO8         = GPIO.addInstance();
 const GPIO9         = GPIO.addInstance();
+const GPIO10        = GPIO.addInstance();
 const MCAN          = scripting.addModule("/ti/driverlib/MCAN", {}, false);
 const MCAN1         = MCAN.addInstance();
 const PWM           = scripting.addModule("/ti/driverlib/PWM", {}, false);
@@ -209,6 +210,11 @@ GPIO9.associatedPins[2].$name        = "PIN_2";
 GPIO9.associatedPins[2].assignedPin  = "24";
 GPIO9.associatedPins[2].assignedPort = "PORTB";
 
+GPIO10.$name                         = "User_LED";
+GPIO10.port                          = "PORTB";
+GPIO10.associatedPins[0].$name       = "User_led";
+GPIO10.associatedPins[0].pin.$assign = "PB22";
+
 MCAN1.$name                = "MCAN0";
 MCAN1.fdMode               = false;
 MCAN1.wkupReqEnable        = true;
@@ -349,6 +355,7 @@ UART3.rxPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric16";
 
 ProjectConfig.genDisable      = true;
 ProjectConfig.switchCondition = true;
+scripting.suppress("Project Configuration File generation is disabled for this project\\. SysConfig Project Migration is not currently supported for this project\\.", ProjectConfig);
 
 /**
  * Pinmux solution for unlocked pins/peripherals. This ensures that minor changes to the automatic solver in a future

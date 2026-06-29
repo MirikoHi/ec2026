@@ -235,6 +235,12 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for Control: GPIOB.4 with pinCMx 17 on package pin 52 */
 #define RELAY_Control_PIN                                        (DL_GPIO_PIN_4)
 #define RELAY_Control_IOMUX                                      (IOMUX_PINCM17)
+/* Port definition for Pin Group User_LED */
+#define User_LED_PORT                                                    (GPIOB)
+
+/* Defines for User_led: GPIOB.22 with pinCMx 50 on package pin 21 */
+#define User_LED_User_led_PIN                                   (DL_GPIO_PIN_22)
+#define User_LED_User_led_IOMUX                                  (IOMUX_PINCM50)
 /* Port definition for Pin Group OLED */
 #define OLED_PORT                                                        (GPIOA)
 
