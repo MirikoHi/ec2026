@@ -148,6 +148,7 @@ void CANSetDLC(CANInstance *instance, uint8_t length)
  *
  * @note  发送前需要将数据写入 instance->tx_buff[]
  *        每次发送前将 tx_buff 同步到 tx_elem.data，然后写入消息RAM
+ *        MCAN的TXBRP在帧实际发送完成前一直为1，等待其清除再写入下一帧
  *
  * @param instance CAN实例
  * @param timeout  超时时间（ms）
@@ -155,11 +156,19 @@ void CANSetDLC(CANInstance *instance, uint8_t length)
  */
 uint8_t CANTransmit(CANInstance *instance, float timeout)
 {
+    float start = DWT_GetTimeline_ms();
+
+    /* 等待TX Buffer空闲（TXBRP位清除 = 上一帧已实际发送完成） */
+    while (DL_MCAN_getTxBufReqPend(MCAN0_INST) & ((uint32_t)1U << instance->tx_buf_idx))
+    {
+        if (DWT_GetTimeline_ms() - start > timeout)
+        {
+            LOGERROR("[bsp_can] CAN TX timeout! buf_idx=%d", instance->tx_buf_idx);
+            return 0;
+        }
+    }
 
     memcpy(instance->tx_elem.data, instance->tx_buff, 8);
-
-    // 注：在简单实现中直接写入覆盖，如果总线拥堵则可能丢帧
-    // TODO: 后续可增加 TX Complete 中断来做确认
 
     /* 写入消息RAM（TX Buffer区） */
     DL_MCAN_writeMsgRam(MCAN0_INST, DL_MCAN_MEM_TYPE_BUF,
