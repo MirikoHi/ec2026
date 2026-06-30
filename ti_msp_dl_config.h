@@ -257,15 +257,6 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for User_led: GPIOB.22 with pinCMx 50 on package pin 21 */
 #define User_LED_User_led_PIN                                   (DL_GPIO_PIN_22)
 #define User_LED_User_led_IOMUX                                  (IOMUX_PINCM50)
-/* Port definition for Pin Group OLED */
-#define OLED_PORT                                                        (GPIOA)
-
-/* Defines for SCL: GPIOA.1 with pinCMx 2 on package pin 34 */
-#define OLED_SCL_PIN                                             (DL_GPIO_PIN_1)
-#define OLED_SCL_IOMUX                                            (IOMUX_PINCM2)
-/* Defines for SDA: GPIOA.0 with pinCMx 1 on package pin 33 */
-#define OLED_SDA_PIN                                             (DL_GPIO_PIN_0)
-#define OLED_SDA_IOMUX                                            (IOMUX_PINCM1)
 /* Defines for key1: GPIOA.30 with pinCMx 5 on package pin 37 */
 #define KEY_key1_PORT                                                    (GPIOA)
 #define KEY_key1_PIN                                            (DL_GPIO_PIN_30)

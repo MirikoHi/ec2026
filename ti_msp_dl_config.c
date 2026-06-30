@@ -193,10 +193,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 
     DL_GPIO_initDigitalOutput(User_LED_User_led_IOMUX);
 
-    DL_GPIO_initDigitalOutput(OLED_SCL_IOMUX);
-
-    DL_GPIO_initDigitalOutput(OLED_SDA_IOMUX);
-
     DL_GPIO_initDigitalInputFeatures(KEY_key1_IOMUX,
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
 		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
@@ -261,8 +257,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 
     DL_GPIO_clearPins(GPIOA, BEEP_PIN_14_PIN |
 		ICM42688_CS_CS_PIN |
-		OLED_SCL_PIN |
-		OLED_SDA_PIN |
 		Motor_dir_EN1_A_PIN |
 		Motor_dir_EN1_B_PIN |
 		Motor_dir_EN2_A_PIN |
@@ -273,8 +267,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		Gray_Address_PIN_0_PIN);
     DL_GPIO_enableOutput(GPIOA, BEEP_PIN_14_PIN |
 		ICM42688_CS_CS_PIN |
-		OLED_SCL_PIN |
-		OLED_SDA_PIN |
 		Motor_dir_EN1_A_PIN |
 		Motor_dir_EN1_B_PIN |
 		Motor_dir_EN2_A_PIN |
