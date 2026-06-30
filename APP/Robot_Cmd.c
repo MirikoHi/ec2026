@@ -4,6 +4,7 @@
 #include "trace.h"
 #include "OLED.h"
 #include "ADC_Voltage.h"
+#include "can_comm.h"
 #include "misc.h"
 #include "dwt.h"
 #include "tjc.h"
@@ -12,18 +13,28 @@
 #include "K230.h"
 #include "icm42688.h"
 icm42688RawData_t Chassis_Gyro;
+
+static CANCommInstance *chasiss_can_comm; // 双板通信CAN comm
+
+static Chassis_Ctrl_Cmd_s chassis_cmd_recv;         // 底盘接收到的控制命令
+static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数据
+
 QueueHandle_t chassis_cmd_queue = NULL,gimbal_cmd_queue =NULL;
 QueueHandle_t chassis_fetch_data_queue = NULL;
 QueueHandle_t trace_fetch_data_queue = NULL;
+
 chassis_cmd_q chassis_cmd_send={0};
 gimbal_cmd_q gimbal_cmd_send ={0};
 trace_fetch_data_q trace_fetch_data={0};
+
 pid_type_def gimbal_yaw_PID={0};
 pid_type_def gimbal_pitch_PID={0};
 pid_type_def gimbal_yaw_forwardfeed_PID = {0};
+
 float last_trace_imu_switch_s=0;
 float now_time=0;
 State robotcmd_control_state = DISABLE;
+
 void tjc_control(void);
 void draw_sin(void);
 void Gimbal_Pid_Cal(void);
@@ -71,8 +82,21 @@ void RobotCmd_Init(void)
 		
 	};
 	PID_init(&gimbal_yaw_forwardfeed_PID,&gimbal_yaw_forwardfeed_pid_config);
+
+	chassis_feedback_data.real_vy = 100;
+	//双板通信can初始化
+	CANComm_Init_Config_s comm_conf = {
+		.can_config = {.tx_id = 0x311, .rx_id = 0x312 },
+		.recv_data_len = sizeof(Chassis_Ctrl_Cmd_s),
+		.send_data_len = sizeof(Chassis_Upload_Data_s),
+};
+	chasiss_can_comm = CANCommInit(&comm_conf);
 	
 }
+
+/**
+ * @brief 核心cmd任务，向云台和底盘发送命令，在RTOS中以200Hz运行
+ */
 void Robot_Cmd(void)
 {
 //	chassis_cmd_send.vx=70.0f;
@@ -88,13 +112,13 @@ void Robot_Cmd(void)
 			gimbal_cmd_send.yaw+=0.6;
 		}
 	}
-
-	
-
-//	LOG("Man!What can I say?");
 //	draw_sin();
+
+	//通过队列向云台和底盘发送命令
 	xQueueSend(chassis_cmd_queue, &chassis_cmd_send, 0U);
 	xQueueSend(gimbal_cmd_queue,&gimbal_cmd_send,0U);
+
+	CANCommSend(chasiss_can_comm, (void *)&chassis_feedback_data);
 }
 void Chassis_Mode_Switch_Callback(uint8_t i)
 {

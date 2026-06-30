@@ -47,7 +47,7 @@ static void InitSenderAssignment(void)
     sender_assignment[0].tx_id      = 0x1FF;
     sender_assignment[0].tx_buf_idx = 0;
     sender_assignment[0].tx_elem    = (DL_MCAN_TxBufElement){
-        .id   = 0x1FF,
+        .id   = CAN_STD_ID_TO_REG(0x1FF),
         .rtr  = 0,
         .xtd  = 0,
         .esi  = 0,
@@ -64,7 +64,7 @@ static void InitSenderAssignment(void)
     sender_assignment[1].tx_id      = 0x200;
     sender_assignment[1].tx_buf_idx = 1;
     sender_assignment[1].tx_elem    = (DL_MCAN_TxBufElement){
-        .id   = 0x200,
+        .id   = CAN_STD_ID_TO_REG(0x200),
         .rtr  = 0,
         .xtd  = 0,
         .esi  = 0,
@@ -114,9 +114,9 @@ static void MotorSenderGrouping(DJIMotorInstance *motor, CAN_Init_Config_s *conf
         config->rx_id = 0x200 + motor_id + 1;
         /* 确保分组 tx_id 正确 */
         if (motor_grouping == 0)
-            sender_assignment[0].tx_elem.id = 0x1FF;
+            sender_assignment[0].tx_elem.id = CAN_STD_ID_TO_REG(0x1FF);
         else
-            sender_assignment[1].tx_elem.id = 0x200;
+            sender_assignment[1].tx_elem.id = CAN_STD_ID_TO_REG(0x200);
         break;
 
     case GM6020:
@@ -134,9 +134,9 @@ static void MotorSenderGrouping(DJIMotorInstance *motor, CAN_Init_Config_s *conf
                 motor_grouping = 1;                       // 0x2FE
             }
             if (motor_grouping == 0)
-                sender_assignment[0].tx_elem.id = 0x1FE;
+                sender_assignment[0].tx_elem.id = CAN_STD_ID_TO_REG(0x1FE);
             else
-                sender_assignment[1].tx_elem.id = 0x2FE;
+                sender_assignment[1].tx_elem.id = CAN_STD_ID_TO_REG(0x2FE);
         }
         else
         {
@@ -152,9 +152,9 @@ static void MotorSenderGrouping(DJIMotorInstance *motor, CAN_Init_Config_s *conf
                 motor_grouping = 1;                       // 0x2FF
             }
             if (motor_grouping == 0)
-                sender_assignment[0].tx_elem.id = 0x1FF;
+                sender_assignment[0].tx_elem.id = CAN_STD_ID_TO_REG(0x1FF);
             else
-                sender_assignment[1].tx_elem.id = 0x2FF;
+                sender_assignment[1].tx_elem.id = CAN_STD_ID_TO_REG(0x2FF);
         }
         config->rx_id = 0x204 + motor_id + 1;
         break;
