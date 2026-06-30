@@ -22,6 +22,15 @@
 /** TX Buffer总数*/
 #define CAN_TX_BUF_CNT       MCAN0_INST_MCAN_TX_BUFF_SIZE
 
+/**
+ * @brief MCAN标准ID与硬件寄存器格式互转宏
+ * @note  TI MCAN 驱动中 DL_MCAN_TxBufElement.id 使用硬件寄存器位布局
+ *        标准11位CAN ID位于消息RAM第一个字的 bits[28:18]
+ *        因此需要: hw_id = std_id << 18
+ */
+#define CAN_STD_ID_TO_REG(id)  ((id) << 18)
+#define CAN_REG_ID_TO_STD(reg) ((reg) >> 18)
+
 /* TX Buffer分配方案（2个Buffer共享使用）：
  * Buffer 0: DJI电机分组 + can_comm 通信
  * Buffer 1: DM电机

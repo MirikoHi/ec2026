@@ -107,7 +107,7 @@ CANInstance *CANRegister(CAN_Init_Config_s *config)
 
     /* 初始化发送报文配置 */
     instance->tx_elem    = TX_ELEM_TEMPLATE;
-    instance->tx_elem.id = config->tx_id;
+    instance->tx_elem.id = CAN_STD_ID_TO_REG(config->tx_id);
     instance->tx_id      = config->tx_id;
     instance->rx_id      = config->rx_id;
     instance->tx_buf_idx = config->tx_buf_idx;
@@ -238,7 +238,7 @@ void MCAN0_INST_IRQHandler(void)
                 /* 只处理标准ID数据帧 */
                 if (rxMsg.xtd == 0 && rxMsg.rtr == 0)
                 {
-                    uint32_t rx_id  = rxMsg.id;
+                    uint32_t rx_id  = CAN_REG_ID_TO_STD(rxMsg.id);
                     uint8_t  rx_dlc = rxMsg.dlc;
 
                     for (uint8_t i = 0; i < idx; i++)
@@ -282,7 +282,7 @@ void MCAN0_INST_IRQHandler(void)
 
                 if (rxMsg.xtd == 0 && rxMsg.rtr == 0)
                 {
-                    uint32_t rx_id  = rxMsg.id;
+                    uint32_t rx_id  = CAN_REG_ID_TO_STD(rxMsg.id);
                     uint8_t  rx_dlc = rxMsg.dlc;
 
                     for (uint8_t i = 0; i < idx; i++)
