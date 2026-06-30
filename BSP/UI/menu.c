@@ -495,5 +495,4 @@ void menu_task(void)
 		}
 	}
 	
-	OLED_Update();
 }
