@@ -130,6 +130,7 @@
 #define CHASSIS_TASK_STACK_DEPTH   256
 #define GIMBAL_TASK_STACK_DEPTH    192
 #define MOTOR_TASK_STACK_DEPTH	   320
+#define HWMOTOR_TASK_STACK_DEPTH   256
 
 #if ENABLE_STACK_MONITOR  //开启时占用栈比较多
 #define DAEMON_TASK_STACK_DEPTH    256
@@ -169,6 +170,7 @@ static TaskHandle_t xChassisTaskHandle   = NULL;
 static TaskHandle_t xGimbalTaskHandle    = NULL;
 static TaskHandle_t xDaemonTaskHandle    = NULL;
 static TaskHandle_t xMenuTaskHandle      = NULL;
+static TaskHandle_t xHwmotorTaskHandle   = NULL;
 #endif
 
 #if ENABLE_STACK_MONITOR
@@ -210,10 +212,10 @@ void app_tasks_init(void)
             STACK_HANDLE(Key));
 			configASSERT(xResult == pdPASS);
 
-			// xResult=xTaskCreate(HwMotorTask, "HwMotor", 256,
-   //          (void *) HwMotor_PARAMETER, tskIDLE_PRIORITY+2,
-   //          NULL);
-			// configASSERT(xResult == pdPASS);
+			xResult=xTaskCreate(HwMotorTask, "HwMotor", HWMOTOR_TASK_STACK_DEPTH,
+			             (void *) HwMotor_PARAMETER, tskIDLE_PRIORITY+2,
+			             STACK_HANDLE(Hwmotor));
+			configASSERT(xResult == pdPASS);
 
 //			xResult=xTaskCreate(StepMotorTask, "StepMotor", 128,
 //            (void *) StepMotor_PARAMETER, tskIDLE_PRIORITY+2,
@@ -513,6 +515,9 @@ static void DaemonTask(void *pvParameters)
 				LOGWARNING("[stack] Menu    free: %u / %u \n",
 				           (unsigned)uxTaskGetStackHighWaterMark(xMenuTaskHandle),
 				           MENU_TASK_STACK_DEPTH);
+				LOGWARNING("[stack] Hwmotor free: %u / %u \n",
+				           (unsigned)uxTaskGetStackHighWaterMark(xHwmotorTaskHandle),
+				           HWMOTOR_TASK_STACK_DEPTH);
 			}
 #endif
 

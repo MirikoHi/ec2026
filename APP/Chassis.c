@@ -14,7 +14,7 @@
 #include "misc.h"
 #include "IMU.h"
 chassis_cmd_q chassis_cmd_receive={0};
-//DCMotorInstance *motor_l,*motor_r;
+DCMotorInstance *motor_l,*motor_r;
 Chassis_Move_State_e Chassis_Move_State;
 float trace_dt;
 float trace_starttime;
@@ -26,9 +26,12 @@ float ICM42688_Data[3] = {0};
 void Stop_Detect(void);
 void Chassis_State_Turn(void);
 void Chassis_Set_Turn(void);
+
+/**
+ * @brief 初始化底盘左右电机和IMU
+ */
 void Chassis_Init(void)
 {
-	
 	DCMotorInitConfig_s motor_l_config ={
 		.Input_Dir = MOTOR_REVERSAL,
 		.Output_Dir = MOTOR_REVERSAL,
@@ -48,9 +51,9 @@ void Chassis_Init(void)
 		},
 		.speed_pid_config = {
 			.mode = PID_POSITION,
-			.Kp = 30000.0f,
+			.Kp = 10000.0f,
 			.Kd = 0.0f,
-			.Ki = 80.0f,
+			.Ki = 0.0f,
 			.max_out = 2499.0f,
 			.max_iout = 500.0f, 
 		},
@@ -65,7 +68,7 @@ void Chassis_Init(void)
 //		.feedforward = 85,
 	};
 	size_t free_heap = xPortGetFreeHeapSize();
-	//motor_l = DCMotor_Init(&motor_l_config);
+	motor_l = DCMotor_Init(&motor_l_config);
 	free_heap = xPortGetFreeHeapSize();
 	DCMotorInitConfig_s motor_r_config ={
 		.Input_Dir = MOTOR_NORMAL,
@@ -86,9 +89,9 @@ void Chassis_Init(void)
 		},
 		.speed_pid_config = {
 			.mode = PID_POSITION,
-			.Kp = 30000.0f,
+			.Kp = 10000.0f,
 			.Kd = 0.0f,
-			.Ki = 80.0f,
+			.Ki = 0.0f,
 			.max_out = 2499.0f,
 			.max_iout = 500.0f, 
 		},
@@ -102,13 +105,21 @@ void Chassis_Init(void)
 		},
 //		.feedforward = 140,
 	};
-	//motor_r = DCMotor_Init(&motor_r_config);
+	motor_r = DCMotor_Init(&motor_r_config);
 	//PAW3395_Init();
 	IMU_init();
 	DWT_Delay(1);
 }
+
+static volatile uint8_t left_disable_flag = 0;
+static volatile uint8_t right_disable_flag = 0;
+/**
+ * @brief 底盘主要任务，根据菜单不同模式执行对应任务，目前以200Hz运行
+ */
 void Chassis(void)
 {
+	motor_l->State = left_disable_flag;
+	motor_r->State = right_disable_flag;
 	static uint8_t debug=0;
 	xQueueReceive(chassis_cmd_queue, &chassis_cmd_receive, 1);
 	//PAW3395_Read_Motion(Chassis_axis);
@@ -123,7 +134,8 @@ void Chassis(void)
 			Chassis_State_Turn();
 			trace_starttime = DWT_GetTimeline_ms();
 			trace_compensation=Trace_task();
-			trace_dt = DWT_GetTimeline_ms() - trace_starttime;
+			trace_dt = DWT_GetTimeline_ms() - trace_starttime;//调试用，计算巡线任务耗时
+
 			//DCMotor_SetTraceCompensation(motor_l,-trace_compensation);
 			//DCMotor_SetTraceCompensation(motor_r,trace_compensation);
 			Stop_Detect();
@@ -147,316 +159,183 @@ void Chassis(void)
 	
 }
 
+/**
+ * @brief 被cmd调用，根据菜单值回调选择是否使能电机
+ */
 void Motor_Cmd_CallBack(uint8_t i)
 {
 	if(i ==0)
 	{
-		// DCMotor_Cmd(motor_l,ENABLE);
-		// DCMotor_Cmd(motor_r,ENABLE);
+		DCMotor_Cmd(motor_l,ENABLE);
+		DCMotor_Cmd(motor_r,ENABLE);
 	}
 	else if(i == 1)
 	{
-		// DCMotor_Cmd(motor_l,DISABLE);
-		// DCMotor_Cmd(motor_r,DISABLE);
+		DCMotor_Cmd(motor_l,DISABLE);
+		DCMotor_Cmd(motor_r,DISABLE);
 	}
 	
 }
 
-//void Stop_Detect(void)
-//{
-//	static float last_near_stop_time;
-//	static uint8_t near_stop_flag = 0;
-//	//直线
-//	if((!near_stop_flag)&&(Chassis_Move_State==Chassis_Line)&&(abs_out(motor_l->position_ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_ref-motor_r->position_measure)<0.008f))
-//	{
-//		last_near_stop_time = DWT_GetTimeline_ms();
-//		near_stop_flag =1;
-//	}
-//	if((DWT_GetTimeline_ms()-last_near_stop_time>100)&&near_stop_flag)
-//	{
-//		Chassis_Move_State = Chassis_Stop;
-//		near_stop_flag = 0;
-//	}
-//	//转弯
-//	if((!near_stop_flag)&&(Chassis_Move_State==Chassis_Turn)&&(abs_out(motor_l->position_ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_ref-motor_r->position_measure)<0.008f))
-//	{
-//		last_near_stop_time = DWT_GetTimeline_ms();
-//		near_stop_flag =1;
-//	}
-//	if((DWT_GetTimeline_ms()-last_near_stop_time>100)&&near_stop_flag)
-//	{
-//		Chassis_Move_State = Chassis_Stop;
-//		near_stop_flag = 0;
-//	}
-//	
-//}
-//void Chassis_Set_Turn(void)
-//{
-//	Chassis_Move_State = Chassis_Turn;
-//	motor_l->encoder->total_count = 0;
-//	motor_r->encoder->total_count = 0;
-//	motor_l->position_pid.max_out = 0.05;
-//	motor_l->position_pid.max_iout = 0.05;
-//	motor_r->position_pid.max_out = 0.05;
-//	motor_r->position_pid.max_iout = 0.05;
-//	
-//		motor_l->position_ref = -0.05;
-//		motor_r->position_ref = 0.05;
-//	
-//}
-//void Chassis_Set_Line(float position)
-//{
-//	Chassis_Move_State = Chassis_Line;
-//	motor_l->encoder->total_count = 0;
-//	motor_r->encoder->total_count = 0;
-//	motor_l->position_pid.max_out = 0.03;
-//	motor_l->position_pid.max_iout = 0.0;
-//	motor_r->position_pid.max_out = 0.03;
-//	motor_r->position_pid.max_iout = 0.0;
-//	
-//	motor_l->position_ref = position;
-//	motor_r->position_ref = position;
-//}
-
-
-//void Chassis_State_Turn(void)
-//{
-//	static uint8_t Chassis_State_Machine;
-//	static uint8_t quan;
-//	switch(Chassis_State_Machine)
-//	{
-//		case 0:
-//			if(quan < chassis_cmd_receive.circle_set)
-//			{
-//				Chassis_State_Machine ++;
-//				Chassis_Set_Line(0.07);
-//			}
-//		break;
-//		case 1:
-//			if(Chassis_Move_State == Chassis_Stop)
-//			{
-//				Chassis_Set_Turn();
-//				Chassis_State_Machine ++;
-//			}
-//		break;
-//		case 2:
-//			if(Chassis_Move_State == Chassis_Stop)
-//			{
-//				Chassis_Set_Line(0.068);
-//				Chassis_State_Machine ++;
-//			}
-//		break;
-//		case 3:
-//			if(Chassis_Move_State == Chassis_Stop)
-//			{
-//				Chassis_Set_Turn();
-//				Chassis_State_Machine ++;
-//			}
-//		break;
-//		case 4:
-//			if(Chassis_Move_State == Chassis_Stop)
-//			{
-//				Chassis_Set_Line(0.071);
-//				Chassis_State_Machine ++;
-//			}
-//		break;
-//			case 5:
-//			if(Chassis_Move_State == Chassis_Stop)
-//			{
-//				Chassis_Set_Turn();
-//				Chassis_State_Machine ++;
-//			}
-//		break;
-//			case 6:
-//			if(Chassis_Move_State == Chassis_Stop)
-//			{
-//				Chassis_Set_Line(0.068);
-//				Chassis_State_Machine ++;
-//			}
-//		break;
-//			case 7:
-//			if(Chassis_Move_State == Chassis_Stop)
-//			{
-//				Chassis_Set_Turn();
-//				Chassis_State_Machine ++;
-//			}
-//		break;
-//		case 8:
-//			if(Chassis_Move_State == Chassis_Stop)
-//			{
-//				Chassis_Set_Line(0.01);
-//				Chassis_State_Machine ++;
-//			}
-//		break;
-//		case 9:
-//			if(Chassis_Move_State == Chassis_Stop)
-//			{
-//				quan ++;
-//				Chassis_State_Machine = 0;
-//			}
-//		break;
-//		default:
-//			break;
-//	}
-//	
-//	
-//	
-//}
 void Stop_Detect(void)
 {
 	if(Line_flag)
 		{
-// 				if((abs_out(motor_l->position_ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_ref-motor_r->position_measure)<0.008f))
-// 				{
-// 						stop_count++;
-// 						if(stop_count >= 40)
-// 						{
-// 								Line_flag = 0;
-// 								Stop_Flag = 1; //这个标志位可以用来判断是否执行下一阶段任务
-// 								stop_count = 0;
-// 								// motor_l->State = DISABLE;
-// 								// motor_r->State = DISABLE;
-// //								ctrl_mode = MOTOR_CTRL_STOP;
-// 						}
-// 				}
-// 				else
-// 				{
-// 						Stop_Flag = 0;
-// 						stop_count = 0;
-// 				}
+				if((abs_out(motor_l->position_ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_ref-motor_r->position_measure)<0.008f))
+				{
+						stop_count++;
+						if(stop_count >= 40)
+						{
+								Line_flag = 0;
+								Stop_Flag = 1; //这个标志位可以用来判断是否执行下一阶段任务
+								stop_count = 0;
+								// motor_l->State = DISABLE;
+								// motor_r->State = DISABLE;
+//								ctrl_mode = MOTOR_CTRL_STOP;
+						}
+				}
+				else
+				{
+						Stop_Flag = 0;
+						stop_count = 0;
+				}
 		}
 		if(Spin_start_flag)
 		{
 			spin_count++;
-			// if(spin_count >= 200 &&(abs_out(motor_l->position_ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_ref-motor_r->position_measure)<0.008f))
-			// {
-			// 		Spin_start_flag = 0;
-			// 		spin_count = 0;
-			// 		Spin_succeed_flag = 1;
-			// 		// motor_l->State = DISABLE;
-			// 		// motor_r->State = DISABLE;
-			// }
+			if(spin_count >= 200 &&(abs_out(motor_l->position_ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_ref-motor_r->position_measure)<0.008f))
+			{
+					Spin_start_flag = 0;
+					spin_count = 0;
+					Spin_succeed_flag = 1;
+					// motor_l->State = DISABLE;
+					// motor_r->State = DISABLE;
+			}
 		}
 	
 }
+
 void Chassis_Set_Turn(void)
 {
-	// motor_l->State = ENABLE;
-	// motor_r->State = ENABLE;
-	// Line_flag = 0;  //不进行巡线的补偿了
-	// Stop_Flag = 0;   //执行转弯时，将直走完成的标志位清零. 即如果上一次是直行，
-	// Spin_start_flag = 1;
-	// Spin_succeed_flag = 0;
-	// motor_l->encoder->total_count = 0;
-	// motor_r->encoder->total_count = 0;
-	// motor_l->position_pid.max_out = 0.08;
-	// motor_l->position_pid.max_iout = 0.05;
-	// motor_r->position_pid.max_out = 0.08;
-	// motor_r->position_pid.max_iout = 0.05;
-	//
-	// motor_l->position_ref = -0.01;
-	// motor_r->position_ref = 0.01;
+	motor_l->State = ENABLE;
+	motor_r->State = ENABLE;
+	Line_flag = 0;  //不进行巡线的补偿了
+	Stop_Flag = 0;   //执行转弯时，将直走完成的标志位清零. 即如果上一次是直行，
+	Spin_start_flag = 1;
+	Spin_succeed_flag = 0;
+	motor_l->encoder->total_count = 0;
+	motor_r->encoder->total_count = 0;
+	motor_l->position_pid.max_out = 0.08;
+	motor_l->position_pid.max_iout = 0.05;
+	motor_r->position_pid.max_out = 0.08;
+	motor_r->position_pid.max_iout = 0.05;
+
+	motor_l->position_ref = -0.01;
+	motor_r->position_ref = 0.01;
 	
 }
+
 void Chassis_Set_Line(float position)
 {
-	// motor_l->State = ENABLE;
-	// motor_r->State = ENABLE;
-	// Line_flag = 1;
-	// Stop_Flag = 0;
-	// Spin_start_flag = 0;
-	// Spin_succeed_flag = 0;
-	// motor_l->encoder->total_count = 0;
-	// motor_r->encoder->total_count = 0;
-	// motor_l->position_pid.max_out = 0.03;
-	// motor_l->position_pid.max_iout = 0.0;
-	// motor_r->position_pid.max_out = 0.03;
-	// motor_r->position_pid.max_iout = 0.0;
-	//
-	// motor_l->position_ref = position;
-	// motor_r->position_ref = position;
+	motor_l->State = ENABLE;
+	motor_r->State = ENABLE;
+	Line_flag = 1;
+	Stop_Flag = 0;
+	Spin_start_flag = 0;
+	Spin_succeed_flag = 0;
+	motor_l->encoder->total_count = 0;
+	motor_r->encoder->total_count = 0;
+	motor_l->position_pid.max_out = 0.03;
+	motor_l->position_pid.max_iout = 0.0;
+	motor_r->position_pid.max_out = 0.03;
+	motor_r->position_pid.max_iout = 0.0;
+
+	motor_l->position_ref = position;
+	motor_r->position_ref = position;
 }
 
 
 void Chassis_State_Turn(void)
 {
-	static uint8_t quan=0;
-	switch(state)
-	{
-		case 0:
-			if(quan < chassis_cmd_receive.circle_set)
-			{
-				state ++;
-				Chassis_Set_Line(0.08);
-			}
-		break;
-		case 1:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 2:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.082);
-				state ++;
-			}
-		break;
-		case 3:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 4:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.082);
-				state ++;
-			}
-		break;
-			case 5:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-			case 6:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.082);
-				state ++;
-			}
-		break;
-			case 7:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 8:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.01);
-				state ++;
-			}
-		break;
-		case 9:
-			if(Stop_Flag)
-			{
-				quan ++;
-				state = 0;
-			}
-		break;
-		default:
-			break;
-	}
-	
+	motor_l->position_ref = 0.05;
+	motor_r->position_ref = 0.05;
+	// static uint8_t quan=0;
+	// switch(state)
+	// {
+	// 	case 0:
+	// 		if(quan < chassis_cmd_receive.circle_set)
+	// 		{
+	// 			state ++;
+	// 			Chassis_Set_Line(0.08);
+	// 		}
+	// 	break;
+	// 	case 1:
+	// 		if(Stop_Flag)
+	// 		{
+	// 			Chassis_Set_Turn();
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 	case 2:
+	// 		if(Spin_succeed_flag)
+	// 		{
+	// 			Chassis_Set_Line(0.082);
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 	case 3:
+	// 		if(Stop_Flag)
+	// 		{
+	// 			Chassis_Set_Turn();
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 	case 4:
+	// 		if(Spin_succeed_flag)
+	// 		{
+	// 			Chassis_Set_Line(0.082);
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 		case 5:
+	// 		if(Stop_Flag)
+	// 		{
+	// 			Chassis_Set_Turn();
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 		case 6:
+	// 		if(Spin_succeed_flag)
+	// 		{
+	// 			Chassis_Set_Line(0.082);
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 		case 7:
+	// 		if(Stop_Flag)
+	// 		{
+	// 			Chassis_Set_Turn();
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 	case 8:
+	// 		if(Spin_succeed_flag)
+	// 		{
+	// 			Chassis_Set_Line(0.01);
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 	case 9:
+	// 		if(Stop_Flag)
+	// 		{
+	// 			quan ++;
+	// 			state = 0;
+	// 		}
+	// 	break;
+	// 	default:
+	// 		break;
+	// }
+	//
 	
 	
 	
