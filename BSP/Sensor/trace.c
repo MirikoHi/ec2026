@@ -2,6 +2,7 @@
 #include "Robot_Cmd.h"
 #include "No_Mcu_Ganv_Grayscale_Sensor_Config.h"
 #include "dwt.h"
+#include "gray_serial.h"
 #define SENSOR_WEIGHTS { -4.0f, -3.0f, -2.0f, -1.0f, 1.0f, 2.0f, 3.0f, 4.0f }
 pid_type_def Trace_PID={0};
 trace_fetch_data_q trace_feedback_data={0};
@@ -18,18 +19,22 @@ No_MCU_Sensor sensor;
 float track_err;
 void Trace_Init(void)
 {
+#ifdef USE_GRAY_SERIAL
+    Gray_Serial_Init();
+#else
 	NVIC_EnableIRQ(ADC1_INST_INT_IRQN);
-	//³õÊ¼»¯´«¸ĞÆ÷£¬²»´øºÚ°×Öµ
+	// åˆå§‹åŒ–ä¼ æ„Ÿå™¨å¹¶è·å–é»‘ç™½å€¼
     No_MCU_Ganv_Sensor_Init_Frist(&sensor);
     No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
     Get_Anolog_Value(&sensor,Anolog);
-    //´ËÊ±´òÓ¡µÄADCµÄÖµ£¬¿ÉÓÃÍ¨¹ıÕâ¸öADC×÷ÎªºÚ°×ÖµµÄĞ£×¼
-    //Ò²¿ÉÒÔ×Ô¼ºĞ´°´¼üÂß¼­Íê³ÉÒ»¼üĞ£×¼¹¦ÄÜ
+    // ä¸²å£æ‰“å°å‡ºADCçš„å€¼ï¼Œå¯ä»¥é€šè¿‡ADCä½œä¸ºé»‘ç™½å€¼çš„æ ¡å‡†
+    // ä¹Ÿå¯ä»¥è‡ªå·±å†™ç”µæ§é€»è¾‘åšä¸€æ¬¡æ ¡å‡†ç¨‹åº
 
     DWT_Delay(0.1);
-    //µÃµ½ºÚ°×Ğ£×¼ÖµÖ®ºó£¬³õÊ¼»¯´«¸ĞÆ÷
+    // å¾—åˆ°é»‘ç™½æ ¡å‡†å€¼ä¹‹åï¼Œåˆå§‹åŒ–ä¼ æ„Ÿå™¨
     No_MCU_Ganv_Sensor_Init(&sensor,white,black);
     DWT_Delay(0.1);
+#endif
 	pid_init_config_s trace_config={
 		.mode = PID_POSITION,
 		.Kp = 0.0075f,
@@ -43,42 +48,46 @@ void Trace_Init(void)
 }
 
 float Cal_Trace_Err(uint8_t current_trace) {
-    // ¶¨ÒåÃ¿¸ö´«¸ĞÆ÷µÄÈ¨ÖØ£¨8¸ö´«¸ĞÆ÷£©
+    // å®šä¹‰æ¯ä¸ªä¼ æ„Ÿå™¨çš„æƒé‡ï¼Œ8ä¸ªä¼ æ„Ÿå™¨å¯¹ç§°åˆ†å¸ƒ
     const int weights[8] = SENSOR_WEIGHTS;
-    
-    int sum = 0;       // È¨ÖØÀÛ¼ÓºÍ
-    int active_count = 0; // ¼ì²âµ½ºÚÏßµÄ´«¸ĞÆ÷ÊıÁ¿
 
-    // ±éÀúÃ¿¸ö´«¸ĞÆ÷£¨bit0-bit7£©
+    int sum = 0;            // æƒé‡ç´¯åŠ å’Œ
+    int active_count = 0;   // æ£€æµ‹åˆ°é»‘çº¿çš„ä¼ æ„Ÿå™¨è®¡æ•°
+
+    // éå†æ¯ä¸ªä¼ æ„Ÿå™¨ï¼ˆbit0 - bit7ï¼‰
     for (int i = 0; i < 8; i++) {
-        // ¼ì²éµÚiÎ»ÊÇ·ñÎª0£¨¼ì²âµ½ºÚÏß£©
+        // æ£€æŸ¥iä½æ˜¯å¦ä¸º0ï¼ˆæ£€æµ‹åˆ°é»‘çº¿ï¼‰
         if (!(current_trace & (1 << i))) {
             sum += weights[i];
             active_count++;
         }
     }
 
-    // ´¦ÀíÎ´¼ì²âµ½ºÚÏßµÄÇé¿ö
+    // å¤„ç†æœªæ£€æµ‹åˆ°é»‘çº¿çš„æƒ…å†µ
     if (active_count == 0) {
-        // ÌØÊâ´¦Àí£º¿É¸ù¾İĞèÇó·µ»Ø×î´ó/×îĞ¡Öµ
-        // ´Ë´¦·µ»Ø0.0f±íÊ¾ÎŞÎó²î
+        // é¢å¤–å¤„ç†ï¼šå¯æ ¹æ®éœ€æ±‚è¿”å›é»˜è®¤å€¼æˆ–æœ€å°å€¼
+        // æ­¤å¤„è¿”å›0.0fè¡¨ç¤ºå±…ä¸­
         return 0.0f;
     }
 
-    // ¼ÆËã¼ÓÈ¨Æ½¾ùÎó²î
+    // è®¡ç®—åŠ æƒå¹³å‡è¯¯å·®
     return (float)sum / (float)active_count;
 }
 
 float Trace_task(void)
 {
-	//ÎŞÊ±»ù´«¸ĞÆ÷³£¹æÈÎÎñ£¬°üº¬Ä£ÄâÁ¿£¬Êı×ÖÁ¿£¬¹éÒ»»¯Á¿
+	// å®šæ—¶è°ƒç”¨ä¼ æ„Ÿå™¨ä»»åŠ¡ï¼ŒåŒ…å«æ¨¡æ‹Ÿæ•°æ®é‡‡é›†å’Œæ•°å­—åŒ–ä¸€æ•´ä¸ªæµç¨‹
+#ifdef USE_GRAY_SERIAL
+    Digtal = Gray_Serial_Read();
+#else
     No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
-    //ÓĞÊ±»ù´«¸ĞÆ÷³£¹æÈÎÎñ£¬°üº¬Ä£ÄâÁ¿£¬Êı×ÖÁ¿£¬¹éÒ»»¯Á¿
+    // å®šæ—¶è°ƒç”¨ä¼ æ„Ÿå™¨ä»»åŠ¡ï¼ŒåŒ…å«æ¨¡æ‹Ÿæ•°æ®é‡‡é›†å’Œæ•°å­—åŒ–ä¸€æ•´ä¸ªæµç¨‹
 //            No_Mcu_Ganv_Sensor_Task_With_tick(&sensor)
-    //»ñÈ¡´«¸ĞÆ÷Êı×ÖÁ¿½á¹û(Ö»ÓĞµ±ÓĞºÚ°×Öµ´«Èë½øÈ¥ÁËÖ®ºó²Å»áÓĞÕâ¸öÖµ£¡£¡)
+    // è·å–æ•°å­—é‡ä¼ æ„Ÿå™¨æ•°æ®ï¼ˆåªæœ‰å½“é»‘ç™½å€¼å¡«è¿›å»ä¹‹åæ‰ä¼šæœ‰æ•°å­—é‡è¾“å‡ºï¼‰
     Digtal=Get_Digtal_For_User(&sensor);
+#endif
     track_err = Cal_Trace_Err(Digtal);
-    //¾­µä°æÀíÂÛĞÔÄÜ1khz£¬Ö»ĞèÒªdelay1ms£¬Çà´º°æ100hz£¬ĞèÒªdelay10ms£¬·ñÔò²»ÄÜÕı³£Ê¹ÓÃ
+    // å¾ªè¿¹ä»»åŠ¡é¢‘ç‡1kHzåªéœ€è¦delay 1msï¼Œå¦‚æœæ˜¯100Hzéœ€è¦delay 10msï¼Œæ ¹æ®éœ€æ±‚é€‰æ‹©ä½¿ç”¨
 		PID_calc(&Trace_PID,0,track_err);
 	return Trace_PID.out;
 }

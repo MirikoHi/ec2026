@@ -255,6 +255,12 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 
     DL_GPIO_initDigitalOutput(Gray_Address_PIN_2_IOMUX);
 
+    DL_GPIO_initDigitalInputFeatures(Gray_Serial_DAT_IOMUX,
+		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_NONE,
+		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+
+    DL_GPIO_initDigitalOutput(Gray_Serial_CLK_IOMUX);
+
     DL_GPIO_clearPins(GPIOA, BEEP_PIN_14_PIN |
 		ICM42688_CS_CS_PIN |
 		Motor_dir_EN1_A_PIN |
@@ -264,7 +270,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		ZDT_Motor_Pitch_Dir_PIN |
 		ZDT_Motor_Yaw_Stp_PIN |
 		ZDT_Motor_Pitch_Stp_PIN |
-		Gray_Address_PIN_0_PIN);
+		Gray_Address_PIN_0_PIN |
+		Gray_Serial_CLK_PIN);
     DL_GPIO_enableOutput(GPIOA, BEEP_PIN_14_PIN |
 		ICM42688_CS_CS_PIN |
 		Motor_dir_EN1_A_PIN |
@@ -274,7 +281,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		ZDT_Motor_Pitch_Dir_PIN |
 		ZDT_Motor_Yaw_Stp_PIN |
 		ZDT_Motor_Pitch_Stp_PIN |
-		Gray_Address_PIN_0_PIN);
+		Gray_Address_PIN_0_PIN |
+		Gray_Serial_CLK_PIN);
     DL_GPIO_clearPins(GPIOB, RELAY_Control_PIN |
 		User_LED_User_led_PIN |
 		Motor_dir_EN2_B_PIN |

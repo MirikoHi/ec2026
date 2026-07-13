@@ -338,6 +338,15 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define Gray_Address_PIN_2_PORT                                          (GPIOB)
 #define Gray_Address_PIN_2_PIN                                  (DL_GPIO_PIN_24)
 #define Gray_Address_PIN_2_IOMUX                                 (IOMUX_PINCM52)
+/* Port definition for Pin Group Gray_Serial */
+#define Gray_Serial_PORT                                                 (GPIOA)
+
+/* Defines for DAT: GPIOA.26 with pinCMx 59 on package pin 30 */
+#define Gray_Serial_DAT_PIN                                     (DL_GPIO_PIN_26)
+#define Gray_Serial_DAT_IOMUX                                    (IOMUX_PINCM59)
+/* Defines for CLK: GPIOA.27 with pinCMx 60 on package pin 31 */
+#define Gray_Serial_CLK_PIN                                     (DL_GPIO_PIN_27)
+#define Gray_Serial_CLK_IOMUX                                    (IOMUX_PINCM60)
 
 
 /* Defines for MCAN0 */

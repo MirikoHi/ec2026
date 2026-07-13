@@ -131,6 +131,7 @@
 #define GIMBAL_TASK_STACK_DEPTH    192
 #define MOTOR_TASK_STACK_DEPTH	   320
 #define HWMOTOR_TASK_STACK_DEPTH   256
+#define TRACE_TASK_STACK_DEPTH     256
 
 #if ENABLE_STACK_MONITOR  //开启时占用栈比较多
 #define DAEMON_TASK_STACK_DEPTH    256
@@ -151,7 +152,7 @@ static void RobotCmdTask(void *pvParameters);
 static void ChassisTask(void *pvParameters);
 static void DaemonTask(void *pvParameters);
 static void NRF24L01Task(void *pvParameters);
-static void GimbalTask(void *pvParameters);
+// static void GimbalTask(void *pvParameters);
 static void StepMotorTask(void *pvParameters);
 static void MotorTask(void *pvParameters);
 static void MenuTask(void *pvParameters);
@@ -167,10 +168,11 @@ static QueueHandle_t xQueue = NULL;
 static TaskHandle_t xKeyTaskHandle       = NULL;
 static TaskHandle_t xRobotCmdTaskHandle  = NULL;
 static TaskHandle_t xChassisTaskHandle   = NULL;
-static TaskHandle_t xGimbalTaskHandle    = NULL;
+// static TaskHandle_t xGimbalTaskHandle    = NULL;
 static TaskHandle_t xDaemonTaskHandle    = NULL;
 static TaskHandle_t xMenuTaskHandle      = NULL;
 static TaskHandle_t xHwmotorTaskHandle   = NULL;
+static TaskHandle_t xTraceTaskHandle     = NULL;
 #endif
 
 #if ENABLE_STACK_MONITOR
@@ -222,10 +224,10 @@ void app_tasks_init(void)
 //            NULL);
 // 			configASSERT(xResult == pdPASS);
 
-//			xResult=xTaskCreate(TraceTask, "Trace", configMINIMAL_STACK_SIZE,
-//            (void *) Trace_PARAMETER, tskIDLE_PRIORITY+2,
-//            NULL);
-//			configASSERT(xResult == pdPASS);	
+		xResult=xTaskCreate(TraceTask, "Trace", TRACE_TASK_STACK_DEPTH,
+            (void *) Trace_PARAMETER, tskIDLE_PRIORITY+2,
+            STACK_HANDLE(Trace));
+		configASSERT(xResult == pdPASS);	
 
 			xResult=xTaskCreate(RobotCmdTask, "RobotCmd", ROBOTCMD_TASK_STACK_DEPTH,
             (void *) RobotCmd_PARAMETER, tskIDLE_PRIORITY+2,
@@ -236,11 +238,11 @@ void app_tasks_init(void)
             (void *) Chassis_PARAMETER, tskIDLE_PRIORITY+2,
             STACK_HANDLE(Chassis));
 			configASSERT(xResult == pdPASS);
-
-			xResult=xTaskCreate(GimbalTask, "Gimbal", GIMBAL_TASK_STACK_DEPTH,
-            (void *) Gimbal_PARAMETER, tskIDLE_PRIORITY+2,
-            STACK_HANDLE(Gimbal));
-			configASSERT(xResult == pdPASS);
+   //
+			// xResult=xTaskCreate(GimbalTask, "Gimbal", GIMBAL_TASK_STACK_DEPTH,
+   //          (void *) Gimbal_PARAMETER, tskIDLE_PRIORITY+2,
+   //          STACK_HANDLE(Gimbal));
+			// configASSERT(xResult == pdPASS);
 
 			// xResult=xTaskCreate(MotorTask, "Motor", MOTOR_TASK_STACK_DEPTH,
    //          (void *) MotorTask_PARAMETER, tskIDLE_PRIORITY+2,
@@ -455,24 +457,24 @@ static void ChassisTask(void *pvParameters)
 		}
 }
 
-static void GimbalTask(void *pvParameters)
-{
-	configASSERT(
-        ((unsigned long) pvParameters) == Gimbal_PARAMETER);
-	Gimbal_Init();
-	vTaskDelay(2000);
-	static float Gimbal_dt;
-  static float Gimbal_start;
-	for (;;){
-			Gimbal_start = DWT_GetTimeline_ms();
-			Gimbal();
-			Gimbal_dt = DWT_GetTimeline_ms() - Gimbal_start;
-			if (Gimbal_dt > 5)
-          LOGERROR("[freeRTOS] Gimbal Task is being DELAY! dt = [%f]", Gimbal_dt);
-			vTaskDelay(pdMS_TO_TICKS(5));
-			
-		}
-}
+// static void GimbalTask(void *pvParameters)
+// {
+// 	configASSERT(
+//         ((unsigned long) pvParameters) == Gimbal_PARAMETER);
+// 	Gimbal_Init();
+// 	vTaskDelay(2000);
+// 	static float Gimbal_dt;
+//   static float Gimbal_start;
+// 	for (;;){
+// 			Gimbal_start = DWT_GetTimeline_ms();
+// 			Gimbal();
+// 			Gimbal_dt = DWT_GetTimeline_ms() - Gimbal_start;
+// 			if (Gimbal_dt > 5)
+//           LOGERROR("[freeRTOS] Gimbal Task is being DELAY! dt = [%f]", Gimbal_dt);
+// 			vTaskDelay(pdMS_TO_TICKS(5));
+//
+// 		}
+// }
 static void DaemonTask(void *pvParameters)
 {
 	configASSERT(
@@ -506,16 +508,19 @@ static void DaemonTask(void *pvParameters)
 				LOGWARNING("[stack] Chassis free: %u / %u",
 				           (unsigned)uxTaskGetStackHighWaterMark(xChassisTaskHandle),
 				           CHASSIS_TASK_STACK_DEPTH);
-				LOGWARNING("[stack] Gimbal  free: %u / %u",
-				           (unsigned)uxTaskGetStackHighWaterMark(xGimbalTaskHandle),
-				           GIMBAL_TASK_STACK_DEPTH);
+				// LOGWARNING("[stack] Gimbal  free: %u / %u",
+				//            (unsigned)uxTaskGetStackHighWaterMark(xGimbalTaskHandle),
+				//            GIMBAL_TASK_STACK_DEPTH);
 				LOGWARNING("[stack] Daemon  free: %u / %u",
 				           (unsigned)uxTaskGetStackHighWaterMark(xDaemonTaskHandle),
 				           DAEMON_TASK_STACK_DEPTH);
 				LOGWARNING("[stack] Menu    free: %u / %u \n",
 				           (unsigned)uxTaskGetStackHighWaterMark(xMenuTaskHandle),
 				           MENU_TASK_STACK_DEPTH);
-				LOGWARNING("[stack] Hwmotor free: %u / %u \n",
+				LOGWARNING("[stack] Trace   free: %u / %u",
+			           (unsigned)uxTaskGetStackHighWaterMark(xTraceTaskHandle),
+			           TRACE_TASK_STACK_DEPTH);
+			LOGWARNING("[stack] Hwmotor free: %u / %u \n",
 				           (unsigned)uxTaskGetStackHighWaterMark(xHwmotorTaskHandle),
 				           HWMOTOR_TASK_STACK_DEPTH);
 			}
