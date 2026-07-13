@@ -29,11 +29,15 @@ typedef struct {
 		float speed_filtered;
 }Motor_Speed_Filter_e;
 
+// EN_1:EN_2 = 1:0  电机正转
+// EN_1:EN_2 = 0:1  电机反转
+// EN_1:EN_2 = 0:0  电机停止
+// EN_1:EN_2 = 1:1  电机刹车
 typedef struct {
-	GPIO_Regs* EN_A_PORT;
-	uint32_t EN_A_pin;
-	GPIO_Regs* EN_B_PORT;
-	uint32_t EN_B_pin;
+	GPIO_Regs* EN_1_PORT;
+	uint32_t EN_1_pin;
+	GPIO_Regs* EN_2_PORT;
+	uint32_t EN_2_pin;
 	GPTIMER_Regs* inst;
 	DL_TIMER_CC_INDEX idx;
 } DCMotor_PortPin_s;

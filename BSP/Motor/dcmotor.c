@@ -3,6 +3,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include "dwt.h"
+#include "motor_def.h"
 DCMotorInstance dcmotor_instance[MOTOR_MAX_NUM] = {0};
 uint8_t idx_dcmotor = 0;
 static float DCMotor_Speed_Filter(Motor_Speed_Filter_e *filter,float speed);
@@ -29,20 +30,20 @@ static void set_motor(DCMotorInstance *motor)
 	int16_t speed = (int16_t)(motor->speed_pid.out*motor->State);
 	if(motor->State == DISABLE)
 	{
-		DL_GPIO_clearPins(motor->PortPin.EN_A_PORT,motor->PortPin.EN_A_pin);                                                   
-		DL_GPIO_clearPins(motor->PortPin.EN_B_PORT,motor->PortPin.EN_B_pin);       
+		DL_GPIO_clearPins(motor->PortPin.EN_1_PORT,motor->PortPin.EN_1_pin);
+		DL_GPIO_clearPins(motor->PortPin.EN_2_PORT,motor->PortPin.EN_2_pin);
 	}
 	else
 	{
-		if(speed*(motor->Output_Dir == MOTOR_NORMAL? 1:-1)<0)                                                                                				  
+		if(speed*(motor->Output_Dir == MOTOR_REVERSAL? 1:-1)<0)
 		{                                                                                                      
-			DL_GPIO_setPins(motor->PortPin.EN_A_PORT,motor->PortPin.EN_A_pin);                                                   
-			DL_GPIO_clearPins(motor->PortPin.EN_B_PORT,motor->PortPin.EN_B_pin);                                                 
+			DL_GPIO_setPins(motor->PortPin.EN_1_PORT,motor->PortPin.EN_1_pin);
+			DL_GPIO_clearPins(motor->PortPin.EN_2_PORT,motor->PortPin.EN_2_pin);
 		}                                                                                                      
 		else                                                                                               
 		{                                                                                                      
-			DL_GPIO_setPins(motor->PortPin.EN_B_PORT,motor->PortPin.EN_B_pin);                                                   
-			DL_GPIO_clearPins(motor->PortPin.EN_A_PORT,motor->PortPin.EN_A_pin);                                                 
+			DL_GPIO_setPins(motor->PortPin.EN_2_PORT,motor->PortPin.EN_2_pin);
+			DL_GPIO_clearPins(motor->PortPin.EN_1_PORT,motor->PortPin.EN_1_pin);
 		}
 	}
 	    
@@ -98,11 +99,12 @@ void Hw_Motor_Task(void)
 		//pid计算
 		PID_calc(&dcmotor_instance[i].speed_pid,dcmotor_instance[i].position_pid.out+dcmotor_instance[i].Trace_Compensation+dcmotor_instance[i].speed_ref,dcmotor_instance[i].filter.speed_filtered);
 		//前馈
-		dcmotor_instance[i].speed_pid.out += (float)dcmotor_instance[i].feedforward*(dcmotor_instance[i].encoder->dir==FORWARD?-1:1);
+		dcmotor_instance[i].speed_pid.out += (float)dcmotor_instance[i].feedforward*((dcmotor_instance[i].speed_pid.Ref > 0 && fabsf(dcmotor_instance[i].speed_pid.Ref) > 0.005f)? 1.0f : -1.0f);
 		if(dcmotor_instance[i].State == DISABLE)
 		{
 			PID_clear(&dcmotor_instance[i].speed_pid);
 		}
+		LIMIT_MIN_MAX(dcmotor_instance[i].speed_pid.out,-2499,2499);
 		//赋值
 		set_motor(&dcmotor_instance[i]);
 	}

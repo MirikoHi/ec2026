@@ -33,13 +33,13 @@ void Chassis_Set_Turn(void);
 void Chassis_Init(void)
 {
 	DCMotorInitConfig_s motor_l_config ={
-		.Input_Dir = MOTOR_REVERSAL,
+		.Input_Dir = MOTOR_NORMAL,
 		.Output_Dir = MOTOR_REVERSAL,
 		.PortPin ={
-			.EN_A_PORT = Motor_dir_EN2_A_PORT,
-			.EN_A_pin = Motor_dir_EN2_A_PIN,
-			.EN_B_PORT = Motor_dir_EN2_B_PORT,
-			.EN_B_pin = Motor_dir_EN2_B_PIN,
+			.EN_1_PORT = Motor_dir_EN1_B_PORT,
+			.EN_1_pin = Motor_dir_EN1_B_PIN,
+			.EN_2_PORT = Motor_dir_EN2_B_PORT,
+			.EN_2_pin = Motor_dir_EN2_B_PIN,
 			.inst = Motor_INST,
 			.idx = GPIO_Motor_C1_IDX,
 		},
@@ -51,33 +51,33 @@ void Chassis_Init(void)
 		},
 		.speed_pid_config = {
 			.mode = PID_POSITION,
-			.Kp = 10000.0f,
-			.Kd = 0.0f,
+			.Kp = 15000.0f,
 			.Ki = 0.0f,
+			.Kd = 50000.0f,
 			.max_out = 2499.0f,
 			.max_iout = 500.0f, 
 		},
 		.position_pid_config= {
 			.mode = PID_POSITION,
-			.Kp = 3.5f,
+			.Kp = 4.0f,
 			.Kd = 0.0f,
 			.Ki = 0.0f,
-			.max_out = 0.01f,
+			.max_out = 2.0f,
 			.max_iout = 0.0f, 
 		},
-//		.feedforward = 85,
+		.feedforward = 85,
 	};
 	size_t free_heap = xPortGetFreeHeapSize();
 	motor_l = DCMotor_Init(&motor_l_config);
 	free_heap = xPortGetFreeHeapSize();
 	DCMotorInitConfig_s motor_r_config ={
-		.Input_Dir = MOTOR_NORMAL,
+		.Input_Dir = MOTOR_REVERSAL,
 		.Output_Dir = MOTOR_REVERSAL,
 		.PortPin ={
-			.EN_A_PORT = Motor_dir_EN1_A_PORT,
-			.EN_A_pin = Motor_dir_EN1_A_PIN,
-			.EN_B_PORT = Motor_dir_EN1_B_PORT,
-			.EN_B_pin = Motor_dir_EN1_B_PIN,
+			.EN_1_PORT = Motor_dir_EN1_A_PORT,
+			.EN_1_pin = Motor_dir_EN1_A_PIN,
+			.EN_2_PORT = Motor_dir_EN2_A_PORT,
+			.EN_2_pin = Motor_dir_EN2_A_PIN,
 			.inst = Motor_INST,
 			.idx = GPIO_Motor_C0_IDX,
 		},
@@ -89,21 +89,21 @@ void Chassis_Init(void)
 		},
 		.speed_pid_config = {
 			.mode = PID_POSITION,
-			.Kp = 10000.0f,
-			.Kd = 0.0f,
+			.Kp = 17000.0f,
 			.Ki = 0.0f,
+			.Kd = 200000.0f,
 			.max_out = 2499.0f,
 			.max_iout = 500.0f, 
 		},
 		.position_pid_config= {
 			.mode = PID_POSITION,
-			.Kp = 3.5f,
+			.Kp = 4.0f,
 			.Kd = 0.0f,
 			.Ki = 0.0f,
-			.max_out = 0.01f,
+			.max_out = 2.0f,
 			.max_iout = 0.0f, 
 		},
-//		.feedforward = 140,
+		.feedforward = 85,
 	};
 	motor_r = DCMotor_Init(&motor_r_config);
 	//PAW3395_Init();
@@ -253,12 +253,15 @@ void Chassis_Set_Line(float position)
 	motor_l->position_ref = position;
 	motor_r->position_ref = position;
 }
-
-
+static volatile uint16_t tar_count = 0;
+static volatile float temp_tar = 0.2f;
 void Chassis_State_Turn(void)
 {
-	motor_l->position_ref = 0.05;
-	motor_r->position_ref = 0.05;
+	tar_count++;
+	motor_l->position_ref = temp_tar * sin(tar_count / 100.0f);
+	motor_r->position_ref = temp_tar * sin(tar_count / 100.0f);
+
+
 	// static uint8_t quan=0;
 	// switch(state)
 	// {
