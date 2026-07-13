@@ -5,7 +5,7 @@
 **********************************************************************
 
 File          : 
-Created       : 24. Jun 2026 20:18
+Created       : 13. Jul 2026 15:37
 Ozone Version : V3.40e
 */
 
@@ -25,15 +25,16 @@ void OnProjectLoad (void) {
   Project.AddPathSubstitute ("D:/Code/ElectricCompetitionProject/electric-competition-training", "$(ProjectDir)");
   Project.AddPathSubstitute ("d:/code/electriccompetitionproject/electric-competition-training", "$(ProjectDir)");
   Project.SetDevice ("MSPM0G3507");
-  Project.SetHostIF ("USB", "602712202");
+  Project.SetHostIF ("USB", "602712552");
   Project.SetTargetIF ("SWD");
   Project.SetTIFSpeed ("4 MHz");
   Project.AddSvdFile ("$(InstallDir)/Config/CPU/Cortex-M0.svd");
-  Project.AddSvdFile ("$(InstallDir)/Config/Peripherals/STM32F407IG.svd");
+  Project.AddSvdFile ("$(InstallDir)/Config/Peripherals/STM32F103xx.svd");
   //
   // User settings
   //
-  File.Open ("$(ProjectDir)/cmake-build-debug/electric-competition-robot");
+  File.Open ("$(ProjectDir)/cmake-build-debug/electric-competition-robot.elf");
+  Edit.SysVar (VAR_HSS_SPEED, FREQ_10_KHZ);
 }
 
 /*********************************************************************
