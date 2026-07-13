@@ -9,6 +9,12 @@ uint8_t idx_encoder = 0;
 uint32_t gpioA_Pin_registered = 0;
 uint32_t gpioB_Pin_registered = 0;
 
+/**
+ * @brief 使能已注册编码器所在的 GPIO 中断
+ *
+ * 遍历当前已初始化的编码器实例，检查 A/B 相是否分布在 GPIOA 或 GPIOB，
+ * 然后开启对应的 NVIC 中断。
+ */
 void Encoder_InterruptBegin(void)
 {
 	bool GPIOA_falg=0;
@@ -37,6 +43,15 @@ void Encoder_InterruptBegin(void)
 
 }
 
+/**
+ * @brief 初始化一个编码器实例
+ *
+ * 该函数会把传入的端口/引脚配置保存到编码器实例中，并把对应引脚
+ * 记录到 GPIOA/GPIOB 的中断掩码里，供后续统一使能中断使用。
+ *
+ * @param init 编码器 A/B 相端口和引脚配置
+ * @return 编码器实例指针
+ */
 ENCODER_RES* Encoder_Init(encoder_PortPin_s* init)
 {
 	ENCODER_RES* encoder=&encoder_instance[idx_encoder++];
@@ -65,7 +80,12 @@ ENCODER_RES* Encoder_Init(encoder_PortPin_s* init)
 	return encoder;
 }
 
-
+/**
+ * @brief 刷新编码器的当前计数、方向和累计计数
+ *
+ * 将中断里累积到 temp_count 的脉冲数结算到 count，
+ * 再基于 count 更新方向和总计数，同时清零临时计数。
+ */
 void Encoder_Update(void)
 {
 	for(uint8_t i=0;i<idx_encoder;i++)
@@ -78,7 +98,10 @@ void Encoder_Update(void)
 	}
 }
 
-
+/**
+ * @brief 编码器 GPIO 中断服务函数，读取A，B相编码器脉冲个数
+ *
+ */
 void GROUP1_IRQHandler(void)
 {
 //	NRF24L01_IRQHandler();
