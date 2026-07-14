@@ -132,20 +132,20 @@ void OLED_WR_Byte(uint8_t dat, uint8_t mode)
 	txData[1] = dat;
 
 	/* 1. 等待I2C总线彻底空闲 */
-	while (!(DL_I2C_getControllerStatus(I2C_1_INST) & DL_I2C_CONTROLLER_STATUS_IDLE));
+	while (!(DL_I2C_getControllerStatus(I2C_0_INST) & DL_I2C_CONTROLLER_STATUS_IDLE));
 
 	/* 2. 将2个字节填入发送FIFO */
-	DL_I2C_fillControllerTXFIFO(I2C_1_INST, txData, 2);
+	DL_I2C_fillControllerTXFIFO(I2C_0_INST, txData, 2);
 
 	/* 3. 启动传输（硬件自动产生START和STOP） */
-	DL_I2C_startControllerTransfer(I2C_1_INST, OLED_I2C_ADDR,
+	DL_I2C_startControllerTransfer(I2C_0_INST, OLED_I2C_ADDR,
 		DL_I2C_CONTROLLER_DIRECTION_TX, 2);
 
 	/* 4. 等待总线变为BUSY_BUS（确认硬件状态机已启动） */
-	while (!(DL_I2C_getControllerStatus(I2C_1_INST) & DL_I2C_CONTROLLER_STATUS_BUSY_BUS));
+	while (!(DL_I2C_getControllerStatus(I2C_0_INST) & DL_I2C_CONTROLLER_STATUS_BUSY_BUS));
 
 	/* 5. 等待I2C回到空闲（本次传输真正完成） */
-	while (!(DL_I2C_getControllerStatus(I2C_1_INST) & DL_I2C_CONTROLLER_STATUS_IDLE));
+	while (!(DL_I2C_getControllerStatus(I2C_0_INST) & DL_I2C_CONTROLLER_STATUS_IDLE));
 }
 
 /**
