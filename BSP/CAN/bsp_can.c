@@ -13,6 +13,8 @@
 #include "string.h"
 #include "dwt.h"
 #include "bsp_log.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 
 /** 全局CAN实例注册表 */
@@ -161,6 +163,7 @@ uint8_t CANTransmit(CANInstance *instance, float timeout)
     /* 等待TX Buffer空闲（TXBRP位清除 = 上一帧已实际发送完成） */
     while (DL_MCAN_getTxBufReqPend(MCAN0_INST) & ((uint32_t)1U << instance->tx_buf_idx))
     {
+        taskYIELD();  //让出CPU，同优先级任务可在此期间运行
         if (DWT_GetTimeline_ms() - start > timeout)
         {
             LOGERROR("[bsp_can] CAN TX timeout! buf_idx=%d", instance->tx_buf_idx);
