@@ -44,6 +44,7 @@ DL_TimerA_backupConfig gTIMER_TICKBackup;
 DL_TimerG_backupConfig gZDT_MOTOR_TICKBackup;
 DL_UART_Main_backupConfig gUART_0Backup;
 DL_SPI_backupConfig gICM42688Backup;
+DL_SPI_backupConfig gSPI_OLEDBackup;
 
 /*
  *  ======== SYSCFG_DL_init ========
@@ -64,6 +65,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_UART_0_init();
     SYSCFG_DL_K230_init();
     SYSCFG_DL_ICM42688_init();
+    SYSCFG_DL_SPI_OLED_init();
     SYSCFG_DL_ADC1_init();
     SYSCFG_DL_MCAN0_init();
     /* Ensure backup structures have no valid state */
@@ -72,6 +74,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
 	gZDT_MOTOR_TICKBackup.backupRdy 	= false;
 	gUART_0Backup.backupRdy 	= false;
 	gICM42688Backup.backupRdy 	= false;
+	gSPI_OLEDBackup.backupRdy 	= false;
 
 
 }
@@ -87,6 +90,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_saveConfiguration(void)
 	retStatus &= DL_TimerG_saveConfiguration(ZDT_MOTOR_TICK_INST, &gZDT_MOTOR_TICKBackup);
 	retStatus &= DL_UART_Main_saveConfiguration(UART_0_INST, &gUART_0Backup);
 	retStatus &= DL_SPI_saveConfiguration(ICM42688_INST, &gICM42688Backup);
+	retStatus &= DL_SPI_saveConfiguration(SPI_OLED_INST, &gSPI_OLEDBackup);
 
     return retStatus;
 }
@@ -100,6 +104,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_restoreConfiguration(void)
 	retStatus &= DL_TimerG_restoreConfiguration(ZDT_MOTOR_TICK_INST, &gZDT_MOTOR_TICKBackup, false);
 	retStatus &= DL_UART_Main_restoreConfiguration(UART_0_INST, &gUART_0Backup);
 	retStatus &= DL_SPI_restoreConfiguration(ICM42688_INST, &gICM42688Backup);
+	retStatus &= DL_SPI_restoreConfiguration(SPI_OLED_INST, &gSPI_OLEDBackup);
 
     return retStatus;
 }
@@ -117,6 +122,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_reset(UART_0_INST);
     DL_UART_Main_reset(K230_INST);
     DL_SPI_reset(ICM42688_INST);
+    DL_SPI_reset(SPI_OLED_INST);
     DL_ADC12_reset(ADC1_INST);
     DL_MCAN_reset(MCAN0_INST);
 
@@ -131,6 +137,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_enablePower(UART_0_INST);
     DL_UART_Main_enablePower(K230_INST);
     DL_SPI_enablePower(ICM42688_INST);
+    DL_SPI_enablePower(SPI_OLED_INST);
     DL_ADC12_enablePower(ADC1_INST);
     DL_MCAN_enablePower(MCAN0_INST);
     delay_cycles(POWER_STARTUP_DELAY);
@@ -179,7 +186,11 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_initPeripheralInputFunction(
         GPIO_ICM42688_IOMUX_POCI, GPIO_ICM42688_IOMUX_POCI_FUNC);
     DL_GPIO_initPeripheralOutputFunction(
-        GPIO_ICM42688_IOMUX_CS0, GPIO_ICM42688_IOMUX_CS0_FUNC);
+        GPIO_SPI_OLED_IOMUX_SCLK, GPIO_SPI_OLED_IOMUX_SCLK_FUNC);
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_SPI_OLED_IOMUX_PICO, GPIO_SPI_OLED_IOMUX_PICO_FUNC);
+    DL_GPIO_initPeripheralInputFunction(
+        GPIO_SPI_OLED_IOMUX_POCI, GPIO_SPI_OLED_IOMUX_POCI_FUNC);
 
     DL_GPIO_initDigitalOutputFeatures(BEEP_PIN_14_IOMUX,
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
@@ -731,11 +742,10 @@ SYSCONFIG_WEAK void SYSCFG_DL_K230_init(void)
 
 static const DL_SPI_Config gICM42688_config = {
     .mode        = DL_SPI_MODE_CONTROLLER,
-    .frameFormat = DL_SPI_FRAME_FORMAT_MOTO4_POL1_PHA1,
+    .frameFormat = DL_SPI_FRAME_FORMAT_MOTO3_POL1_PHA1,
     .parity      = DL_SPI_PARITY_NONE,
     .dataSize    = DL_SPI_DATA_SIZE_8,
     .bitOrder    = DL_SPI_BIT_ORDER_MSB_FIRST,
-    .chipSelectPin = DL_SPI_CHIP_SELECT_0,
 };
 
 static const DL_SPI_ClockConfig gICM42688_clockConfig = {
@@ -760,6 +770,37 @@ SYSCONFIG_WEAK void SYSCFG_DL_ICM42688_init(void) {
 
     /* Enable module */
     DL_SPI_enable(ICM42688_INST);
+}
+static const DL_SPI_Config gSPI_OLED_config = {
+    .mode        = DL_SPI_MODE_CONTROLLER,
+    .frameFormat = DL_SPI_FRAME_FORMAT_MOTO3_POL0_PHA0,
+    .parity      = DL_SPI_PARITY_NONE,
+    .dataSize    = DL_SPI_DATA_SIZE_8,
+    .bitOrder    = DL_SPI_BIT_ORDER_MSB_FIRST,
+};
+
+static const DL_SPI_ClockConfig gSPI_OLED_clockConfig = {
+    .clockSel    = DL_SPI_CLOCK_BUSCLK,
+    .divideRatio = DL_SPI_CLOCK_DIVIDE_RATIO_1
+};
+
+SYSCONFIG_WEAK void SYSCFG_DL_SPI_OLED_init(void) {
+    DL_SPI_setClockConfig(SPI_OLED_INST, (DL_SPI_ClockConfig *) &gSPI_OLED_clockConfig);
+
+    DL_SPI_init(SPI_OLED_INST, (DL_SPI_Config *) &gSPI_OLED_config);
+
+    /* Configure Controller mode */
+    /*
+     * Set the bit rate clock divider to generate the serial output clock
+     *     outputBitRate = (spiInputClock) / ((1 + SCR) * 2)
+     *     8000000 = (80000000)/((1 + 4) * 2)
+     */
+    DL_SPI_setBitRateSerialClockDivider(SPI_OLED_INST, 4);
+    /* Set RX and TX FIFO threshold levels */
+    DL_SPI_setFIFOThreshold(SPI_OLED_INST, DL_SPI_RX_FIFO_LEVEL_1_2_FULL, DL_SPI_TX_FIFO_LEVEL_1_2_EMPTY);
+
+    /* Enable module */
+    DL_SPI_enable(SPI_OLED_INST);
 }
 
 /* ADC1 Initialization */
