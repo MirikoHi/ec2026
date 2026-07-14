@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>__MSPM0G3507__</Define>
               <Undefine></Undefine>
-              <IncludePath>../../../../../../source;../../../../../../source/third_party/CMSIS/Core/Include;../../../../../../kernel/freertos/Source/include;..\..\..\..\..\..\kernel\freertos\Source\portable\GCC\ARM_CM0;../</IncludePath>
+              <IncludePath>..\..\..\..\..\..;..\..\..\..\..\mspm0_sdk;..\..\..\..\..\mspm0_sdk\third_party\CMSIS\Core\Include;..\..\..\..\Source\include;..\..\..\..\Source\portable\TI_ARM_CLANG\ARM_CM0;..\..\..\..;..\..\..\..\..\SYSVIEWFreeRTOSV11\FreeRTOSV11;..\..\..\..\..\SYSVIEWFreeRTOSV11\SYSVIEW;..\..\..\..\..\SYSVIEWFreeRTOSV11\SEGGER;..\..\..\..\..\SYSVIEWFreeRTOSV11\Config;..\..\..\..\..\SEGGER\RTT;..\..\..\..\..\SEGGER\Config</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -387,7 +387,7 @@
             <File>
               <FileName>FreeRTOSConfig.h</FileName>
               <FileType>5</FileType>
-              <FilePath>../FreeRTOSConfig.h</FilePath>
+              <FilePath>..\..\..\..\FreeRTOSConfig.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -397,102 +397,102 @@
             <File>
               <FileName>croutine.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/Source/croutine.c</FilePath>
+              <FilePath>..\..\..\..\Source\croutine.c</FilePath>
             </File>
             <File>
               <FileName>event_groups.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/Source/event_groups.c</FilePath>
+              <FilePath>..\..\..\..\Source\event_groups.c</FilePath>
             </File>
             <File>
               <FileName>list.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/Source/list.c</FilePath>
+              <FilePath>..\..\..\..\Source\list.c</FilePath>
             </File>
             <File>
               <FileName>queue.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/Source/queue.c</FilePath>
+              <FilePath>..\..\..\..\Source\queue.c</FilePath>
             </File>
             <File>
               <FileName>stream_buffer.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/Source/stream_buffer.c</FilePath>
+              <FilePath>..\..\..\..\Source\stream_buffer.c</FilePath>
             </File>
             <File>
               <FileName>tasks.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/Source/tasks.c</FilePath>
+              <FilePath>..\..\..\..\Source\tasks.c</FilePath>
             </File>
             <File>
               <FileName>timers.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/Source/timers.c</FilePath>
+              <FilePath>..\..\..\..\Source\timers.c</FilePath>
             </File>
             <File>
               <FileName>heap_4.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/Source/portable/MemMang/heap_4.c</FilePath>
+              <FilePath>..\..\..\..\Source\portable/MemMang/heap_4.c</FilePath>
             </File>
             <File>
               <FileName>port.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/Source/portable/GCC/ARM_CM0/port.c</FilePath>
+              <FilePath>..\..\..\..\Source\portable\TI_ARM_CLANG\ARM_CM0\port.c</FilePath>
             </File>
             <File>
               <FileName>portasm.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/Source/portable/GCC/ARM_CM0/portasm.c</FilePath>
+              <FilePath>..\..\..\..\Source\portable\TI_ARM_CLANG\ARM_CM0\portasm.c</FilePath>
             </File>
             <File>
               <FileName>AppHooks_freertos.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/dpl/AppHooks_freertos.c</FilePath>
+              <FilePath>..\..\..\..\dpl\AppHooks_freertos.c</FilePath>
             </File>
             <File>
               <FileName>ClockP_freertos.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/dpl/ClockP_freertos.c</FilePath>
+              <FilePath>..\..\..\..\dpl\ClockP_freertos.c</FilePath>
             </File>
             <File>
               <FileName>DebugP_freertos.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/dpl/DebugP_freertos.c</FilePath>
+              <FilePath>..\..\..\..\dpl\DebugP_freertos.c</FilePath>
             </File>
             <File>
               <FileName>MutexP_freertos.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/dpl/MutexP_freertos.c</FilePath>
+              <FilePath>..\..\..\..\dpl\MutexP_freertos.c</FilePath>
             </File>
             <File>
               <FileName>SemaphoreP_freertos.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/dpl/SemaphoreP_freertos.c</FilePath>
+              <FilePath>..\..\..\..\dpl\SemaphoreP_freertos.c</FilePath>
             </File>
             <File>
               <FileName>SystemP_freertos.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/dpl/SystemP_freertos.c</FilePath>
+              <FilePath>..\..\..\..\dpl\SystemP_freertos.c</FilePath>
             </File>
             <File>
               <FileName>StaticAllocs_freertos.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/dpl/StaticAllocs_freertos.c</FilePath>
+              <FilePath>..\..\..\..\dpl\StaticAllocs_freertos.c</FilePath>
             </File>
             <File>
               <FileName>TaskP_freertos.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/dpl/TaskP_freertos.c</FilePath>
+              <FilePath>..\..\..\..\dpl\TaskP_freertos.c</FilePath>
             </File>
             <File>
               <FileName>HwiPMSPM0_freertos.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../../../../../../kernel/freertos/dpl/HwiPMSPM0_freertos.c</FilePath>
+              <FilePath>..\..\..\..\dpl\HwiPMSPM0_freertos.c</FilePath>
             </File>
             <File>
               <FileName>startup_mspm0g350x_uvision.s</FileName>
               <FileType>2</FileType>
-              <FilePath>../../../../../../source/ti/devices/msp/m0p/startup_system_files/keil/startup_mspm0g350x_uvision.s</FilePath>
+              <FilePath>..\..\..\..\..\target\keil\startup_mspm0g350x_uvision.s</FilePath>
             </File>
           </Files>
         </Group>
