@@ -221,7 +221,6 @@ int8_t bsp_Icm42688RegCfg(void)
     uint8_t reg_val = 0;
     /* 读取 who am i 寄存器 */
     reg_val = icm42688_read_reg(ICM42688_WHO_AM_I);
-		printf("reg_val:%d\n",reg_val);
     icm42688_write_reg(ICM42688_REG_BANK_SEL, 0); //设置bank 0区域寄存器
     icm42688_write_reg(ICM42688_REG_BANK_SEL, 0x01); //软复位传感器
     ICM42688DelayMs(100);

@@ -69,10 +69,9 @@ void IMU_init(void)
 		now = nowtime;
 		return;
 	}
-	printf("IMU ERROR!!\r\n");
 }
 
-static double Gyro_fill[3][300];
+static float Gyro_fill[3][300];
 static double Gyro_total[3];
 static double sqrGyro_total[3];
 static int GyroinitFlag = 0;
