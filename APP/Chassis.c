@@ -107,7 +107,8 @@ void Chassis_Init(void)
 	};
 	motor_r = DCMotor_Init(&motor_r_config);
 	//PAW3395_Init();
-	IMU_init();
+	IMU_init();   //ICM42688陀螺仪初始化
+	JY901s_Init(); //JY901s陀螺仪初始化
 	DWT_Delay(1);
 }
 
