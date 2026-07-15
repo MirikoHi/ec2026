@@ -1,17 +1,17 @@
 #include "Robot_Cmd.h"
 #include "bsp_log.h"
-#include "JY901S.h"
+#include "../BSP/IMU/JY901S.h"
 #include "trace.h"
 #include "OLED.h"
-#include "ADC_Voltage.h"
+#include "../BSP/Voltage/ADC_Voltage.h"
 #include "can_comm.h"
 #include "misc.h"
 #include "dwt.h"
-#include "tjc.h"
+//#include "tjc.h"
 #include "Chassis.h"
 #include "math.h"
 #include "K230.h"
-#include "icm42688.h"
+#include "../BSP/IMU/icm42688.h"
 icm42688RawData_t Chassis_Gyro;
 
 static CANCommInstance *chasiss_can_comm; // 双板通信CAN comm

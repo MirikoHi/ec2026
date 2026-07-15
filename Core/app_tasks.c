@@ -69,7 +69,7 @@
 #include "semphr.h"
 #include "task.h"
 #include "OLED.h"
-#include "KEY.h"
+#include "../BSP/Display/KEY.h"
 #include "trace.h"
 #include "DCmotor.h"
 #include "Robot_Cmd.h"
@@ -77,11 +77,11 @@
 #include "encoder_timer.h"
 #include "dwt.h"
 #include "daemon.h"
-#include "menu.h"
+#include "../BSP/Display/menu.h"
 #include "NRF24L01.h"
 #include "Gimbal.h"
 #include "ZDT_Motor.h"
-#include "motor_task.h"
+#include "../BSP/Motor_DJIDM/motor_task.h"
 /* TI includes. */
 #include "ti_msp_dl_config.h"
 

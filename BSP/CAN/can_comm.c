@@ -9,7 +9,7 @@
 #include "can_comm.h"
 #include "stdlib.h"
 #include "string.h"
-#include "crc8.h"
+#include "../Algorithm/crc8.h"
 #include "dwt.h"
 #include "bsp_log.h"
 

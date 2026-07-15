@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>__MSPM0G3507__</Define>
               <Undefine></Undefine>
-              <IncludePath>..\..\..\;..\..\..\Core;..\..\..\BSP\Motor;..\..\..\BSP\Sensor;..\..\..\BSP\Display;..\..\..\BSP\Comm;..\..\..\BSP\Control;..\..\..\BSP\System;..\..\..\BSP\UI;..\..\..\BSP\Periph;..\..\..\APP;..\..\SEGGER\RTT;..\..\SEGGER\Config;..\..\SEGGER\log;..\..\mspm0_sdk;..\..\mspm0_sdk\third_party\CMSIS\Core\Include;..\..\FreeRTOS\Source\include;..\..\FreeRTOS\Source\portable\GCC\ARM_CM0;..\..\FreeRTOS\builds\LP_MSPM0G3507\release;..\..\SYSVIEWFreeRTOSV11\FreeRTOSV11;..\..\SYSVIEWFreeRTOSV11\SYSVIEW;..\..\SYSVIEWFreeRTOSV11\SEGGER;..\..\SYSVIEWFreeRTOSV11\Config;..\..\..\BSP\CAN</IncludePath>
+              <IncludePath>..\..\..\;..\..\..\Core;..\..\..\BSP\Motor;..\..\..\BSP\Display;..\..\..\BSP\Comm;..\..\..\BSP\Algorithm;..\..\..\BSP\System;..\..\..\BSP\IMU;..\..\..\BSP\Trace;..\..\..\BSP\Motor_DJIDM;..\..\..\BSP\Beep;..\..\..\BSP\Voltage;..\..\..\APP;..\..\SEGGER\RTT;..\..\SEGGER\Config;..\..\SEGGER\log;..\..\mspm0_sdk;..\..\mspm0_sdk\third_party\CMSIS\Core\Include;..\..\FreeRTOS\Source\include;..\..\FreeRTOS\Source\portable\GCC\ARM_CM0;..\..\FreeRTOS\builds\LP_MSPM0G3507\release;..\..\SYSVIEWFreeRTOSV11\FreeRTOSV11;..\..\SYSVIEWFreeRTOSV11\SYSVIEW;..\..\SYSVIEWFreeRTOSV11\SEGGER;..\..\SYSVIEWFreeRTOSV11\Config;..\..\..\BSP\CAN</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -480,11 +480,6 @@
               <FilePath>..\..\..\BSP\Display\OLED.h</FilePath>
             </File>
             <File>
-              <FileName>oledfont.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\..\..\BSP\Display\oledfont.h</FilePath>
-            </File>
-            <File>
               <FileName>OLED_Data.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\BSP\Display\OLED_Data.c</FilePath>
@@ -497,22 +492,22 @@
             <File>
               <FileName>KEY.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\BSP\Periph\KEY.c</FilePath>
+              <FilePath>..\..\..\BSP\Display\KEY.c</FilePath>
             </File>
             <File>
               <FileName>KEY.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\..\BSP\Periph\KEY.h</FilePath>
+              <FilePath>..\..\..\BSP\Display\KEY.h</FilePath>
             </File>
             <File>
               <FileName>trace.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\BSP\Sensor\trace.c</FilePath>
+              <FilePath>..\..\..\BSP\Trace\trace.c</FilePath>
             </File>
             <File>
               <FileName>trace.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\..\BSP\Sensor\trace.h</FilePath>
+              <FilePath>..\..\..\BSP\Trace\trace.h</FilePath>
             </File>
             <File>
               <FileName>misc.c</FileName>
@@ -527,12 +522,12 @@
             <File>
               <FileName>PID.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\BSP\Control\PID.c</FilePath>
+              <FilePath>..\..\..\BSP\Algorithm\PID.c</FilePath>
             </File>
             <File>
               <FileName>PID.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\..\BSP\Control\PID.h</FilePath>
+              <FilePath>..\..\..\BSP\Algorithm\PID.h</FilePath>
             </File>
             <File>
               <FileName>dwt.c</FileName>
@@ -557,12 +552,12 @@
             <File>
               <FileName>menu.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\..\BSP\UI\menu.h</FilePath>
+              <FilePath>..\..\..\BSP\Display\menu.h</FilePath>
             </File>
             <File>
               <FileName>menu.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\BSP\UI\menu.c</FilePath>
+              <FilePath>..\..\..\BSP\Display\menu.c</FilePath>
             </File>
             <File>
               <FileName>fifo.c</FileName>
@@ -597,22 +592,22 @@
             <File>
               <FileName>icm42688.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\BSP\Sensor\icm42688.c</FilePath>
+              <FilePath>..\..\..\BSP\IMU\icm42688.c</FilePath>
             </File>
             <File>
               <FileName>icm42688.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\..\BSP\Sensor\icm42688.h</FilePath>
+              <FilePath>..\..\..\BSP\IMU\icm42688.h</FilePath>
             </File>
             <File>
               <FileName>No_Mcu_Ganv_Grayscale_Sensor.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\BSP\Sensor\No_Mcu_Ganv_Grayscale_Sensor.c</FilePath>
+              <FilePath>..\..\..\BSP\Trace\No_Mcu_Ganv_Grayscale_Sensor.c</FilePath>
             </File>
             <File>
               <FileName>No_Mcu_Ganv_Grayscale_Sensor_Config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\..\BSP\Sensor\No_Mcu_Ganv_Grayscale_Sensor_Config.h</FilePath>
+              <FilePath>..\..\..\BSP\Trace\No_Mcu_Ganv_Grayscale_Sensor_Config.h</FilePath>
             </File>
             <File>
               <FileName>encoder_timer.c</FileName>
@@ -647,12 +642,12 @@
             <File>
               <FileName>IMU.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\BSP\Sensor\IMU.c</FilePath>
+              <FilePath>..\..\..\BSP\IMU\IMU.c</FilePath>
             </File>
             <File>
               <FileName>IMU.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\..\BSP\Sensor\IMU.h</FilePath>
+              <FilePath>..\..\..\BSP\IMU\IMU.h</FilePath>
             </File>
             <File>
               <FileName>bsp_can.c</FileName>
@@ -667,12 +662,102 @@
             <File>
               <FileName>crc8.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\BSP\CAN\crc8.c</FilePath>
+              <FilePath>..\..\..\BSP\Algorithm\crc8.c</FilePath>
             </File>
             <File>
               <FileName>gray_serial.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\BSP\Sensor\gray_serial.c</FilePath>
+              <FilePath>..\..\..\BSP\Trace\gray_serial.c</FilePath>
+            </File>
+            <File>
+              <FileName>gray_serial.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\Trace\gray_serial.h</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_can.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\CAN\bsp_can.h</FilePath>
+            </File>
+            <File>
+              <FileName>can_comm.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\CAN\can_comm.h</FilePath>
+            </File>
+            <File>
+              <FileName>crc8.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\Algorithm\crc8.h</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_beep.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\BSP\Beep\bsp_beep.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_beep.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\Beep\bsp_beep.h</FilePath>
+            </File>
+            <File>
+              <FileName>JY901S.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\BSP\IMU\JY901S.c</FilePath>
+            </File>
+            <File>
+              <FileName>JY901S.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\IMU\JY901S.h</FilePath>
+            </File>
+            <File>
+              <FileName>Servo.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\BSP\Motor\Servo.c</FilePath>
+            </File>
+            <File>
+              <FileName>Servo.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\Motor\Servo.h</FilePath>
+            </File>
+            <File>
+              <FileName>dji_motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\BSP\Motor_DJIDM\dji_motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>dji_motor.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\Motor_DJIDM\dji_motor.h</FilePath>
+            </File>
+            <File>
+              <FileName>dmmotor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\BSP\Motor_DJIDM\dmmotor.c</FilePath>
+            </File>
+            <File>
+              <FileName>dmmotor.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\Motor_DJIDM\dmmotor.h</FilePath>
+            </File>
+            <File>
+              <FileName>motor_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\BSP\Motor_DJIDM\motor_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_task.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\Motor_DJIDM\motor_task.h</FilePath>
+            </File>
+            <File>
+              <FileName>ADC_Voltage.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\BSP\Voltage\ADC_Voltage.c</FilePath>
+            </File>
+            <File>
+              <FileName>ADC_Voltage.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\BSP\Voltage\ADC_Voltage.h</FilePath>
             </File>
           </Files>
         </Group>

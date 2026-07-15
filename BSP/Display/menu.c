@@ -21,9 +21,9 @@
 #include <locale.h>
 #include "FreeRTOS.h"
 #include "task.h"
-#include "Chassis.h"
-#include "Robot_Cmd.h"
-#include "Gimbal.h"
+#include "../../APP/Chassis.h"
+#include "../../APP/Robot_Cmd.h"
+#include "../../APP/Gimbal.h"
 
 //当前激活的菜单实例指针（指向 ALL_Menu_Instance 中的某一项） */
 MenuInstance* now_menu;
