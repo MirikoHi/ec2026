@@ -124,7 +124,7 @@
 // 是否打开栈水位监控功能 ： 1开启 0关闭   todo：在实际运行的时候看栈水位，优化大小节省sram空间
 #define ENABLE_STACK_MONITOR       1
 
-#define KEY_TASK_STACK_DEPTH       160
+#define KEY_TASK_STACK_DEPTH       256
 #define MENU_TASK_STACK_DEPTH      192
 #define ROBOTCMD_TASK_STACK_DEPTH  256
 #define CHASSIS_TASK_STACK_DEPTH   256
@@ -358,9 +358,9 @@ static void KeyTask(void *pvParameters)
 			
 			Key_Tick();
 			Key_dt = DWT_GetTimeline_ms() - Key_start;
-			if (Key_dt > 1)
+			if (Key_dt > 5)
             LOGERROR("[freeRTOS] Key Task is being DELAY! dt = [%f]", Key_dt);
-			vTaskDelay(pdMS_TO_TICKS(1));
+			vTaskDelay(pdMS_TO_TICKS(5));
 			
 		}
 }
