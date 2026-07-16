@@ -212,23 +212,23 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_ICM42688_SCLK_PIN                                   DL_GPIO_PIN_11
 #define GPIO_ICM42688_IOMUX_SCLK                                (IOMUX_PINCM22)
 #define GPIO_ICM42688_IOMUX_SCLK_FUNC                IOMUX_PINCM22_PF_SPI0_SCLK
-/* Defines for SPI_OLED */
-#define SPI_OLED_INST                                                      SPI1
-#define SPI_OLED_INST_IRQHandler                                SPI1_IRQHandler
-#define SPI_OLED_INST_INT_IRQN                                    SPI1_INT_IRQn
-#define GPIO_SPI_OLED_PICO_PORT                                           GPIOB
-#define GPIO_SPI_OLED_PICO_PIN                                    DL_GPIO_PIN_8
-#define GPIO_SPI_OLED_IOMUX_PICO                                (IOMUX_PINCM25)
-#define GPIO_SPI_OLED_IOMUX_PICO_FUNC                IOMUX_PINCM25_PF_SPI1_PICO
-#define GPIO_SPI_OLED_POCI_PORT                                           GPIOA
-#define GPIO_SPI_OLED_POCI_PIN                                   DL_GPIO_PIN_16
-#define GPIO_SPI_OLED_IOMUX_POCI                                (IOMUX_PINCM38)
-#define GPIO_SPI_OLED_IOMUX_POCI_FUNC                IOMUX_PINCM38_PF_SPI1_POCI
-/* GPIO configuration for SPI_OLED */
-#define GPIO_SPI_OLED_SCLK_PORT                                           GPIOB
-#define GPIO_SPI_OLED_SCLK_PIN                                    DL_GPIO_PIN_9
-#define GPIO_SPI_OLED_IOMUX_SCLK                                (IOMUX_PINCM26)
-#define GPIO_SPI_OLED_IOMUX_SCLK_FUNC                IOMUX_PINCM26_PF_SPI1_SCLK
+/* Defines for NRF24L01 */
+#define NRF24L01_INST                                                      SPI1
+#define NRF24L01_INST_IRQHandler                                SPI1_IRQHandler
+#define NRF24L01_INST_INT_IRQN                                    SPI1_INT_IRQn
+#define GPIO_NRF24L01_PICO_PORT                                           GPIOB
+#define GPIO_NRF24L01_PICO_PIN                                    DL_GPIO_PIN_8
+#define GPIO_NRF24L01_IOMUX_PICO                                (IOMUX_PINCM25)
+#define GPIO_NRF24L01_IOMUX_PICO_FUNC                IOMUX_PINCM25_PF_SPI1_PICO
+#define GPIO_NRF24L01_POCI_PORT                                           GPIOB
+#define GPIO_NRF24L01_POCI_PIN                                   DL_GPIO_PIN_21
+#define GPIO_NRF24L01_IOMUX_POCI                                (IOMUX_PINCM49)
+#define GPIO_NRF24L01_IOMUX_POCI_FUNC                IOMUX_PINCM49_PF_SPI1_POCI
+/* GPIO configuration for NRF24L01 */
+#define GPIO_NRF24L01_SCLK_PORT                                           GPIOB
+#define GPIO_NRF24L01_SCLK_PIN                                    DL_GPIO_PIN_9
+#define GPIO_NRF24L01_IOMUX_SCLK                                (IOMUX_PINCM26)
+#define GPIO_NRF24L01_IOMUX_SCLK_FUNC                IOMUX_PINCM26_PF_SPI1_SCLK
 
 
 
@@ -360,6 +360,15 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for CLK: GPIOA.27 with pinCMx 60 on package pin 31 */
 #define Gray_Serial_CLK_PIN                                     (DL_GPIO_PIN_27)
 #define Gray_Serial_CLK_IOMUX                                    (IOMUX_PINCM60)
+/* Port definition for Pin Group NRF24L */
+#define NRF24L_PORT                                                      (GPIOB)
+
+/* Defines for CSN: GPIOB.5 with pinCMx 18 on package pin 53 */
+#define NRF24L_CSN_PIN                                           (DL_GPIO_PIN_5)
+#define NRF24L_CSN_IOMUX                                         (IOMUX_PINCM18)
+/* Defines for CE: GPIOB.20 with pinCMx 48 on package pin 19 */
+#define NRF24L_CE_PIN                                           (DL_GPIO_PIN_20)
+#define NRF24L_CE_IOMUX                                          (IOMUX_PINCM48)
 
 
 /* Defines for MCAN0 */
@@ -414,7 +423,7 @@ void SYSCFG_DL_UART_1_init(void);
 void SYSCFG_DL_UART_0_init(void);
 void SYSCFG_DL_K230_init(void);
 void SYSCFG_DL_ICM42688_init(void);
-void SYSCFG_DL_SPI_OLED_init(void);
+void SYSCFG_DL_NRF24L01_init(void);
 void SYSCFG_DL_ADC1_init(void);
 
 void SYSCFG_DL_MCAN0_init(void);

@@ -44,7 +44,7 @@ DL_TimerA_backupConfig gTIMER_TICKBackup;
 DL_TimerG_backupConfig gZDT_MOTOR_TICKBackup;
 DL_UART_Main_backupConfig gUART_0Backup;
 DL_SPI_backupConfig gICM42688Backup;
-DL_SPI_backupConfig gSPI_OLEDBackup;
+DL_SPI_backupConfig gNRF24L01Backup;
 
 /*
  *  ======== SYSCFG_DL_init ========
@@ -65,7 +65,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_UART_0_init();
     SYSCFG_DL_K230_init();
     SYSCFG_DL_ICM42688_init();
-    SYSCFG_DL_SPI_OLED_init();
+    SYSCFG_DL_NRF24L01_init();
     SYSCFG_DL_ADC1_init();
     SYSCFG_DL_MCAN0_init();
     /* Ensure backup structures have no valid state */
@@ -74,7 +74,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
 	gZDT_MOTOR_TICKBackup.backupRdy 	= false;
 	gUART_0Backup.backupRdy 	= false;
 	gICM42688Backup.backupRdy 	= false;
-	gSPI_OLEDBackup.backupRdy 	= false;
+	gNRF24L01Backup.backupRdy 	= false;
 
 
 }
@@ -90,7 +90,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_saveConfiguration(void)
 	retStatus &= DL_TimerG_saveConfiguration(ZDT_MOTOR_TICK_INST, &gZDT_MOTOR_TICKBackup);
 	retStatus &= DL_UART_Main_saveConfiguration(UART_0_INST, &gUART_0Backup);
 	retStatus &= DL_SPI_saveConfiguration(ICM42688_INST, &gICM42688Backup);
-	retStatus &= DL_SPI_saveConfiguration(SPI_OLED_INST, &gSPI_OLEDBackup);
+	retStatus &= DL_SPI_saveConfiguration(NRF24L01_INST, &gNRF24L01Backup);
 
     return retStatus;
 }
@@ -104,7 +104,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_restoreConfiguration(void)
 	retStatus &= DL_TimerG_restoreConfiguration(ZDT_MOTOR_TICK_INST, &gZDT_MOTOR_TICKBackup, false);
 	retStatus &= DL_UART_Main_restoreConfiguration(UART_0_INST, &gUART_0Backup);
 	retStatus &= DL_SPI_restoreConfiguration(ICM42688_INST, &gICM42688Backup);
-	retStatus &= DL_SPI_restoreConfiguration(SPI_OLED_INST, &gSPI_OLEDBackup);
+	retStatus &= DL_SPI_restoreConfiguration(NRF24L01_INST, &gNRF24L01Backup);
 
     return retStatus;
 }
@@ -122,7 +122,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_reset(UART_0_INST);
     DL_UART_Main_reset(K230_INST);
     DL_SPI_reset(ICM42688_INST);
-    DL_SPI_reset(SPI_OLED_INST);
+    DL_SPI_reset(NRF24L01_INST);
     DL_ADC12_reset(ADC1_INST);
     DL_MCAN_reset(MCAN0_INST);
 
@@ -137,7 +137,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_enablePower(UART_0_INST);
     DL_UART_Main_enablePower(K230_INST);
     DL_SPI_enablePower(ICM42688_INST);
-    DL_SPI_enablePower(SPI_OLED_INST);
+    DL_SPI_enablePower(NRF24L01_INST);
     DL_ADC12_enablePower(ADC1_INST);
     DL_MCAN_enablePower(MCAN0_INST);
     delay_cycles(POWER_STARTUP_DELAY);
@@ -186,11 +186,11 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_initPeripheralInputFunction(
         GPIO_ICM42688_IOMUX_POCI, GPIO_ICM42688_IOMUX_POCI_FUNC);
     DL_GPIO_initPeripheralOutputFunction(
-        GPIO_SPI_OLED_IOMUX_SCLK, GPIO_SPI_OLED_IOMUX_SCLK_FUNC);
+        GPIO_NRF24L01_IOMUX_SCLK, GPIO_NRF24L01_IOMUX_SCLK_FUNC);
     DL_GPIO_initPeripheralOutputFunction(
-        GPIO_SPI_OLED_IOMUX_PICO, GPIO_SPI_OLED_IOMUX_PICO_FUNC);
+        GPIO_NRF24L01_IOMUX_PICO, GPIO_NRF24L01_IOMUX_PICO_FUNC);
     DL_GPIO_initPeripheralInputFunction(
-        GPIO_SPI_OLED_IOMUX_POCI, GPIO_SPI_OLED_IOMUX_POCI_FUNC);
+        GPIO_NRF24L01_IOMUX_POCI, GPIO_NRF24L01_IOMUX_POCI_FUNC);
 
     DL_GPIO_initDigitalOutputFeatures(BEEP_PIN_14_IOMUX,
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
@@ -272,6 +272,10 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 
     DL_GPIO_initDigitalOutput(Gray_Serial_CLK_IOMUX);
 
+    DL_GPIO_initDigitalOutput(NRF24L_CSN_IOMUX);
+
+    DL_GPIO_initDigitalOutput(NRF24L_CE_IOMUX);
+
     DL_GPIO_clearPins(GPIOA, BEEP_PIN_14_PIN |
 		ICM42688_CS_CS_PIN |
 		Motor_dir_EN1_A_PIN |
@@ -298,12 +302,16 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		User_LED_User_led_PIN |
 		Motor_dir_EN2_B_PIN |
 		Gray_Address_PIN_1_PIN |
-		Gray_Address_PIN_2_PIN);
+		Gray_Address_PIN_2_PIN |
+		NRF24L_CE_PIN);
+    DL_GPIO_setPins(GPIOB, NRF24L_CSN_PIN);
     DL_GPIO_enableOutput(GPIOB, RELAY_Control_PIN |
 		User_LED_User_led_PIN |
 		Motor_dir_EN2_B_PIN |
 		Gray_Address_PIN_1_PIN |
-		Gray_Address_PIN_2_PIN);
+		Gray_Address_PIN_2_PIN |
+		NRF24L_CSN_PIN |
+		NRF24L_CE_PIN);
     DL_GPIO_setLowerPinsPolarity(GPIOB, DL_GPIO_PIN_2_EDGE_RISE |
 		DL_GPIO_PIN_3_EDGE_RISE);
     DL_GPIO_setUpperPinsPolarity(GPIOB, DL_GPIO_PIN_18_EDGE_RISE |
@@ -769,7 +777,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_ICM42688_init(void) {
     /* Enable module */
     DL_SPI_enable(ICM42688_INST);
 }
-static const DL_SPI_Config gSPI_OLED_config = {
+static const DL_SPI_Config gNRF24L01_config = {
     .mode        = DL_SPI_MODE_CONTROLLER,
     .frameFormat = DL_SPI_FRAME_FORMAT_MOTO3_POL0_PHA0,
     .parity      = DL_SPI_PARITY_NONE,
@@ -777,15 +785,15 @@ static const DL_SPI_Config gSPI_OLED_config = {
     .bitOrder    = DL_SPI_BIT_ORDER_MSB_FIRST,
 };
 
-static const DL_SPI_ClockConfig gSPI_OLED_clockConfig = {
+static const DL_SPI_ClockConfig gNRF24L01_clockConfig = {
     .clockSel    = DL_SPI_CLOCK_BUSCLK,
     .divideRatio = DL_SPI_CLOCK_DIVIDE_RATIO_1
 };
 
-SYSCONFIG_WEAK void SYSCFG_DL_SPI_OLED_init(void) {
-    DL_SPI_setClockConfig(SPI_OLED_INST, (DL_SPI_ClockConfig *) &gSPI_OLED_clockConfig);
+SYSCONFIG_WEAK void SYSCFG_DL_NRF24L01_init(void) {
+    DL_SPI_setClockConfig(NRF24L01_INST, (DL_SPI_ClockConfig *) &gNRF24L01_clockConfig);
 
-    DL_SPI_init(SPI_OLED_INST, (DL_SPI_Config *) &gSPI_OLED_config);
+    DL_SPI_init(NRF24L01_INST, (DL_SPI_Config *) &gNRF24L01_config);
 
     /* Configure Controller mode */
     /*
@@ -793,12 +801,12 @@ SYSCONFIG_WEAK void SYSCFG_DL_SPI_OLED_init(void) {
      *     outputBitRate = (spiInputClock) / ((1 + SCR) * 2)
      *     8000000 = (80000000)/((1 + 4) * 2)
      */
-    DL_SPI_setBitRateSerialClockDivider(SPI_OLED_INST, 4);
+    DL_SPI_setBitRateSerialClockDivider(NRF24L01_INST, 4);
     /* Set RX and TX FIFO threshold levels */
-    DL_SPI_setFIFOThreshold(SPI_OLED_INST, DL_SPI_RX_FIFO_LEVEL_1_2_FULL, DL_SPI_TX_FIFO_LEVEL_1_2_EMPTY);
+    DL_SPI_setFIFOThreshold(NRF24L01_INST, DL_SPI_RX_FIFO_LEVEL_1_2_FULL, DL_SPI_TX_FIFO_LEVEL_1_2_EMPTY);
 
     /* Enable module */
-    DL_SPI_enable(SPI_OLED_INST);
+    DL_SPI_enable(NRF24L01_INST);
 }
 
 /* ADC1 Initialization */
