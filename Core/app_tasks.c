@@ -124,13 +124,13 @@
 // 是否打开栈水位监控功能 ： 1开启 0关闭   todo：在实际运行的时候看栈水位，优化大小节省sram空间
 #define ENABLE_STACK_MONITOR       1
 
-#define KEY_TASK_STACK_DEPTH       256
+#define KEY_TASK_STACK_DEPTH       192
 #define MENU_TASK_STACK_DEPTH      192
 #define ROBOTCMD_TASK_STACK_DEPTH  256
 #define CHASSIS_TASK_STACK_DEPTH   256
 #define GIMBAL_TASK_STACK_DEPTH    192
 #define MOTOR_TASK_STACK_DEPTH	   320
-#define HWMOTOR_TASK_STACK_DEPTH   256
+#define HWMOTOR_TASK_STACK_DEPTH   192
 #define TRACE_TASK_STACK_DEPTH     256
 
 #if ENABLE_STACK_MONITOR  //开启时占用栈比较多
@@ -573,7 +573,7 @@ static void MotorTask(void *pvParameters)
 			MotorControlTask();
 			Motor_dt = DWT_GetTimeline_ms() - Motor_start;
 			if (Motor_dt > 2)
-	          LOGERROR("[freeRTOS] Motor Task is being DELAY! dt = [%f]", &Motor_dt);
+	          LOGERROR("[freeRTOS] Motor Task is being DELAY! dt = [%f]", Motor_dt);
 			vTaskDelay(pdMS_TO_TICKS(2));
 		}
 }
@@ -595,10 +595,11 @@ static void MenuTask(void *pvParameters)
         Menu_start = DWT_GetTimeline_ms();
         menu_task();
         Menu_dt = DWT_GetTimeline_ms() - Menu_start;
-        if (Menu_dt > 10)
-            LOGERROR("[freeRTOS] Menu Task is being DELAY! dt = [%f]", &Menu_dt);
+    	LOGINFO("Menu Task DT = [%f] ms", Menu_dt);
+        if (Menu_dt > 100)
+            LOGERROR("[freeRTOS] Menu Task is being DELAY! dt = [%f]", Menu_dt);
 
     	//10Hz固定频率刷新屏幕显示
-        vTaskDelayUntil(&xNextWakeTime, pdMS_TO_TICKS(100));
+    	vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

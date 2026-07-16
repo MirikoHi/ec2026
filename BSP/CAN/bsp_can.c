@@ -166,7 +166,7 @@ uint8_t CANTransmit(CANInstance *instance, float timeout)
         taskYIELD();  //让出CPU，同优先级任务可在此期间运行
         if (DWT_GetTimeline_ms() - start > timeout)
         {
-            LOGERROR("[bsp_can] CAN TX timeout! buf_idx=%d", instance->tx_buf_idx);
+            //LOGERROR("[bsp_can] CAN TX timeout! buf_idx=%d", instance->tx_buf_idx);
             return 0;
         }
     }

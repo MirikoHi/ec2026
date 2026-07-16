@@ -137,8 +137,8 @@ void Chassis(void)
 			trace_compensation=Trace_task();
 			trace_dt = DWT_GetTimeline_ms() - trace_starttime;//调试用，计算巡线任务耗时
 
-			//DCMotor_SetTraceCompensation(motor_l,-trace_compensation);
-			//DCMotor_SetTraceCompensation(motor_r,trace_compensation);
+			DCMotor_SetTraceCompensation(motor_l,-trace_compensation);
+			DCMotor_SetTraceCompensation(motor_r,trace_compensation);
 			Stop_Detect();
 			break;
 		case IMU_MODE:
