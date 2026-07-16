@@ -1,66 +1,82 @@
-## Example Summary
+## 项目概述
 
-The blink LED demo is a simple demo that implements a blinking LED with
-FreeRTOS's tickless idle mode. The LED blinks every 1 second.
+基于嘉立创天猛星MSPM0G3507开发板的电赛框架，支持差分驱动底盘+二轴云台，搭载视觉跟踪，采用模块化架构设计，支持跨平台开发
 
-## Peripherals & Pin Assignments
+基于TI SDK例程建立，例程位置在：mspm0_sdk_2_10_00_04\examples\rtos\LP_MSPM0G3507\kernel\blink_led
 
-| Peripheral | Pin | Function |
-| --- | --- | --- |
-| GPIOA | PA0 | Open-Drain Output |
-| SYSCTL |  |  |
-| EVENT |  |  |
-| DEBUGSS | PA20 | Debug Clock |
-| DEBUGSS | PA19 | Debug Data In Out |
+## 开发环境
 
-## BoosterPacks, Board Resources & Jumper Settings
+支持的IDE
+CLion + CMake
+Keil MDK
 
-Visit [LP_MSPM0G3507](https://www.ti.com/tool/LP-MSPM0G3507) for LaunchPad information, including user guide and hardware files.
+## 硬件平台
+MCU: TI MSPM0G3507 (ARM Cortex-M0+, 80MHz, 128KB Flash, 32KB SRAM)
+开发板: 嘉立创天猛星MSPM0G3507
+调试器: J-Link / DAPLink (4MHz SWD)
 
-| Pin | Peripheral | Function | LaunchPad Pin | LaunchPad Settings |
-| --- | --- | --- | --- | --- |
-| PA0 | GPIOA | PA0 | J27_9 | <ul><li>PA0 is 5V tolerant open-drain so it requires pull-up<br><ul><li>`J19 1:2` Use 3.3V pull-up<br><li>`J19 2:3` Use 5V pull-up</ul><br><li>PA0 can be connected to LED1<br><ul><li>`J4 ON` Connect to LED1<br><li>`J4 OFF` Disconnect from LED1</ul></ul> |
-| PA20 | DEBUGSS | SWCLK | N/A | <ul><li>PA20 is used by SWD during debugging<br><ul><li>`J101 15:16 ON` Connect to XDS-110 SWCLK while debugging<br><li>`J101 15:16 OFF` Disconnect from XDS-110 SWCLK if using pin in application</ul></ul> |
-| PA19 | DEBUGSS | SWDIO | N/A | <ul><li>PA19 is used by SWD during debugging<br><ul><li>`J101 13:14 ON` Connect to XDS-110 SWDIO while debugging<br><li>`J101 13:14 OFF` Disconnect from XDS-110 SWDIO if using pin in application</ul></ul> |
+## 项目架构
 
-### Device Migration Recommendations
-This project was developed for a superset device included in the LP_MSPM0G3507 LaunchPad. Please
-visit the [CCS User's Guide](https://software-dl.ti.com/msp430/esd/MSPM0-SDK/latest/docs/english/tools/ccs_ide_guide/doc_guide/doc_guide-srcs/ccs_ide_guide.html#manual-migration)
-for information about migrating to other MSPM0 devices.
+```
+electric-competition-training/
+├── 📁 Core/           # 系统核心（入口 & 初始化）
+│   ├── main.c        # 程序入口
+│   └── app_tasks.c   # FreeRTOS任务创建
+├── 📁 APP/           # 应用层逻辑
+│   ├── Robot.c       # 系统初始化入口
+│   ├── Chassis.c     # 底盘控制
+│   ├── Gimbal.c      # 云台控制
+│   └── Robot_Cmd.c  # 命令队列管理
+├── 📁 BSP/           # 硬件驱动层
+│   ├── Motor/        # 电机驱动（DC/步进）
+│   ├── Sensor/       # 传感器（IMU/巡线）
+│   ├── Display/      # 屏幕显示，菜单功能选择
+│   ├── IMU/          # SPI通信的ICM陀螺仪和串口通信的JY901s陀螺仪
+│   ├── Comm/         # 通信（K230/无线）
+│   ├── System/       # 系统工具（PID/守护进程等）
+│   ├── Trace/        # 循迹功能
+│   └── Motor_DJIDM/  # 懂得都懂
+└── 📁 Vendor/        # 第三方库
+    ├── FreeRTOS      # 实时操作系统
+    ├── mspm0_sdk     # TI官方SDK
+    └── SEGGER        # 调试工具链
+```
 
-### Low-Power Recommendations
-TI recommends to terminate unused pins by setting the corresponding functions to
-GPIO and configure the pins to output low or input with internal
-pullup/pulldown resistor.
+## 快速开始
 
-SysConfig allows developers to easily configure unused pins by selecting **Board**→**Configure Unused Pins**.
+### 环境准备
+参考天猛星入门手册 | 立创开发板技术文档中心的环境配置
 
-For more information about jumper configuration to achieve low-power using the
-MSPM0 LaunchPad, please visit the [LP-MSPM0G3507 User's Guide](https://www.ti.com/lit/slau873).
+### CLion开发
 
-## Example Usage
+使用CLion打开项目
 
-* For **CCS**:
-    Compile, load and run the example.
-* For **Keil**:
-    The .uvmpw project workspace file shall be used to bring the example project along with the freertos project to the IDE.
-    In Keil uVision,
-    * Select **Project** → **Batch Setup**
-    * Select all the project targets for the build
-    * Select **Project** → **Batch Build**, it will build all the projects in the workspace.
-* For **IAR**:
-    The .eww project workspace file shall be used to bring the example project along with the freertos project to the IDE.
-    In IAR IDE:
-    * Select **Project** → **Rebuild All**
-    * It should first build Freertos project followed by example project.
+ ==配置CMake选项：-DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-arm-none-eabi.cmake（确保指向正确的cmake/toolchain-arm-none-eabi.cmake）==
 
-LED1 will blink every 1s when the example run.
+<img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716133817149.png" alt="img" style="float: left; zoom: 50%;" />
 
-## Application Design Details
+编译并 使用jlink+ozone烧录，记得勾选：
 
-* This example shows how two tasks coordinate to blink LED1 every 1s.
-* In order to blink LED1, one task passes a queue message every second to another task.
+<img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716133901491.png" alt="img" style="float: left; zoom: 50%;" />
 
-### FREERTOS:
+### Keil开发
 
-* Please view the FreeRTOSConfig.h header file for example configuration information.
+项目路径为：Vendor/target/keil/
+
+<img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716134009047.png" alt="img" style="float:left;zoom:67%;" />
+
+编译产物在Vendor/target/keil/Objects/
+
+### 引脚配置
+使用TI SysConfig直接打开 robot.syscfg文件进行引脚配置
+配置完成后File-Save可重新生成驱动代码
+
+### Daplink无线调试
+
+用keil打开项目工程，勾选Daplink即可
+
+<img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716134322729.png" alt="img" style="float:left;zoom:67%;" />
+
+记得注释SYSVIEW相关内容，否则daplink运行程序的时候会停在SYSVIEW初始化代码的某个位置
+
+<img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716134158210.png" alt="img" style="float:left;zoom:67%;" />
