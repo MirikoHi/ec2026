@@ -118,7 +118,7 @@ void Robot_Cmd(void)
 	xQueueSend(chassis_cmd_queue, &chassis_cmd_send, 0U);
 	xQueueSend(gimbal_cmd_queue,&gimbal_cmd_send,0U);
 
-	CANCommSend(chasiss_can_comm, (void *)&chassis_feedback_data);
+	//CANCommSend(chasiss_can_comm, (void *)&chassis_feedback_data);
 }
 void Chassis_Mode_Switch_Callback(uint8_t i)
 {

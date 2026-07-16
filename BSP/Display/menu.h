@@ -25,5 +25,7 @@ typedef struct MenuInitConfig{
 
 void MenuInit(void);
 void menu_task(void);
+void MenuSetAnimationEnabled(uint8_t enabled);
+uint8_t MenuAnimationEnabled(void);
 
 #endif

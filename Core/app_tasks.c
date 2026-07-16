@@ -358,9 +358,9 @@ static void KeyTask(void *pvParameters)
 			
 			Key_Tick();
 			Key_dt = DWT_GetTimeline_ms() - Key_start;
-			if (Key_dt > 5)
+			if (Key_dt > 1)
             LOGERROR("[freeRTOS] Key Task is being DELAY! dt = [%f]", Key_dt);
-			vTaskDelay(pdMS_TO_TICKS(5));
+			vTaskDelay(pdMS_TO_TICKS(1));
 			
 		}
 }

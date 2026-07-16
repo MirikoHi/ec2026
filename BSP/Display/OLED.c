@@ -75,6 +75,18 @@
 
 /*全局变量*********************/
 uint8_t AniFlag=0;//动画完成标志位,让动画只执行一次
+typedef struct
+{
+	uint8_t active;
+	uint8_t x1;
+	uint8_t y1;
+	uint8_t l1;
+	uint8_t w1;
+	uint8_t x2;
+	uint8_t y2;
+	uint8_t l2;
+	uint8_t w2;
+} OLED_AnimationState;
 
 /**
   * OLED显存数组
@@ -84,8 +96,16 @@ uint8_t AniFlag=0;//动画完成标志位,让动画只执行一次
   */
 uint8_t OLED_DisplayBuf[8][128];
 static uint8_t OLED_TxBuf[129];
+static OLED_AnimationState OLED_AnimState;
+
+#define OLED_I2C_TIMEOUT_CYCLES   200000U
 
 static void OLED_I2C_WriteBlocking(const uint8_t *buffer, uint16_t count);
+static uint8_t OLED_I2C_WaitIdle(uint32_t timeout);
+static void OLED_I2C_Abort(void);
+static uint8_t OLED_AnimationStepAxis(uint8_t current, uint8_t target);
+static void OLED_UpdateAreaUnion(uint8_t x1, uint8_t y1, uint8_t l1, uint8_t w1,
+	uint8_t x2, uint8_t y2, uint8_t l2, uint8_t w2);
 
 /*********************全局变量*/
 
@@ -110,26 +130,72 @@ void OLED_GPIO_Init(void)
 	}
 }
 
+static uint8_t OLED_I2C_WaitIdle(uint32_t timeout)
+{
+	while (timeout-- > 0U)
+	{
+		uint32_t status = DL_I2C_getControllerStatus(I2C_0_INST);
+
+		if ((status & DL_I2C_CONTROLLER_STATUS_ERROR) != 0U)
+		{
+			return 0U;
+		}
+
+		if ((status & DL_I2C_CONTROLLER_STATUS_IDLE) != 0U)
+		{
+			return 1U;
+		}
+	}
+
+	return 0U;
+}
+
+static void OLED_I2C_Abort(void)
+{
+	DL_I2C_resetControllerTransfer(I2C_0_INST);
+	DL_I2C_flushControllerTXFIFO(I2C_0_INST);
+	DL_I2C_flushControllerRXFIFO(I2C_0_INST);
+}
+
 static void OLED_I2C_WriteBlocking(const uint8_t *buffer, uint16_t count)
 {
 	uint16_t written;
+	uint32_t timeout;
 
 	if ((buffer == NULL) || (count == 0U))
 	{
 		return;
 	}
 
-	while (!(DL_I2C_getControllerStatus(I2C_0_INST) & DL_I2C_CONTROLLER_STATUS_IDLE));
+	if (OLED_I2C_WaitIdle(OLED_I2C_TIMEOUT_CYCLES) == 0U)
+	{
+		OLED_I2C_Abort();
+		return;
+	}
+
 	DL_I2C_flushControllerTXFIFO(I2C_0_INST);
 
 	written = DL_I2C_fillControllerTXFIFO(I2C_0_INST, buffer, count);
 	DL_I2C_startControllerTransfer(I2C_0_INST, 0x3C,
 		DL_I2C_CONTROLLER_DIRECTION_TX, count);
 
-	while (!(DL_I2C_getControllerStatus(I2C_0_INST) & DL_I2C_CONTROLLER_STATUS_BUSY_BUS));
-
+	timeout = OLED_I2C_TIMEOUT_CYCLES;
 	while (written < count)
 	{
+		uint32_t status = DL_I2C_getControllerStatus(I2C_0_INST);
+
+		if ((status & DL_I2C_CONTROLLER_STATUS_ERROR) != 0U)
+		{
+			OLED_I2C_Abort();
+			return;
+		}
+
+		if (timeout-- == 0U)
+		{
+			OLED_I2C_Abort();
+			return;
+		}
+
 		if (!DL_I2C_isControllerTXFIFOFull(I2C_0_INST))
 		{
 			written += DL_I2C_fillControllerTXFIFO(I2C_0_INST,
@@ -137,7 +203,51 @@ static void OLED_I2C_WriteBlocking(const uint8_t *buffer, uint16_t count)
 		}
 	}
 
-	while (!(DL_I2C_getControllerStatus(I2C_0_INST) & DL_I2C_CONTROLLER_STATUS_IDLE));
+	if (OLED_I2C_WaitIdle(OLED_I2C_TIMEOUT_CYCLES) == 0U)
+	{
+		OLED_I2C_Abort();
+	}
+}
+
+static uint8_t OLED_AnimationStepAxis(uint8_t current, uint8_t target)
+{
+	if (current < target)
+	{
+		current = current + ((target - current) / 2U);
+		if (current == (uint8_t) (target - 1U))
+		{
+			current = target;
+		}
+	}
+	else if (current > target)
+	{
+		current = current - ((current - target) / 2U);
+		if (current == (uint8_t) (target + 1U))
+		{
+			current = target;
+		}
+	}
+
+	return current;
+}
+
+static void OLED_UpdateAreaUnion(uint8_t x1, uint8_t y1, uint8_t l1, uint8_t w1,
+	uint8_t x2, uint8_t y2, uint8_t l2, uint8_t w2)
+{
+	uint8_t left = x1;
+	uint8_t top = y1;
+	uint8_t right = x1 + l1;
+	uint8_t bottom = y1 + w1;
+
+	if (x2 < left) { left = x2; }
+	if (y2 < top) { top = y2; }
+	if ((uint8_t) (x2 + l2) > right) { right = (uint8_t) (x2 + l2); }
+	if ((uint8_t) (y2 + w2) > bottom) { bottom = (uint8_t) (y2 + w2); }
+
+	if ((right > left) && (bottom > top))
+	{
+		OLED_UpdateArea(left, top, (uint8_t) (right - left), (uint8_t) (bottom - top));
+	}
 }
 
 /*********************引脚配置*/
@@ -1472,75 +1582,17 @@ OLED二分法逼近反相动画,需要与OLED_AnimUpdate配合使用,每调用�
   */
 void OLED_Animation(uint8_t X1,uint8_t Y1,uint8_t L1,uint8_t W1,uint8_t X2,uint8_t Y2,uint8_t L2,uint8_t W2)
 {
-	OLED_ReverseArea(X1,Y1,L1,W1);//进来以后先把上一行反相清除
-	while(AniFlag == 0)
-	{
-		/*一次加一半*/
-		if((X1 < X2)||(Y1 < Y2)||(L1 < L2)||(W1 < W2))
-		{
-			OLED_ReverseArea(X1,Y1,L1,W1);//把上一次反相的反回来,先不刷新,等后面同时刷新,更流畅
-			if(X1 < X2){X1 = X1 + ((X2-X1)/2);}
-			if(Y1 < Y2){Y1 = Y1 + ((Y2-Y1)/2);}
-			if(L1 < L2){L1 = L1 + ((L2-L1)/2);}
-			if(W1 < W2){W1 = W1 + ((W2-W1)/2);}
-			
-			//由于二分,以及整型的原因,只能加到目标值减1,此时给他变成目标值
-			if(X1 == X2-1){X1 = X2;}
-			if(Y1 == Y2-1){Y1 = Y2;}
-			if(L1 == L2-1){L1 = L2;}
-			if(W1 == W2-1){W1 = W2;}
-			
-			OLED_ReverseArea(X1,Y1,L1,W1);//反相当前一帧
-			OLED_Update();
-			/*全部达到目的地,标志位置1,退出循环,不再进行动画*/
-			/*如2->11
-			1st:2+(11-2)/2=2+4=6;
-			2st:6+(11-6)/2=6+2=8;
-			3st:8+(11-8)/2=8+1=9;
-			4st:9+(11-9)/2=9+1=10;
-			5st:10+(11-10)/2=10+0=10;
-			也就是当数值达到目标数值减1时,就可以认为到达目的地了
-			*/
-			if((X1 == X2)&&(Y1 == Y2)&&(L1 == L2)&&(W1 == W2))
-			{
-				AniFlag = 1;
-				break;
-			}
-
-		}
-		/*一次减一半*/
-		if((X1 > X2)||(Y1 > Y2)||(L1 > L2)||(W1 > W2))
-		{
-			OLED_ReverseArea(X1,Y1,L1,W1);//把上一次反相的反回来,先不刷新,等后面同时刷新,更流畅
-			if(X1 > X2){X1 = X1 - ((X1-X2)/2);}
-			if(Y1 > Y2){Y1 = Y1 - ((Y1-Y2)/2);}
-			if(L1 > L2){L1 = L1 - ((L1-L2)/2);}
-			if(W1 > W2){W1 = W1 - ((W1-W2)/2);}
-			
-			//由于二分,以及整型的原因,只能加到目标值加1,此时给他变成目标值
-			if(X1 == X2+1){X1 = X2;}
-			if(Y1 == Y2+1){Y1 = Y2;}
-			if(L1 == L2+1){L1 = L2;}
-			if(W1 == W2+1){W1 = W2;}
-
-			OLED_ReverseArea(X1,Y1,L1,W1);//反相当前一帧
-			OLED_Update();
-			/*全部达到目的地,标志位置1,退出循环,不再进行动画*/
-			/*如11->2
-			1st:11-(11-2)/2=11-4=7;
-			2st:7-(7-2)/2=7-2=5;
-			3st:5-(5-2)/2=5-1=4;
-			4st:4-(4-2)/2=4-1=3;
-			5st:3-(3-2)/2=3-0=3;
-			也就是当数值达到目标数值加1时,就可以认为到达目的地了
-			*/
-			if((X1 == X2)&&(Y1 == Y2)&&(L1 == L2)&&(W1 == W2))
-			{
-				AniFlag = 1;
-				break;
-			}
-		}
-	}		
+	OLED_AnimState.active = 1;
+	OLED_AnimState.x1 = X1;
+	OLED_AnimState.y1 = Y1;
+	OLED_AnimState.l1 = L1;
+	OLED_AnimState.w1 = W1;
+	OLED_AnimState.x2 = X2;
+	OLED_AnimState.y2 = Y2;
+	OLED_AnimState.l2 = L2;
+	OLED_AnimState.w2 = W2;
+	AniFlag = 0;
+	OLED_AnimationStep();
 }
 
 /**
@@ -1550,7 +1602,52 @@ void OLED_Animation(uint8_t X1,uint8_t Y1,uint8_t L1,uint8_t W1,uint8_t X2,uint8
   */
 void OLED_AnimUpdate(void)
 {
+	OLED_AnimState.active = 0;
 	AniFlag = 0;
+}
+
+void OLED_AnimationStep(void)
+{
+	uint8_t old_x;
+	uint8_t old_y;
+	uint8_t old_l;
+	uint8_t old_w;
+
+	if (OLED_AnimState.active == 0U)
+	{
+		return;
+	}
+
+	old_x = OLED_AnimState.x1;
+	old_y = OLED_AnimState.y1;
+	old_l = OLED_AnimState.l1;
+	old_w = OLED_AnimState.w1;
+
+	OLED_ReverseArea(old_x, old_y, old_l, old_w);
+
+	OLED_AnimState.x1 = OLED_AnimationStepAxis(OLED_AnimState.x1, OLED_AnimState.x2);
+	OLED_AnimState.y1 = OLED_AnimationStepAxis(OLED_AnimState.y1, OLED_AnimState.y2);
+	OLED_AnimState.l1 = OLED_AnimationStepAxis(OLED_AnimState.l1, OLED_AnimState.l2);
+	OLED_AnimState.w1 = OLED_AnimationStepAxis(OLED_AnimState.w1, OLED_AnimState.w2);
+
+	OLED_ReverseArea(OLED_AnimState.x1, OLED_AnimState.y1,
+		OLED_AnimState.l1, OLED_AnimState.w1);
+	OLED_UpdateAreaUnion(old_x, old_y, old_l, old_w,
+		OLED_AnimState.x1, OLED_AnimState.y1, OLED_AnimState.l1, OLED_AnimState.w1);
+
+	if ((OLED_AnimState.x1 == OLED_AnimState.x2) &&
+		(OLED_AnimState.y1 == OLED_AnimState.y2) &&
+		(OLED_AnimState.l1 == OLED_AnimState.l2) &&
+		(OLED_AnimState.w1 == OLED_AnimState.w2))
+	{
+		OLED_AnimState.active = 0U;
+		AniFlag = 1;
+	}
+}
+
+uint8_t OLED_AnimationBusy(void)
+{
+	return OLED_AnimState.active;
 }
 /*********************功能函数*/
 

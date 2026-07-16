@@ -57,6 +57,8 @@ void OLED_DrawArc(int16_t X, int16_t Y, uint8_t Radius, int16_t StartAngle, int1
 /*动画函数*/
 void OLED_Animation(uint8_t X1,uint8_t Y1,uint8_t L1,uint8_t W1,uint8_t X2,uint8_t Y2,uint8_t L2,uint8_t W2);
 void OLED_AnimUpdate(void);
+void OLED_AnimationStep(void);
+uint8_t OLED_AnimationBusy(void);
 /*********************函数声明*/
 
 #endif
