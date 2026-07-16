@@ -83,6 +83,9 @@ uint8_t AniFlag=0;//动画完成标志位,让动画只执行一次
   * 才会将显存数组的数据发送到OLED硬件，进行显示
   */
 uint8_t OLED_DisplayBuf[8][128];
+static uint8_t OLED_TxBuf[129];
+
+static void OLED_I2C_WriteBlocking(const uint8_t *buffer, uint16_t count);
 
 /*********************全局变量*/
 
@@ -105,6 +108,36 @@ void OLED_GPIO_Init(void)
 	{
 		for (j = 0; j < 1000; j ++);
 	}
+}
+
+static void OLED_I2C_WriteBlocking(const uint8_t *buffer, uint16_t count)
+{
+	uint16_t written;
+
+	if ((buffer == NULL) || (count == 0U))
+	{
+		return;
+	}
+
+	while (!(DL_I2C_getControllerStatus(I2C_0_INST) & DL_I2C_CONTROLLER_STATUS_IDLE));
+	DL_I2C_flushControllerTXFIFO(I2C_0_INST);
+
+	written = DL_I2C_fillControllerTXFIFO(I2C_0_INST, buffer, count);
+	DL_I2C_startControllerTransfer(I2C_0_INST, 0x3C,
+		DL_I2C_CONTROLLER_DIRECTION_TX, count);
+
+	while (!(DL_I2C_getControllerStatus(I2C_0_INST) & DL_I2C_CONTROLLER_STATUS_BUSY_BUS));
+
+	while (written < count)
+	{
+		if (!DL_I2C_isControllerTXFIFOFull(I2C_0_INST))
+		{
+			written += DL_I2C_fillControllerTXFIFO(I2C_0_INST,
+				&buffer[written], count - written);
+		}
+	}
+
+	while (!(DL_I2C_getControllerStatus(I2C_0_INST) & DL_I2C_CONTROLLER_STATUS_IDLE));
 }
 
 /*********************引脚配置*/
@@ -130,6 +163,8 @@ void OLED_WR_Byte(uint8_t dat, uint8_t mode)
 
 	txData[0] = mode ? 0x40 : 0x00;	/* 控制字节：命令=0x00，数据=0x40 */
 	txData[1] = dat;
+	OLED_I2C_WriteBlocking(txData, 2);
+	return;
 
 	/* 1. 等待I2C总线彻底空闲 */
 	while (!(DL_I2C_getControllerStatus(I2C_0_INST) & DL_I2C_CONTROLLER_STATUS_IDLE));
@@ -166,6 +201,11 @@ void OLED_WriteCommand(uint8_t Command)
   */
 void OLED_WriteData(uint8_t *Data, uint8_t Count)
 {
+	OLED_TxBuf[0] = 0x40;	/* 鎺у埗瀛楄妭锛氭暟鎹ā寮?*/
+	memcpy(&OLED_TxBuf[1], Data, Count);
+	OLED_I2C_WriteBlocking(OLED_TxBuf, (uint16_t) Count + 1U);
+	return;
+
 	uint8_t i;
 	for (i = 0; i < Count; i ++)
 	{
@@ -1516,4 +1556,3 @@ void OLED_AnimUpdate(void)
 
 /*****************江协科技|版权所有****************/
 /*****************jiangxiekeji.com*****************/
-
