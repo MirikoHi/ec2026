@@ -595,7 +595,6 @@ static void MenuTask(void *pvParameters)
         Menu_start = DWT_GetTimeline_ms();
         menu_task();
         Menu_dt = DWT_GetTimeline_ms() - Menu_start;
-    	LOGINFO("Menu Task DT = [%f] ms", Menu_dt);
         if (Menu_dt > 50)
             LOGERROR("[freeRTOS] Menu Task is being DELAY! dt = [%f]", Menu_dt);
 
