@@ -56,6 +56,8 @@ static uint8_t menu_window_width(void);
 static uint8_t menu_window_height(void);
 static void menu_refresh_window(void);
 static void menu_switch_highlight(uint8_t old_row, uint8_t old_upper, uint8_t new_row, uint8_t new_upper);
+static uint8_t menu_item_count(const MenuInstance *menu);
+static void menu_set_selection(uint8_t absolute_idx);
 
 /**
  * @brief  菜单系统总初始化函数
@@ -290,7 +292,6 @@ static void menu_switch_highlight(uint8_t old_row, uint8_t old_upper, uint8_t ne
 			0, new_row * 16U, new_width, 16);
 		return;
 	}
-
 	if(old_width > 0U)
 	{
 		OLED_ReverseArea(0, old_row * 16U, old_width, 16);
@@ -301,6 +302,55 @@ static void menu_switch_highlight(uint8_t old_row, uint8_t old_upper, uint8_t ne
 		OLED_ReverseArea(0, new_row * 16U, new_width, 16);
 		OLED_UpdateArea(0, new_row * 16U, new_width, 16);
 	}
+}
+
+static uint8_t menu_item_count(const MenuInstance *menu)
+{
+	uint8_t count = 0U;
+
+	for (uint8_t i = 0U; i < MAX_MENU_NUM; i++)
+	{
+		if (menu->string[i] == NULL)
+		{
+			break;
+		}
+		count++;
+	}
+
+	return count;
+}
+
+static void menu_set_selection(uint8_t absolute_idx)
+{
+	uint8_t item_count = menu_item_count(now_menu);
+
+	if (item_count == 0U)
+	{
+		row_idx = 0U;
+		row_max_idx = 0U;
+		upper_limit_row_idx = 0U;
+		lower_limit_row_idx = 0U;
+		return;
+	}
+
+	row_max_idx = (item_count >= 4U) ? 3U : (uint8_t)(item_count - 1U);
+	if (absolute_idx >= item_count)
+	{
+		absolute_idx = (uint8_t)(item_count - 1U);
+	}
+
+	if (absolute_idx <= row_max_idx)
+	{
+		upper_limit_row_idx = 0U;
+		row_idx = absolute_idx;
+	}
+	else
+	{
+		upper_limit_row_idx = (uint8_t)(absolute_idx - row_max_idx);
+		row_idx = row_max_idx;
+	}
+
+	lower_limit_row_idx = (uint8_t)(upper_limit_row_idx + row_max_idx);
 }
 
 void MenuSetAnimationEnabled(uint8_t enabled)
@@ -427,6 +477,8 @@ static MenuInstance* single_menu_init(MenuInitConfig_s *config,MenuInstance *pre
  */
 void menu_task(void)
 {
+	uint8_t item_count;
+
 	if ((menu_animation_enabled != 0U) && OLED_AnimationBusy())
 	{
 		OLED_AnimationStep();
@@ -438,6 +490,7 @@ void menu_task(void)
 		LOGERROR("[menu]idx error!");
 		return;
 	}
+	item_count = menu_item_count(now_menu);
 	
 	if(Key_Check(0,KEY_SINGLE))//前进
 	{
@@ -550,6 +603,17 @@ void menu_task(void)
 				OLED_ReverseArea(0,0,16*now_menu->CharNum[row_idx+upper_limit_row_idx],16);
 				menu_refresh_window();
 			}
+			else if(item_count > 0U)
+			{
+				menu_set_selection((uint8_t)(item_count - 1U));
+				OLED_Clear();
+				for(uint8_t i=0;i<=row_max_idx;i++)
+				{
+					OLED_ShowString(0,i*16,(char *)now_menu->string[i+upper_limit_row_idx],OLED_8X16);
+				}
+				OLED_ReverseArea(0,row_idx*16,16*now_menu->CharNum[row_idx+upper_limit_row_idx],16);
+				menu_refresh_window();
+			}
 		}
 	}
 	else if(Key_Check(1,KEY_SINGLE|KEY_REPEAT))//向下
@@ -572,6 +636,17 @@ void menu_task(void)
 					OLED_ShowString(0,i*16,(char *)now_menu->string[i+upper_limit_row_idx],OLED_8X16);
 				}
 				OLED_ReverseArea(0,row_max_idx*16,16*now_menu->CharNum[row_idx+upper_limit_row_idx],16);
+				menu_refresh_window();
+			}
+			else if(item_count > 0U)
+			{
+				menu_set_selection(0U);
+				OLED_Clear();
+				for(uint8_t i=0;i<=row_max_idx;i++)
+				{
+					OLED_ShowString(0,i*16,(char *)now_menu->string[i+upper_limit_row_idx],OLED_8X16);
+				}
+				OLED_ReverseArea(0,row_idx*16,16*now_menu->CharNum[row_idx+upper_limit_row_idx],16);
 				menu_refresh_window();
 			}
 		}

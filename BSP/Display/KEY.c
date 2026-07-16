@@ -3,9 +3,9 @@
 #define KEY_PRESSED    1
 #define KEY_UNPRESSED  0
 
-#define KEY_TIME_DOUBLE    200
-#define KEY_TIME_LONG				500	
-#define KEY_TIME_REPEAT    100
+#define KEY_TIME_DOUBLE    (200/5)
+#define KEY_TIME_LONG	   (400/5)
+#define KEY_TIME_REPEAT    (200/5)
 
 #define KEY_COUNT    4
 

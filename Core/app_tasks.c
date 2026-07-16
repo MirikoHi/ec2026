@@ -126,7 +126,7 @@
 
 #define KEY_TASK_STACK_DEPTH       192
 #define MENU_TASK_STACK_DEPTH      192
-#define ROBOTCMD_TASK_STACK_DEPTH  256
+#define ROBOTCMD_TASK_STACK_DEPTH  192
 #define CHASSIS_TASK_STACK_DEPTH   256
 #define GIMBAL_TASK_STACK_DEPTH    192
 #define MOTOR_TASK_STACK_DEPTH	   320
@@ -358,9 +358,9 @@ static void KeyTask(void *pvParameters)
 			
 			Key_Tick();
 			Key_dt = DWT_GetTimeline_ms() - Key_start;
-			if (Key_dt > 1)
+			if (Key_dt > 5)
             LOGERROR("[freeRTOS] Key Task is being DELAY! dt = [%f]", Key_dt);
-			vTaskDelay(pdMS_TO_TICKS(1));
+			vTaskDelay(pdMS_TO_TICKS(5));
 			
 		}
 }
@@ -596,10 +596,10 @@ static void MenuTask(void *pvParameters)
         menu_task();
         Menu_dt = DWT_GetTimeline_ms() - Menu_start;
     	LOGINFO("Menu Task DT = [%f] ms", Menu_dt);
-        if (Menu_dt > 100)
+        if (Menu_dt > 50)
             LOGERROR("[freeRTOS] Menu Task is being DELAY! dt = [%f]", Menu_dt);
 
     	//10Hz固定频率刷新屏幕显示
-    	vTaskDelay(pdMS_TO_TICKS(100));
+    	vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
