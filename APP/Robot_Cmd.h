@@ -21,11 +21,14 @@ typedef enum {
 	TRACE_MODE,
 	IMU_MODE,
 	POSITION_MODE,
+	REMOTE_MODE,
 }Chassis_Mode_e;
 
 typedef struct {
 		Chassis_Mode_e Chassis_Mode;
 		uint8_t circle_set;
+		float remote_forward;
+		float remote_turn;
 }chassis_cmd_q;
 
 typedef struct {

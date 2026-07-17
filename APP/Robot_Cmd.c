@@ -37,9 +37,19 @@ float last_trace_imu_switch_s=0;
 float now_time=0;
 State robotcmd_control_state = DISABLE;
 
+#define ELRS_REMOTE_ENABLE_CH       5U
+#define ELRS_REMOTE_TURN_CH         1U
+#define ELRS_REMOTE_FORWARD_CH      2U
+#define ELRS_REMOTE_ENABLE_VALUE    900U
+#define ELRS_REMOTE_DEADBAND        0.04f
+#define ELRS_REMOTE_MAX_FORWARD     0.25f
+#define ELRS_REMOTE_MAX_TURN        0.18f
+
 void tjc_control(void);
 void draw_sin(void);
 void Gimbal_Pid_Cal(void);
+static void RobotCmd_UpdateRemoteMode(void);
+static float RobotCmd_ELRSChannelToNorm(uint16_t channel);
 void RobotCmd_Init(void)
 {
 	chassis_cmd_queue = xQueueCreate(4, sizeof(chassis_cmd_q));
@@ -106,6 +116,7 @@ void Robot_Cmd(void)
 //	chassis_cmd_send.vx=70.0f;
 	
 	xQueueReceive(trace_fetch_data_queue, &trace_fetch_data, 1);
+	RobotCmd_UpdateRemoteMode();
 //	bsp_IcmGetGyroscope(&Chassis_Gyro);
 	
 	if(gimbal_cmd_send.task_flag ==2)
@@ -178,6 +189,76 @@ void Gimbal_Pid_Cal(void)
 	PID_calc(&gimbal_pitch_PID,0,K230_err[1]);
 	gimbal_cmd_send.yaw += gimbal_yaw_PID.out;
 	gimbal_cmd_send.pitch +=gimbal_pitch_PID.out;
+}
+
+static void RobotCmd_UpdateRemoteMode(void)
+{
+	static Chassis_Mode_e last_non_remote_mode = TRACE_MODE;
+	uint16_t ch1;
+	uint16_t ch2;
+	uint16_t ch5;
+
+	if (robotcmd_elrs == NULL)
+	{
+		return;
+	}
+	if (robotcmd_elrs->rc_frame_count == 0U)
+	{
+		return;
+	}
+
+	ch1 = robotcmd_elrs->channel[ELRS_REMOTE_TURN_CH - 1U];
+	ch2 = robotcmd_elrs->channel[ELRS_REMOTE_FORWARD_CH - 1U];
+	ch5 = robotcmd_elrs->channel[ELRS_REMOTE_ENABLE_CH - 1U];
+
+	if (chassis_cmd_send.Chassis_Mode != REMOTE_MODE)
+	{
+		last_non_remote_mode = chassis_cmd_send.Chassis_Mode;
+	}
+
+	if (ch5 > ELRS_REMOTE_ENABLE_VALUE)
+	{
+		chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
+		chassis_cmd_send.remote_turn = -1.0f * RobotCmd_ELRSChannelToNorm(ch1) * ELRS_REMOTE_MAX_TURN;
+		chassis_cmd_send.remote_forward = RobotCmd_ELRSChannelToNorm(ch2) * ELRS_REMOTE_MAX_FORWARD;
+	}
+	else if (chassis_cmd_send.Chassis_Mode == REMOTE_MODE)
+	{
+		chassis_cmd_send.Chassis_Mode = last_non_remote_mode;
+		chassis_cmd_send.remote_turn = 0.0f;
+		chassis_cmd_send.remote_forward = 0.0f;
+	}
+}
+
+static float RobotCmd_ELRSChannelToNorm(uint16_t channel)
+{
+	float value;
+
+	if (channel >= ELRS_CHANNEL_VALUE_MID)
+	{
+		value = (float)(channel - ELRS_CHANNEL_VALUE_MID) /
+		        (float)(ELRS_CHANNEL_VALUE_MAX - ELRS_CHANNEL_VALUE_MID);
+	}
+	else
+	{
+		value = -((float)(ELRS_CHANNEL_VALUE_MID - channel) /
+		          (float)(ELRS_CHANNEL_VALUE_MID - ELRS_CHANNEL_VALUE_MIN));
+	}
+
+	if ((value > -ELRS_REMOTE_DEADBAND) && (value < ELRS_REMOTE_DEADBAND))
+	{
+		value = 0.0f;
+	}
+	if (value > 1.0f)
+	{
+		value = 1.0f;
+	}
+	else if (value < -1.0f)
+	{
+		value = -1.0f;
+	}
+
+	return value;
 }
 
 void Task_Callback(uint8_t i)

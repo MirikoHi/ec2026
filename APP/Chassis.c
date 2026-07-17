@@ -22,10 +22,13 @@ uint8_t stop_count,spin_count;
 uint8_t Spin_start_flag = 0, Spin_succeed_flag = 0 , Stop_Flag = 0;
 uint8_t Line_flag = 0, Turn_flag = 0 ;
 uint8_t state = 0;
+static uint8_t remote_mode_active = 0;
 float ICM42688_Data[3] = {0};
 void Stop_Detect(void);
 void Chassis_State_Turn(void);
 void Chassis_Set_Turn(void);
+static void Chassis_RemoteControl(void);
+static void Chassis_ClearRemoteSpeed(void);
 
 /**
  * @brief 初始化底盘左右电机和IMU
@@ -125,6 +128,10 @@ void Chassis(void)
 	xQueueReceive(chassis_cmd_queue, &chassis_cmd_receive, 1);
 	//PAW3395_Read_Motion(Chassis_axis);
 	float trace_compensation;
+	if (chassis_cmd_receive.Chassis_Mode != REMOTE_MODE)
+	{
+		Chassis_ClearRemoteSpeed();
+	}
 	switch(chassis_cmd_receive.Chassis_Mode)
 	{
 		case TRACE_MODE:
@@ -153,6 +160,9 @@ void Chassis(void)
 			break;
 		case POSITION_MODE:
 				break;
+		case REMOTE_MODE:
+			Chassis_RemoteControl();
+			break;
 		default:
 			break;
 	}
@@ -163,6 +173,45 @@ void Chassis(void)
 /**
  * @brief 被cmd调用，根据菜单值回调选择是否使能电机
  */
+static void Chassis_RemoteControl(void)
+{
+	float left_speed = chassis_cmd_receive.remote_forward - chassis_cmd_receive.remote_turn;
+	float right_speed = chassis_cmd_receive.remote_forward + chassis_cmd_receive.remote_turn;
+
+	motor_l->State = ENABLE;
+	motor_r->State = ENABLE;
+	Line_flag = 0;
+	Stop_Flag = 0;
+	Spin_start_flag = 0;
+	Spin_succeed_flag = 0;
+	DCMotor_SetTraceCompensation(motor_l, 0.0f);
+	DCMotor_SetTraceCompensation(motor_r, 0.0f);
+
+	if (remote_mode_active == 0U)
+	{
+		PID_clear(&motor_l->position_pid);
+		PID_clear(&motor_r->position_pid);
+		remote_mode_active = 1U;
+	}
+
+	motor_l->position_ref = motor_l->position_measure;
+	motor_r->position_ref = motor_r->position_measure;
+	motor_l->speed_ref = left_speed;
+	motor_r->speed_ref = right_speed;
+}
+
+static void Chassis_ClearRemoteSpeed(void)
+{
+	if (remote_mode_active == 0U)
+	{
+		return;
+	}
+
+	motor_l->speed_ref = 0.0f;
+	motor_r->speed_ref = 0.0f;
+	remote_mode_active = 0U;
+}
+
 void Motor_Cmd_CallBack(uint8_t i)
 {
 	if(i ==0)
