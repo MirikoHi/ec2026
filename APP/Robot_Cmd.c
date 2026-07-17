@@ -11,6 +11,7 @@
 #include "Chassis.h"
 #include "math.h"
 #include "K230.h"
+#include "elrs.h"
 #include "../BSP/IMU/icm42688.h"
 icm42688RawData_t Chassis_Gyro;
 
@@ -26,6 +27,7 @@ QueueHandle_t trace_fetch_data_queue = NULL;
 chassis_cmd_q chassis_cmd_send={0};
 gimbal_cmd_q gimbal_cmd_send ={0};
 trace_fetch_data_q trace_fetch_data={0};
+const volatile ELRS_Data_s *robotcmd_elrs = NULL;
 
 pid_type_def gimbal_yaw_PID={0};
 pid_type_def gimbal_pitch_PID={0};
@@ -46,6 +48,8 @@ void RobotCmd_Init(void)
 	gimbal_cmd_queue = xQueueCreate(4,sizeof(gimbal_cmd_q));
 //	while(bsp_Icm42688Init()!=0x00);
 	BSPLogInit();
+	ELRS_Init();
+	robotcmd_elrs = ELRS_GetData();
 	
 
 	chassis_cmd_send.Chassis_Mode = TRACE_MODE;  //todo:这里记得改回默认值，调试用
@@ -175,6 +179,7 @@ void Gimbal_Pid_Cal(void)
 	gimbal_cmd_send.yaw += gimbal_yaw_PID.out;
 	gimbal_cmd_send.pitch +=gimbal_pitch_PID.out;
 }
+
 void Task_Callback(uint8_t i)
 {
 	if(i==0)

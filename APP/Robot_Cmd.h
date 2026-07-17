@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
+#include "elrs.h"
 
 
 
@@ -14,6 +15,7 @@ extern QueueHandle_t chassis_cmd_queue;
 extern QueueHandle_t chassis_fetch_data_queue;
 extern QueueHandle_t trace_fetch_data_queue;
 extern QueueHandle_t gimbal_cmd_queue;
+extern const volatile ELRS_Data_s *robotcmd_elrs;
 typedef enum {
 	NORMAL_MODE=0,
 	TRACE_MODE,
@@ -92,4 +94,3 @@ void Control_Switch_Callback(uint8_t i);
 void Task_Callback(uint8_t i);
 void Chassis_Mode_Switch_Callback(uint8_t i);
 #endif
-

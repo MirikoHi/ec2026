@@ -184,9 +184,9 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_UART_0_IOMUX_TX                                     (IOMUX_PINCM29)
 #define GPIO_UART_0_IOMUX_RX_FUNC                      IOMUX_PINCM30_PF_UART3_RX
 #define GPIO_UART_0_IOMUX_TX_FUNC                      IOMUX_PINCM29_PF_UART3_TX
-#define UART_0_BAUD_RATE                                                (115200)
-#define UART_0_IBRD_80_MHZ_115200_BAUD                                      (43)
-#define UART_0_FBRD_80_MHZ_115200_BAUD                                      (26)
+#define UART_0_BAUD_RATE                                                (420000)
+#define UART_0_IBRD_80_MHZ_420000_BAUD                                      (11)
+#define UART_0_FBRD_80_MHZ_420000_BAUD                                      (58)
 /* Defines for K230 */
 #define K230_INST                                                          UART2
 #define K230_INST_FREQUENCY                                             40000000
