@@ -34,7 +34,7 @@
  *  ============ ti_msp_dl_config.c =============
  *  Configured MSPM0 DriverLib module definitions
  *
- *  DO NOT EDIT - This file is generated for the MSPM0G350X
+ *  DO NOT EDIT - This file is generated for the MSPM0G351X
  *  by the SysConfig tool.
  */
 
@@ -252,22 +252,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_NONE,
 		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
 
-    DL_GPIO_initDigitalOutputFeatures(ZDT_Motor_Yaw_Dir_IOMUX,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
-		 DL_GPIO_DRIVE_STRENGTH_LOW, DL_GPIO_HIZ_DISABLE);
-
-    DL_GPIO_initDigitalOutputFeatures(ZDT_Motor_Pitch_Dir_IOMUX,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
-		 DL_GPIO_DRIVE_STRENGTH_LOW, DL_GPIO_HIZ_DISABLE);
-
-    DL_GPIO_initDigitalOutputFeatures(ZDT_Motor_Yaw_Stp_IOMUX,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
-		 DL_GPIO_DRIVE_STRENGTH_LOW, DL_GPIO_HIZ_DISABLE);
-
-    DL_GPIO_initDigitalOutputFeatures(ZDT_Motor_Pitch_Stp_IOMUX,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_DOWN,
-		 DL_GPIO_DRIVE_STRENGTH_LOW, DL_GPIO_HIZ_DISABLE);
-
     DL_GPIO_initDigitalOutput(Gray_Address_PIN_0_IOMUX);
 
     DL_GPIO_initDigitalOutput(Gray_Address_PIN_1_IOMUX);
@@ -291,10 +275,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		Motor_dir_EN1_A_PIN |
 		Motor_dir_EN1_B_PIN |
 		Motor_dir_EN2_A_PIN |
-		ZDT_Motor_Yaw_Dir_PIN |
-		ZDT_Motor_Pitch_Dir_PIN |
-		ZDT_Motor_Yaw_Stp_PIN |
-		ZDT_Motor_Pitch_Stp_PIN |
 		Gray_Address_PIN_0_PIN |
 		Gray_Serial_CLK_PIN |
 		bmi088_cs2_cs2_PIN);
@@ -303,10 +283,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		Motor_dir_EN1_A_PIN |
 		Motor_dir_EN1_B_PIN |
 		Motor_dir_EN2_A_PIN |
-		ZDT_Motor_Yaw_Dir_PIN |
-		ZDT_Motor_Pitch_Dir_PIN |
-		ZDT_Motor_Yaw_Stp_PIN |
-		ZDT_Motor_Pitch_Stp_PIN |
 		Gray_Address_PIN_0_PIN |
 		Gray_Serial_CLK_PIN |
 		bmi088_cs2_cs2_PIN);
@@ -521,7 +497,7 @@ static const DL_TimerA_ClockConfig gServoClockConfig = {
 static const DL_TimerA_PWMConfig gServoConfig = {
     .pwmMode = DL_TIMER_PWM_MODE_EDGE_ALIGN,
     .period = 8000,
-    .isTimerWithFourCC = true,
+    .isTimerWithFourCC = false,
     .startTimer = DL_TIMER_STOP,
 };
 
@@ -867,24 +843,16 @@ SYSCONFIG_WEAK void SYSCFG_DL_NRF24L01_init(void) {
 
 /* ADC1 Initialization */
 static const DL_ADC12_ClockConfig gADC1ClockConfig = {
-    .clockSel       = DL_ADC12_CLOCK_SYSOSC,
+    .clockSel       = DL_ADC12_CLOCK_HFCLK,
     .divideRatio    = DL_ADC12_CLOCK_DIVIDE_8,
-    .freqRange      = DL_ADC12_CLOCK_FREQ_RANGE_24_TO_32,
+    .freqRange      = DL_ADC12_CLOCK_FREQ_RANGE_32_TO_40,
 };
 SYSCONFIG_WEAK void SYSCFG_DL_ADC1_init(void)
 {
     DL_ADC12_setClockConfig(ADC1_INST, (DL_ADC12_ClockConfig *) &gADC1ClockConfig);
-    DL_ADC12_initSingleSample(ADC1_INST,
-        DL_ADC12_REPEAT_MODE_ENABLED, DL_ADC12_SAMPLING_SOURCE_AUTO, DL_ADC12_TRIG_SRC_SOFTWARE,
-        DL_ADC12_SAMP_CONV_RES_12_BIT, DL_ADC12_SAMP_CONV_DATA_FORMAT_UNSIGNED);
-    DL_ADC12_configConversionMem(ADC1_INST, ADC1_ADCMEM_ADC_Channel8,
-        DL_ADC12_INPUT_CHAN_8, DL_ADC12_REFERENCE_VOLTAGE_VDDA, DL_ADC12_SAMPLE_TIMER_SOURCE_SCOMP0, DL_ADC12_AVERAGING_MODE_DISABLED,
+    DL_ADC12_configConversionMem(ADC1_INST, ADC1_ADCMEM_0,
+        DL_ADC12_INPUT_CHAN_0, DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA, DL_ADC12_SAMPLE_TIMER_SOURCE_SCOMP0, DL_ADC12_AVERAGING_MODE_DISABLED,
         DL_ADC12_BURN_OUT_SOURCE_DISABLED, DL_ADC12_TRIGGER_MODE_AUTO_NEXT, DL_ADC12_WINDOWS_COMP_MODE_DISABLED);
-    DL_ADC12_setPowerDownMode(ADC1_INST,DL_ADC12_POWER_DOWN_MODE_MANUAL);
-    DL_ADC12_setSampleTime0(ADC1_INST,40);
-    /* Enable ADC12 interrupt */
-    DL_ADC12_clearInterruptStatus(ADC1_INST,(DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED));
-    DL_ADC12_enableInterrupt(ADC1_INST,(DL_ADC12_INTERRUPT_MEM0_RESULT_LOADED));
     DL_ADC12_enableConversions(ADC1_INST);
 }
 
