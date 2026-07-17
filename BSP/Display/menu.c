@@ -39,9 +39,20 @@ uint8_t upper_limit_row_idx;
 
 //当前显示窗口在 now_menu->string[] 数组中的末尾索引（闭区间） */
 uint8_t lower_limit_row_idx;
-static uint8_t menu_animation_enabled = 1U;
+static uint8_t menu_animation_enabled = 0U;
 static uint8_t menu_last_refresh_width = 0U;
 static uint8_t menu_last_refresh_height = 0U;
+
+typedef struct
+{
+	uint8_t active;
+	int16_t x;
+	uint8_t width;
+	uint8_t current_page;
+	uint8_t end_page;
+} MenuRefreshState;
+
+static MenuRefreshState menu_refresh_state = {1};
 
 #define MENU_TITLE_HEIGHT      16U
 #define MENU_ROW_HEIGHT        16U
@@ -77,6 +88,9 @@ static void menu_draw_rows(void);
 static void menu_redraw(void);
 static void menu_redraw_with_animation(uint8_t start_row);
 static void menu_set_selection(uint8_t absolute_idx);
+static void menu_request_refresh_area(int16_t x, int16_t y, uint8_t width, uint8_t height);
+static void menu_process_refresh_step(void);
+static void menu_flush_all_pending(void);
 
 /**
  * @brief  菜单系统总初始化函数
@@ -233,6 +247,7 @@ MenuInitConfig_s first_menu_config={
 	OLED_Init();
 	menu_set_selection(0U);
 	menu_redraw();
+	menu_flush_all_pending();
 }
 
 static uint8_t menu_row_width(uint8_t row, uint8_t upper)
@@ -252,12 +267,119 @@ static uint8_t menu_window_height(void)
 	return 64U;
 }
 
+static void menu_request_refresh_area(int16_t x, int16_t y, uint8_t width, uint8_t height)
+{
+	int16_t page;
+	int16_t page_end;
+	int16_t left;
+	int16_t right;
+	int16_t new_right;
+
+	if ((width == 0U) || (height == 0U))
+	{
+		return;
+	}
+	if ((x >= 128) || ((x + width) <= 0))
+	{
+		return;
+	}
+	if ((y >= 64) || ((y + height) <= 0))
+	{
+		return;
+	}
+
+	if (x < 0)
+	{
+		width = (uint8_t) (width + x);
+		x = 0;
+	}
+	if ((x + width) > 128)
+	{
+		width = (uint8_t) (128 - x);
+	}
+
+	page = y / 8;
+	page_end = (y + height - 1) / 8 + 1;
+	if (y < 0)
+	{
+		page -= 1;
+		page_end -= 1;
+	}
+	if (page < 0)
+	{
+		page = 0;
+	}
+	if (page_end > 8)
+	{
+		page_end = 8;
+	}
+	if (page >= page_end)
+	{
+		return;
+	}
+
+	if (menu_refresh_state.active == 0U)
+	{
+		menu_refresh_state.active = 1U;
+		menu_refresh_state.x = x;
+		menu_refresh_state.width = width;
+		menu_refresh_state.current_page = (uint8_t) page;
+		menu_refresh_state.end_page = (uint8_t) page_end;
+		return;
+	}
+
+	left = (x < menu_refresh_state.x) ? x : menu_refresh_state.x;
+	right = menu_refresh_state.x + menu_refresh_state.width;
+	new_right = x + width;
+	if (new_right > right)
+	{
+		right = new_right;
+	}
+	menu_refresh_state.x = left;
+	menu_refresh_state.width = (uint8_t) (right - left);
+	if (page < menu_refresh_state.current_page)
+	{
+		menu_refresh_state.current_page = (uint8_t) page;
+	}
+	if (page_end > menu_refresh_state.end_page)
+	{
+		menu_refresh_state.end_page = (uint8_t) page_end;
+	}
+}
+
+static void menu_process_refresh_step(void)
+{
+	if (menu_refresh_state.active == 0U)
+	{
+		return;
+	}
+
+	OLED_UpdateAreaLimited(menu_refresh_state.x,
+		(int16_t) (menu_refresh_state.current_page * 8),
+		menu_refresh_state.width,
+		8U,
+		1U);
+	menu_refresh_state.current_page++;
+	if (menu_refresh_state.current_page >= menu_refresh_state.end_page)
+	{
+		menu_refresh_state.active = 0U;
+	}
+}
+
+static void menu_flush_all_pending(void)
+{
+	while (menu_refresh_state.active != 0U)
+	{
+		menu_process_refresh_step();
+	}
+}
+
 static void menu_refresh_window(void)
 {
 	uint8_t width = menu_window_width();
 	uint8_t height = menu_window_height();
 
-	OLED_UpdateArea(0, 0, width, height);
+	menu_request_refresh_area(0, 0, width, height);
 	menu_last_refresh_width = width;
 	menu_last_refresh_height = height;
 }
@@ -275,7 +397,7 @@ static void menu_switch_highlight(uint8_t old_row, uint8_t old_upper, uint8_t ne
 	if (menu_animation_enabled != 0U)
 	{
 		menu_draw_title(menu_item_count(now_menu));
-		OLED_UpdateArea(0, 0, 128, MENU_TITLE_HEIGHT);
+		menu_request_refresh_area(0, 0, 128, MENU_TITLE_HEIGHT);
 		OLED_Animation(0, old_y, old_width, MENU_ROW_HEIGHT,
 			0, new_y, new_width, MENU_ROW_HEIGHT);
 		return;
@@ -283,14 +405,14 @@ static void menu_switch_highlight(uint8_t old_row, uint8_t old_upper, uint8_t ne
 	if(old_width > 0U)
 	{
 		OLED_ReverseArea(0, old_y, old_width, MENU_ROW_HEIGHT);
-		OLED_UpdateArea(0, old_y, old_width, MENU_ROW_HEIGHT);
+		menu_request_refresh_area(0, old_y, old_width, MENU_ROW_HEIGHT);
 	}
 	if(new_width > 0U)
 	{
 		menu_draw_title(menu_item_count(now_menu));
-		OLED_UpdateArea(0, 0, 128, MENU_TITLE_HEIGHT);
+		menu_request_refresh_area(0, 0, 128, MENU_TITLE_HEIGHT);
 		OLED_ReverseArea(0, new_y, new_width, MENU_ROW_HEIGHT);
-		OLED_UpdateArea(0, new_y, new_width, MENU_ROW_HEIGHT);
+		menu_request_refresh_area(0, new_y, new_width, MENU_ROW_HEIGHT);
 	}
 }
 
@@ -442,13 +564,13 @@ static void menu_redraw_with_animation(uint8_t start_row)
 	if ((menu_animation_enabled != 0U) && (start_row != row_idx))
 	{
 		OLED_ReverseArea(0, menu_row_y(start_row), MENU_HIGHLIGHT_WIDTH, MENU_ROW_HEIGHT);
-		OLED_UpdateArea(0, menu_row_y(start_row), MENU_HIGHLIGHT_WIDTH, MENU_ROW_HEIGHT);
+		menu_request_refresh_area(0, menu_row_y(start_row), MENU_HIGHLIGHT_WIDTH, MENU_ROW_HEIGHT);
 		menu_switch_highlight(start_row, upper_limit_row_idx, row_idx, upper_limit_row_idx);
 	}
 	else
 	{
 		OLED_ReverseArea(0, menu_row_y(row_idx), MENU_HIGHLIGHT_WIDTH, MENU_ROW_HEIGHT);
-		OLED_UpdateArea(0, menu_row_y(row_idx), MENU_HIGHLIGHT_WIDTH, MENU_ROW_HEIGHT);
+		menu_request_refresh_area(0, menu_row_y(row_idx), MENU_HIGHLIGHT_WIDTH, MENU_ROW_HEIGHT);
 	}
 }
 
@@ -612,9 +734,12 @@ void menu_task(void)
 	uint8_t item_count;
 	uint8_t selected_idx;
 
+	menu_process_refresh_step();
+
 	if ((menu_animation_enabled != 0U) && OLED_AnimationBusy())
 	{
 		OLED_AnimationStep();
+		menu_process_refresh_step();
 		return;
 	}
 
@@ -710,5 +835,5 @@ void menu_task(void)
 			}
 		}
 	}
-	
+	menu_process_refresh_step();
 }

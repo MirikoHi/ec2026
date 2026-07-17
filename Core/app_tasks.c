@@ -595,7 +595,8 @@ static void MenuTask(void *pvParameters)
         Menu_start = DWT_GetTimeline_ms();
         menu_task();
         Menu_dt = DWT_GetTimeline_ms() - Menu_start;
-        if (Menu_dt > 50)
+    	//LOGINFO("Menu Task dt = [%f]", Menu_dt);
+        if (Menu_dt > 5)
             LOGERROR("[freeRTOS] Menu Task is being DELAY! dt = [%f]", Menu_dt);
 
     	//10Hz固定频率刷新屏幕显示

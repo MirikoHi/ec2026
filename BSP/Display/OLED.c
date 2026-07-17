@@ -99,10 +99,24 @@ static uint8_t OLED_TxBuf[129];
 static OLED_AnimationState OLED_AnimState;
 
 #define OLED_I2C_TIMEOUT_CYCLES   200000U
+#define OLED_I2C_ADDR             0x3C
+
+typedef struct
+{
+	const uint8_t *buffer;
+	uint16_t remaining;
+	volatile uint8_t busy;
+	volatile uint8_t transferDone;
+	volatile uint8_t error;
+} OLED_I2C_State;
+
+static OLED_I2C_State OLED_I2C_StateMachine;
 
 static void OLED_I2C_WriteBlocking(const uint8_t *buffer, uint16_t count);
 static uint8_t OLED_I2C_WaitIdle(uint32_t timeout);
+static uint8_t OLED_I2C_WaitTransaction(uint32_t timeout);
 static void OLED_I2C_Abort(void);
+static void OLED_I2C_PrepareTransfer(const uint8_t *buffer, uint16_t count);
 static uint8_t OLED_AnimationStepAxis(uint8_t current, uint8_t target);
 static void OLED_UpdateAreaUnion(uint8_t x1, uint8_t y1, uint8_t l1, uint8_t w1,
 	uint8_t x2, uint8_t y2, uint8_t l2, uint8_t w2);
@@ -155,13 +169,143 @@ static void OLED_I2C_Abort(void)
 	DL_I2C_resetControllerTransfer(I2C_0_INST);
 	DL_I2C_flushControllerTXFIFO(I2C_0_INST);
 	DL_I2C_flushControllerRXFIFO(I2C_0_INST);
+	DL_I2C_clearInterruptStatus(I2C_0_INST,
+		DL_I2C_INTERRUPT_CONTROLLER_TX_DONE |
+		DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER |
+		DL_I2C_INTERRUPT_CONTROLLER_NACK |
+		DL_I2C_INTERRUPT_CONTROLLER_ARBITRATION_LOST |
+		DL_I2C_INTERRUPT_CONTROLLER_STOP);
+	DL_I2C_disableInterrupt(I2C_0_INST, DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER);
+	OLED_I2C_StateMachine.buffer = NULL;
+	OLED_I2C_StateMachine.remaining = 0U;
+	OLED_I2C_StateMachine.busy = 0U;
+	OLED_I2C_StateMachine.transferDone = 0U;
+	OLED_I2C_StateMachine.error = 1U;
+}
+
+static void OLED_I2C_PrepareTransfer(const uint8_t *buffer, uint16_t count)
+{
+	uint16_t primed;
+
+	OLED_I2C_StateMachine.buffer = buffer;
+	OLED_I2C_StateMachine.remaining = count;
+	OLED_I2C_StateMachine.busy = 1U;
+	OLED_I2C_StateMachine.transferDone = 0U;
+	OLED_I2C_StateMachine.error = 0U;
+
+	DL_I2C_flushControllerTXFIFO(I2C_0_INST);
+	DL_I2C_clearInterruptStatus(I2C_0_INST,
+		DL_I2C_INTERRUPT_CONTROLLER_TX_DONE |
+		DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER |
+		DL_I2C_INTERRUPT_CONTROLLER_NACK |
+		DL_I2C_INTERRUPT_CONTROLLER_ARBITRATION_LOST |
+		DL_I2C_INTERRUPT_CONTROLLER_STOP);
+	primed = DL_I2C_fillControllerTXFIFO(I2C_0_INST,
+		OLED_I2C_StateMachine.buffer,
+		OLED_I2C_StateMachine.remaining);
+	OLED_I2C_StateMachine.buffer += primed;
+	OLED_I2C_StateMachine.remaining -= primed;
+
+	if (OLED_I2C_StateMachine.remaining > 0U)
+	{
+		DL_I2C_enableInterrupt(I2C_0_INST,
+			DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER);
+	}
+	else
+	{
+		DL_I2C_disableInterrupt(I2C_0_INST,
+			DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER);
+	}
+}
+
+static void OLED_I2C_PollTransactionFallback(void)
+{
+	uint32_t raw = DL_I2C_getRawInterruptStatus(I2C_0_INST,
+		DL_I2C_INTERRUPT_CONTROLLER_TX_DONE |
+		DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER |
+		DL_I2C_INTERRUPT_CONTROLLER_NACK |
+		DL_I2C_INTERRUPT_CONTROLLER_ARBITRATION_LOST |
+		DL_I2C_INTERRUPT_CONTROLLER_STOP);
+
+	if ((raw & DL_I2C_INTERRUPT_CONTROLLER_NACK) != 0U)
+	{
+		DL_I2C_clearInterruptStatus(I2C_0_INST,
+			DL_I2C_INTERRUPT_CONTROLLER_NACK);
+		OLED_I2C_StateMachine.error = 1U;
+		OLED_I2C_StateMachine.busy = 0U;
+		DL_I2C_resetControllerTransfer(I2C_0_INST);
+		return;
+	}
+
+	if ((raw & DL_I2C_INTERRUPT_CONTROLLER_ARBITRATION_LOST) != 0U)
+	{
+		DL_I2C_clearInterruptStatus(I2C_0_INST,
+			DL_I2C_INTERRUPT_CONTROLLER_ARBITRATION_LOST);
+		OLED_I2C_StateMachine.error = 1U;
+		OLED_I2C_StateMachine.busy = 0U;
+		DL_I2C_resetControllerTransfer(I2C_0_INST);
+		return;
+	}
+
+	if (((raw & DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER) != 0U) &&
+		(OLED_I2C_StateMachine.remaining > 0U))
+	{
+		uint16_t filled;
+
+		DL_I2C_clearInterruptStatus(I2C_0_INST,
+			DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER);
+		filled = DL_I2C_fillControllerTXFIFO(I2C_0_INST,
+			OLED_I2C_StateMachine.buffer,
+			OLED_I2C_StateMachine.remaining);
+		OLED_I2C_StateMachine.buffer += filled;
+		OLED_I2C_StateMachine.remaining -= filled;
+		if (OLED_I2C_StateMachine.remaining == 0U)
+		{
+			DL_I2C_disableInterrupt(I2C_0_INST,
+				DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER);
+		}
+	}
+
+	if ((raw & DL_I2C_INTERRUPT_CONTROLLER_TX_DONE) != 0U)
+	{
+		DL_I2C_clearInterruptStatus(I2C_0_INST,
+			DL_I2C_INTERRUPT_CONTROLLER_TX_DONE);
+		OLED_I2C_StateMachine.transferDone = 1U;
+		OLED_I2C_StateMachine.busy = 0U;
+		return;
+	}
+
+	if ((raw & DL_I2C_INTERRUPT_CONTROLLER_STOP) != 0U)
+	{
+		DL_I2C_clearInterruptStatus(I2C_0_INST,
+			DL_I2C_INTERRUPT_CONTROLLER_STOP);
+		OLED_I2C_StateMachine.transferDone = 1U;
+		OLED_I2C_StateMachine.busy = 0U;
+	}
+}
+
+static uint8_t OLED_I2C_WaitTransaction(uint32_t timeout)
+{
+	while (timeout-- > 0U)
+	{
+		OLED_I2C_PollTransactionFallback();
+
+		if (OLED_I2C_StateMachine.error != 0U)
+		{
+			return 0U;
+		}
+
+		if (OLED_I2C_StateMachine.transferDone != 0U)
+		{
+			return 1U;
+		}
+	}
+
+	return 0U;
 }
 
 static void OLED_I2C_WriteBlocking(const uint8_t *buffer, uint16_t count)
 {
-	uint16_t written;
-	uint32_t timeout;
-
 	if ((buffer == NULL) || (count == 0U))
 	{
 		return;
@@ -173,34 +317,14 @@ static void OLED_I2C_WriteBlocking(const uint8_t *buffer, uint16_t count)
 		return;
 	}
 
-	DL_I2C_flushControllerTXFIFO(I2C_0_INST);
-
-	written = DL_I2C_fillControllerTXFIFO(I2C_0_INST, buffer, count);
-	DL_I2C_startControllerTransfer(I2C_0_INST, 0x3C,
+	OLED_I2C_PrepareTransfer(buffer, count);
+	DL_I2C_startControllerTransfer(I2C_0_INST, OLED_I2C_ADDR,
 		DL_I2C_CONTROLLER_DIRECTION_TX, count);
 
-	timeout = OLED_I2C_TIMEOUT_CYCLES;
-	while (written < count)
+	if (OLED_I2C_WaitTransaction(OLED_I2C_TIMEOUT_CYCLES) == 0U)
 	{
-		uint32_t status = DL_I2C_getControllerStatus(I2C_0_INST);
-
-		if ((status & DL_I2C_CONTROLLER_STATUS_ERROR) != 0U)
-		{
-			OLED_I2C_Abort();
-			return;
-		}
-
-		if (timeout-- == 0U)
-		{
-			OLED_I2C_Abort();
-			return;
-		}
-
-		if (!DL_I2C_isControllerTXFIFOFull(I2C_0_INST))
-		{
-			written += DL_I2C_fillControllerTXFIFO(I2C_0_INST,
-				&buffer[written], count - written);
-		}
+		OLED_I2C_Abort();
+		return;
 	}
 
 	if (OLED_I2C_WaitIdle(OLED_I2C_TIMEOUT_CYCLES) == 0U)
@@ -254,9 +378,6 @@ static void OLED_UpdateAreaUnion(uint8_t x1, uint8_t y1, uint8_t l1, uint8_t w1,
 
 
 /*通信协议*********************/
-
-/** OLED I2C 7位从机地址 (0x78 >> 1 = 0x3C) */
-#define OLED_I2C_ADDR  0x3C
 
 /**
   * 函    数：OLED写一个字节（硬件I2C底层）
@@ -337,6 +458,15 @@ void OLED_WriteData(uint8_t *Data, uint8_t Count)
 void OLED_Init(void)
 {
 	OLED_GPIO_Init();			//先调用底层的端口初始化
+DL_I2C_setControllerTXFIFOThreshold(I2C_0_INST, DL_I2C_TX_FIFO_LEVEL_BYTES_1);
+	DL_I2C_enableInterrupt(I2C_0_INST,
+		DL_I2C_INTERRUPT_CONTROLLER_TX_DONE |
+		DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER |
+		DL_I2C_INTERRUPT_CONTROLLER_NACK |
+		DL_I2C_INTERRUPT_CONTROLLER_ARBITRATION_LOST |
+		DL_I2C_INTERRUPT_CONTROLLER_STOP);
+	NVIC_ClearPendingIRQ(I2C_0_INST_INT_IRQN);
+	NVIC_EnableIRQ(I2C_0_INST_INT_IRQN);
 	
 	/*写入一系列的命令，对OLED进行初始化配置*/
 	OLED_WriteCommand(0xAE);	//设置显示开启/关闭，0xAE关闭，0xAF开启
@@ -544,6 +674,35 @@ void OLED_UpdateArea(int16_t X, int16_t Y, uint8_t Width, uint8_t Height)
 			OLED_SetCursor(j, X);
 			/*连续写入Width个数据，将显存数组的数据写入到OLED硬件*/
 			OLED_WriteData(&OLED_DisplayBuf[j][X], Width);
+		}
+	}
+}
+
+void OLED_UpdateAreaLimited(int16_t X, int16_t Y, uint8_t Width, uint8_t Height, uint8_t maxPages)
+{
+	int16_t j;
+	int16_t Page, Page1;
+	uint8_t pagesSent = 0U;
+
+	Page = Y / 8;
+	Page1 = (Y + Height - 1) / 8 + 1;
+	if (Y < 0)
+	{
+		Page -= 1;
+		Page1 -= 1;
+	}
+
+	for (j = Page; j < Page1; j ++)
+	{
+		if ((maxPages != 0U) && (pagesSent >= maxPages))
+		{
+			break;
+		}
+		if (X >= 0 && X <= 127 && j >= 0 && j <= 7)
+		{
+			OLED_SetCursor(j, X);
+			OLED_WriteData(&OLED_DisplayBuf[j][X], Width);
+			pagesSent++;
 		}
 	}
 }
@@ -1648,6 +1807,71 @@ void OLED_AnimationStep(void)
 uint8_t OLED_AnimationBusy(void)
 {
 	return OLED_AnimState.active;
+}
+void I2C0_IRQHandler(void)
+{
+	DL_I2C_IIDX pending;
+
+	while ((pending = DL_I2C_getPendingInterrupt(I2C_0_INST)) != DL_I2C_IIDX_NO_INT)
+	{
+		switch (pending)
+		{
+			case DL_I2C_IIDX_CONTROLLER_TX_DONE:
+				DL_I2C_clearInterruptStatus(I2C_0_INST,
+					DL_I2C_INTERRUPT_CONTROLLER_TX_DONE);
+				OLED_I2C_StateMachine.transferDone = 1U;
+				OLED_I2C_StateMachine.busy = 0U;
+				break;
+			case DL_I2C_IIDX_CONTROLLER_TXFIFO_TRIGGER:
+			{
+				uint16_t filled;
+
+				DL_I2C_clearInterruptStatus(I2C_0_INST,
+					DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER);
+				if (OLED_I2C_StateMachine.remaining > 0U)
+				{
+					filled = DL_I2C_fillControllerTXFIFO(I2C_0_INST,
+						OLED_I2C_StateMachine.buffer,
+						OLED_I2C_StateMachine.remaining);
+					OLED_I2C_StateMachine.buffer += filled;
+					OLED_I2C_StateMachine.remaining -= filled;
+					if (OLED_I2C_StateMachine.remaining == 0U)
+					{
+						DL_I2C_disableInterrupt(I2C_0_INST,
+							DL_I2C_INTERRUPT_CONTROLLER_TXFIFO_TRIGGER);
+					}
+				}
+				break;
+			}
+			case DL_I2C_IIDX_CONTROLLER_STOP:
+				DL_I2C_clearInterruptStatus(I2C_0_INST,
+					DL_I2C_INTERRUPT_CONTROLLER_STOP);
+				OLED_I2C_StateMachine.transferDone = 1U;
+				OLED_I2C_StateMachine.busy = 0U;
+				break;
+			case DL_I2C_IIDX_CONTROLLER_NACK:
+				DL_I2C_clearInterruptStatus(I2C_0_INST,
+					DL_I2C_INTERRUPT_CONTROLLER_NACK);
+				OLED_I2C_StateMachine.error = 1U;
+				OLED_I2C_StateMachine.busy = 0U;
+				DL_I2C_resetControllerTransfer(I2C_0_INST);
+				break;
+			case DL_I2C_IIDX_CONTROLLER_ARBITRATION_LOST:
+				DL_I2C_clearInterruptStatus(I2C_0_INST,
+					DL_I2C_INTERRUPT_CONTROLLER_ARBITRATION_LOST);
+				OLED_I2C_StateMachine.error = 1U;
+				OLED_I2C_StateMachine.busy = 0U;
+				DL_I2C_resetControllerTransfer(I2C_0_INST);
+				break;
+			default:
+				break;
+		}
+
+		if (OLED_I2C_StateMachine.error != 0U)
+		{
+			break;
+		}
+	}
 }
 /*********************功能函数*/
 
