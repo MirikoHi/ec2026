@@ -7,7 +7,7 @@ project(electric-competition-robot C ASM)
 #   1. 直接改下面这行的 ON/OFF
 #   2. 或在命令行传参：cmake -DUSE_MSPM0G3519=OFF ..
 # ============================================================
-option(USE_MSPM0G3519 "Build for MSPM0G3519 (OFF = MSPM0G3507)" OFF)
+option(USE_MSPM0G3519 "Build for MSPM0G3519 (OFF = MSPM0G3507)" ON)
 
 # ============================================================
 # MCU and compiler flags
