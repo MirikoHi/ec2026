@@ -19,7 +19,7 @@ unsigned int adc_getValue(void)
     DL_ADC12_disableConversions(ADC1_INST);
 
     //获取数据
-    gAdcResult = DL_ADC12_getMemResult(ADC1_INST, ADC1_ADCMEM_ADC_Channel8);
+    // gAdcResult = DL_ADC12_getMemResult(ADC1_INST, ADC1_ADCMEM_ADC_Channel8);
 
     return gAdcResult;
 }

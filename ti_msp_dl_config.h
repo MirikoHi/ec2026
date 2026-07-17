@@ -34,14 +34,14 @@
  *  ============ ti_msp_dl_config.h =============
  *  Configured MSPM0 DriverLib module declarations
  *
- *  DO NOT EDIT - This file is generated for the MSPM0G350X
+ *  DO NOT EDIT - This file is generated for the MSPM0G351X
  *  by the SysConfig tool.
  */
 #ifndef ti_msp_dl_config_h
 #define ti_msp_dl_config_h
 
-#define CONFIG_MSPM0G350X
-#define CONFIG_MSPM0G3507
+#define CONFIG_MSPM0G351X
+#define CONFIG_MSPM0G3519
 
 #if defined(__ti_version__) || defined(__TI_COMPILER_VERSION__)
 #define SYSCONFIG_WEAK __attribute__((weak))
@@ -188,18 +188,18 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define UART_0_IBRD_80_MHZ_115200_BAUD                                      (43)
 #define UART_0_FBRD_80_MHZ_115200_BAUD                                      (26)
 /* Defines for K230 */
-#define K230_INST                                                          UART2
+#define K230_INST                                                          UART7
 #define K230_INST_FREQUENCY                                             40000000
-#define K230_INST_IRQHandler                                    UART2_IRQHandler
-#define K230_INST_INT_IRQN                                        UART2_INT_IRQn
+#define K230_INST_IRQHandler                                    UART7_IRQHandler
+#define K230_INST_INT_IRQN                                        UART7_INT_IRQn
 #define GPIO_K230_RX_PORT                                                  GPIOB
 #define GPIO_K230_TX_PORT                                                  GPIOB
 #define GPIO_K230_RX_PIN                                          DL_GPIO_PIN_16
 #define GPIO_K230_TX_PIN                                          DL_GPIO_PIN_15
 #define GPIO_K230_IOMUX_RX                                       (IOMUX_PINCM33)
 #define GPIO_K230_IOMUX_TX                                       (IOMUX_PINCM32)
-#define GPIO_K230_IOMUX_RX_FUNC                        IOMUX_PINCM33_PF_UART2_RX
-#define GPIO_K230_IOMUX_TX_FUNC                        IOMUX_PINCM32_PF_UART2_TX
+#define GPIO_K230_IOMUX_RX_FUNC                        IOMUX_PINCM33_PF_UART7_RX
+#define GPIO_K230_IOMUX_TX_FUNC                        IOMUX_PINCM32_PF_UART7_TX
 #define K230_BAUD_RATE                                                  (115200)
 #define K230_IBRD_40_MHZ_115200_BAUD                                        (21)
 #define K230_FBRD_40_MHZ_115200_BAUD                                        (45)
@@ -248,13 +248,12 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define ADC1_INST                                                           ADC1
 #define ADC1_INST_IRQHandler                                     ADC1_IRQHandler
 #define ADC1_INST_INT_IRQN                                       (ADC1_INT_IRQn)
-#define ADC1_ADCMEM_ADC_Channel8                              DL_ADC12_MEM_IDX_0
-#define ADC1_ADCMEM_ADC_Channel8_REF             DL_ADC12_REFERENCE_VOLTAGE_VDDA
-#define ADC1_ADCMEM_ADC_Channel8_REF_VOLTAGE_V                                     3.3
-#define GPIO_ADC1_C8_PORT                                                  GPIOA
-#define GPIO_ADC1_C8_PIN                                          DL_GPIO_PIN_22
-#define GPIO_ADC1_IOMUX_C8                                       (IOMUX_PINCM47)
-#define GPIO_ADC1_IOMUX_C8_FUNC                   (IOMUX_PINCM47_PF_UNCONNECTED)
+#define ADC1_ADCMEM_0                                         DL_ADC12_MEM_IDX_0
+#define ADC1_ADCMEM_0_REF                   DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA
+#define GPIO_ADC1_C0_PORT                                                  GPIOA
+#define GPIO_ADC1_C0_PIN                                          DL_GPIO_PIN_15
+#define GPIO_ADC1_IOMUX_C0                                       (IOMUX_PINCM37)
+#define GPIO_ADC1_IOMUX_C0_FUNC                   (IOMUX_PINCM37_PF_UNCONNECTED)
 
 
 
@@ -336,21 +335,6 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define ENCODER_ENC_B1_IIDX                                 (DL_GPIO_IIDX_DIO19)
 #define ENCODER_ENC_B1_PIN                                      (DL_GPIO_PIN_19)
 #define ENCODER_ENC_B1_IOMUX                                     (IOMUX_PINCM45)
-/* Port definition for Pin Group ZDT_Motor */
-#define ZDT_Motor_PORT                                                   (GPIOA)
-
-/* Defines for Yaw_Dir: GPIOA.15 with pinCMx 37 on package pin 8 */
-#define ZDT_Motor_Yaw_Dir_PIN                                   (DL_GPIO_PIN_15)
-#define ZDT_Motor_Yaw_Dir_IOMUX                                  (IOMUX_PINCM37)
-/* Defines for Pitch_Dir: GPIOA.8 with pinCMx 19 on package pin 54 */
-#define ZDT_Motor_Pitch_Dir_PIN                                  (DL_GPIO_PIN_8)
-#define ZDT_Motor_Pitch_Dir_IOMUX                                (IOMUX_PINCM19)
-/* Defines for Yaw_Stp: GPIOA.17 with pinCMx 39 on package pin 10 */
-#define ZDT_Motor_Yaw_Stp_PIN                                   (DL_GPIO_PIN_17)
-#define ZDT_Motor_Yaw_Stp_IOMUX                                  (IOMUX_PINCM39)
-/* Defines for Pitch_Stp: GPIOA.9 with pinCMx 20 on package pin 55 */
-#define ZDT_Motor_Pitch_Stp_PIN                                  (DL_GPIO_PIN_9)
-#define ZDT_Motor_Pitch_Stp_IOMUX                                (IOMUX_PINCM20)
 /* Defines for PIN_0: GPIOA.24 with pinCMx 54 on package pin 25 */
 #define Gray_Address_PIN_0_PORT                                          (GPIOA)
 #define Gray_Address_PIN_0_PIN                                  (DL_GPIO_PIN_24)
