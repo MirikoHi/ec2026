@@ -19,28 +19,28 @@ void Gimbal_Attitude_Solving(void);
 void Gimbal_task_2(void);
 void Gimbal_Init(void)
 {
-	ZDT_Motor_Config_s yaw_config = {
-		.PortPin={
-			.Stp_PORT = ZDT_Motor_PORT,
-	    .Stp_pin = ZDT_Motor_Yaw_Stp_PIN,
-	    .Dir_PORT = ZDT_Motor_PORT,
-	    .Dir_pin = ZDT_Motor_Yaw_Dir_PIN,
-		},
-		.delay_ms = 0.1f,
-	};
-	yaw_motor = ZDT_Motor_Init(&yaw_config);
-	
-	
-	ZDT_Motor_Config_s pitch_config = {
-		.PortPin={
-			.Stp_PORT = ZDT_Motor_PORT,
-	    .Stp_pin = ZDT_Motor_Pitch_Stp_PIN,
-	    .Dir_PORT = ZDT_Motor_PORT,
-	    .Dir_pin = ZDT_Motor_Pitch_Dir_PIN,
-		},
-		.delay_ms = 0.1f,
-	};
-	pitch_motor = ZDT_Motor_Init(&pitch_config);
+	// ZDT_Motor_Config_s yaw_config = {
+	// 	.PortPin={
+	// 		.Stp_PORT = ZDT_Motor_PORT,
+	//     .Stp_pin = ZDT_Motor_Yaw_Stp_PIN,
+	//     .Dir_PORT = ZDT_Motor_PORT,
+	//     .Dir_pin = ZDT_Motor_Yaw_Dir_PIN,
+	// 	},
+	// 	.delay_ms = 0.1f,
+	// };
+	// yaw_motor = ZDT_Motor_Init(&yaw_config);
+	//
+	//
+	// ZDT_Motor_Config_s pitch_config = {
+	// 	.PortPin={
+	// 		.Stp_PORT = ZDT_Motor_PORT,
+	//     .Stp_pin = ZDT_Motor_Pitch_Stp_PIN,
+	//     .Dir_PORT = ZDT_Motor_PORT,
+	//     .Dir_pin = ZDT_Motor_Pitch_Dir_PIN,
+	// 	},
+	// 	.delay_ms = 0.1f,
+	// };
+	// pitch_motor = ZDT_Motor_Init(&pitch_config);
 	ZDT_TICK_Init();
 
 	

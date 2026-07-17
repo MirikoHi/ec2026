@@ -2,12 +2,26 @@ cmake_minimum_required(VERSION 3.20)
 project(electric-competition-robot C ASM)
 
 # ============================================================
+# 芯片选择开关（类似 C 语言的 #define / #ifdef）
+# 切换方式：
+#   1. 直接改下面这行的 ON/OFF
+#   2. 或在命令行传参：cmake -DUSE_MSPM0G3519=OFF ..
+# ============================================================
+option(USE_MSPM0G3519 "Build for MSPM0G3519 (OFF = MSPM0G3507)" ON)
+
+# ============================================================
 # MCU and compiler flags
 # (CPU architecture flags are set in the toolchain file)
 # ============================================================
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -gstrict-dwarf -ffunction-sections -fdata-sections -Wall")
 
-add_compile_definitions(__MSPM0G3507__)
+if(USE_MSPM0G3519)
+    add_compile_definitions(__MSPM0G3519__)
+    message(STATUS "Target MCU: MSPM0G3519")
+else()
+    add_compile_definitions(__MSPM0G3507__)
+    message(STATUS "Target MCU: MSPM0G3507")
+endif()
 
 # ============================================================
 # SysConfig generated files (pre-build step)
@@ -144,8 +158,12 @@ file(GLOB_RECURSE APP_SOURCES_RECURSE
         "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/SYSVIEWFreeRTOSV11/*.c"
 )
 
-# 添加启动文件（特殊）
-set(STARTUP_FILE "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/target/gcc/startup_mspm0g350x_gcc.c")
+# 添加启动文件（根据芯片选择）
+if(USE_MSPM0G3519)
+    set(STARTUP_FILE "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/target/gcc/startup_mspm0g351x_gcc.c")
+else()
+    set(STARTUP_FILE "${CMAKE_CURRENT_SOURCE_DIR}/Vendor/target/gcc/startup_mspm0g350x_gcc.c")
+endif()
 list(APPEND APP_SOURCES_RECURSE ${STARTUP_FILE})
 
 # 添加 SysConfig 生成的文件（可能尚未生成，但已声明）
@@ -204,7 +222,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 # ============================================================
 # 链接器脚本和链接选项
 # ============================================================
-set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/target/gcc/mspm0g3507.lds)
+if(USE_MSPM0G3519)
+    set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/target/gcc/mspm0g3519.lds)
+else()
+    set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/target/gcc/mspm0g3507.lds)
+endif()
 
 target_link_options(${PROJECT_NAME} PRIVATE
         -Wl,-T,${LINKER_SCRIPT}
