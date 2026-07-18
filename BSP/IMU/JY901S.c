@@ -10,15 +10,12 @@ float YawAngleLast=0;
  * @brief 获取IMU数据
  * @retval 返回IMU数据结构体指针
  */
-volatile JY901s_IMU_Data_s *JY901s_IMU_GetData(void)
+volatile JY901s_IMU_Data_s *JY901s_IMU_Init(void)
 {
 	return &IMU_Data;
-}
-
-void JY901s_Init(void)
-{
 	NVIC_EnableIRQ(UART_1_INST_INT_IRQN);
 }
+
 /**
  * @brief       数据包处理函数
  * @param       串口接收的数据RxData

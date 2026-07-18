@@ -21,6 +21,8 @@ DCMotorInstance* DCMotor_Init(DCMotorInitConfig_s *config)
 	instance->Input_Dir = config->Input_Dir;
 	instance->Output_Dir = config->Output_Dir;
 	instance->feedforward = config->feedforward;
+	instance->loop_mode = config->loop_mode;
+	instance->Trace_Compensation = 0.0f;
 	DCMotor_Cmd(instance,DISABLE);
 	
 	return instance;
@@ -53,10 +55,6 @@ static void set_motor(DCMotorInstance *motor)
 		
 }
 
-void DCMotor_SetPosition(DCMotorInstance *motor,float Position)
-{
-	motor->position_ref = Position;
-}
 void DCMotor_Cmd(DCMotorInstance* motor,State state)
 {
 		motor->State=state;
@@ -78,6 +76,17 @@ void DCMotor_SetTraceCompensation(DCMotorInstance *motor,float compensation)
 {
 	motor->Trace_Compensation = compensation;
 }
+
+void DC_Motor_SetRef(DCMotorInstance * motor,float ref) {
+	if (motor->loop_mode == SPEED_MODE) {
+		motor->speed_pid.Ref = ref;
+		motor->speed_pid.pid_update_flag = 1;
+	}
+	if (motor->loop_mode == ANGLE_MODE) {
+		motor->position_pid.Ref = ref;
+		motor->position_pid.pid_update_flag = 1;
+	}
+}
 void Hw_Motor_Task(void)
 {
 	static float last_control_s=0;
@@ -95,11 +104,20 @@ void Hw_Motor_Task(void)
 		dcmotor_instance[i].speed_measure=(dcmotor_instance[i].Input_Dir==MOTOR_REVERSAL? -1:1)*(dcmotor_instance[i].encoder->count*ENCODER_TO_SPEED_MS);
 		//滤波
 		DCMotor_Speed_Filter(&dcmotor_instance[i].filter,dcmotor_instance[i].speed_measure);
-		PID_calc(&dcmotor_instance[i].position_pid,dcmotor_instance[i].position_ref,dcmotor_instance[i].position_measure);
-		//pid计算
-		PID_calc(&dcmotor_instance[i].speed_pid,dcmotor_instance[i].position_pid.out+dcmotor_instance[i].Trace_Compensation+dcmotor_instance[i].speed_ref,dcmotor_instance[i].filter.speed_filtered);
+		if (dcmotor_instance[i].loop_mode == ANGLE_MODE) {
+			//计算角度环输出，角度环out和巡线补偿作为速度环ref
+			PID_calc(&dcmotor_instance[i].position_pid,dcmotor_instance[i].position_pid.Ref,dcmotor_instance[i].position_measure);
+			//计算速度环输出
+			PID_calc(&dcmotor_instance[i].speed_pid,dcmotor_instance[i].position_pid.out+dcmotor_instance[i].Trace_Compensation,dcmotor_instance[i].filter.speed_filtered);
+		}
+		if (dcmotor_instance[i].loop_mode == SPEED_MODE) {
+			//计算速度环输出
+			PID_calc(&dcmotor_instance[i].speed_pid,dcmotor_instance[i].Trace_Compensation+dcmotor_instance[i].speed_pid.Ref,dcmotor_instance[i].filter.speed_filtered);
+		}
 		//前馈
-		dcmotor_instance[i].speed_pid.out += (float)dcmotor_instance[i].feedforward*((dcmotor_instance[i].speed_pid.Ref > 0 && fabsf(dcmotor_instance[i].speed_pid.Ref) > 0.005f)? 1.0f : -1.0f);
+		if (fabsf(dcmotor_instance[i].speed_pid.Ref) > 0.005f) //在有目标值的时候进行累加，目标值为0停下的时候不给前馈
+		dcmotor_instance[i].speed_pid.out += (float)dcmotor_instance[i].feedforward*((dcmotor_instance[i].speed_pid.Ref > 0 )? 1.0f : -1.0f);
+
 		if(dcmotor_instance[i].State == DISABLE)
 		{
 			PID_clear(&dcmotor_instance[i].speed_pid);

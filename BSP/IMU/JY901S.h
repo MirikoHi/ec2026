@@ -15,7 +15,7 @@ typedef struct {
 		float Yaw_Total_Angle;
 }JY901s_IMU_Data_s;
 
-volatile JY901s_IMU_Data_s *JY901s_IMU_GetData(void);
+volatile JY901s_IMU_Data_s *JY901s_IMU_Init(void);
 
 extern volatile JY901s_IMU_Data_s IMU_Data;
 #endif

@@ -42,6 +42,12 @@ typedef struct {
 	DL_TIMER_CC_INDEX idx;
 } DCMotor_PortPin_s;
 
+typedef enum {
+	ANGLE_MODE = 0,
+	SPEED_MODE,
+} Motor_Loop_Mode;
+//todo:考虑加入更多状态，比如加入巡线的PID计算和不加入巡线的闭环
+
 typedef struct {
 		pid_type_def speed_pid;
 		pid_type_def position_pid;
@@ -50,11 +56,10 @@ typedef struct {
 		Motor_Dir Input_Dir;
 		Motor_Dir Output_Dir;
 		uint8_t feedforward;
-	
+
+		Motor_Loop_Mode loop_mode;
 		Motor_Speed_Filter_e filter;
 		float speed_measure;//rpm
-		float speed_ref;
-		float position_ref;
 		float position_measure;
 		float Trace_Compensation;
 		State State;
@@ -69,7 +74,8 @@ typedef struct {
 		uint8_t feedforward;
 		Motor_Dir Input_Dir;
 		Motor_Dir Output_Dir;
-		
+		Motor_Loop_Mode loop_mode;
+
 }DCMotorInitConfig_s;
 
 
@@ -77,8 +83,8 @@ typedef struct {
 
 
 DCMotorInstance* DCMotor_Init(DCMotorInitConfig_s *config);
+void DC_Motor_SetRef(DCMotorInstance * motor,float ref) ;
 void DCMotor_SetTraceCompensation(DCMotorInstance *motor,float compensation);
 void Hw_Motor_Task(void);
 void DCMotor_Cmd(DCMotorInstance* motor,State state);
-void DCMotor_SetPosition(DCMotorInstance *motor,float Position);
 #endif
