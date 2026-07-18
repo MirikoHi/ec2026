@@ -49,6 +49,8 @@ void tjc_control(void);
 void draw_sin(void);
 void Gimbal_Pid_Cal(void);
 static void RobotCmd_UpdateRemoteMode(void);
+static void RobotCmd_ExitRemoteMode(Chassis_Mode_e restore_mode);
+static uint8_t RobotCmd_IsRemoteSwitchOn(uint16_t channel);
 static float RobotCmd_ELRSChannelToNorm(uint16_t channel);
 void RobotCmd_Init(void)
 {
@@ -198,25 +200,41 @@ static void RobotCmd_UpdateRemoteMode(void)
 	uint16_t ch2;
 	uint16_t ch5;
 
+	/* ELRS尚未初始化时，不接管原有菜单/循迹模式。 */
 	if (robotcmd_elrs == NULL)
 	{
 		return;
 	}
+
+	/* 从未收到过遥控器有效帧：保持原模式，避免开机无遥控器时误触发失能。 */
 	if (robotcmd_elrs->rc_frame_count == 0U)
 	{
 		return;
 	}
 
+	/*
+	 * 曾经在线后又离线：退出遥控模式，并通知底盘失能电机。
+	 * 这样不会保持最后一次遥控输出，也不会影响开机前从未接入遥控器的场景。
+	 */
+	if (ELRS_IsOnline() == 0U)
+	{
+		chassis_cmd_send.remote_lost_disable = 1U;
+		RobotCmd_ExitRemoteMode(last_non_remote_mode);
+		return;
+	}
+
+	chassis_cmd_send.remote_lost_disable = 0U;
 	ch1 = robotcmd_elrs->channel[ELRS_REMOTE_TURN_CH - 1U];
 	ch2 = robotcmd_elrs->channel[ELRS_REMOTE_FORWARD_CH - 1U];
 	ch5 = robotcmd_elrs->channel[ELRS_REMOTE_ENABLE_CH - 1U];
 
+	/* 进入遥控前记录当前模式，退出遥控时恢复到这个模式。 */
 	if (chassis_cmd_send.Chassis_Mode != REMOTE_MODE)
 	{
 		last_non_remote_mode = chassis_cmd_send.Chassis_Mode;
 	}
 
-	if (ch5 > ELRS_REMOTE_ENABLE_VALUE)
+	if (RobotCmd_IsRemoteSwitchOn(ch5) != 0U)
 	{
 		chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
 		chassis_cmd_send.remote_turn = -1.0f * RobotCmd_ELRSChannelToNorm(ch1) * ELRS_REMOTE_MAX_TURN;
@@ -224,10 +242,23 @@ static void RobotCmd_UpdateRemoteMode(void)
 	}
 	else if (chassis_cmd_send.Chassis_Mode == REMOTE_MODE)
 	{
-		chassis_cmd_send.Chassis_Mode = last_non_remote_mode;
-		chassis_cmd_send.remote_turn = 0.0f;
-		chassis_cmd_send.remote_forward = 0.0f;
+		RobotCmd_ExitRemoteMode(last_non_remote_mode);
 	}
+}
+
+static void RobotCmd_ExitRemoteMode(Chassis_Mode_e restore_mode)
+{
+	if (chassis_cmd_send.Chassis_Mode == REMOTE_MODE)
+	{
+		chassis_cmd_send.Chassis_Mode = restore_mode;
+	}
+	chassis_cmd_send.remote_turn = 0.0f;
+	chassis_cmd_send.remote_forward = 0.0f;
+}
+
+static uint8_t RobotCmd_IsRemoteSwitchOn(uint16_t channel)
+{
+	return channel > ELRS_REMOTE_ENABLE_VALUE;
 }
 
 static float RobotCmd_ELRSChannelToNorm(uint16_t channel)

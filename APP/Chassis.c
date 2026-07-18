@@ -36,6 +36,7 @@ void Chassis_State_Turn(void);
 void Chassis_Set_Turn(void);
 static void Chassis_RemoteControl(void);
 static void Chassis_ClearRemoteSpeed(void);
+static void Chassis_RemoteLostDisable(void);
 static void Chassis_Trace_Cal(void);
 static void Motor_FeedForward_Update(void);
 /**
@@ -145,6 +146,12 @@ void Chassis(void)
 	//更新ICM陀螺仪数据
 	IMU_getYawPitchRoll((float *)IMU_data);  //耗时约1ms
 
+	if (chassis_cmd_receive.remote_lost_disable != 0U)
+	{
+		Chassis_RemoteLostDisable();
+		return;
+	}
+
 	if (chassis_cmd_receive.Chassis_Mode != REMOTE_MODE)
 	{
 		Chassis_ClearRemoteSpeed();
@@ -195,14 +202,14 @@ static void Chassis_RemoteControl(void)
 	static float left_out;
 	static float right_out;
 	//遥控器下改成速度环
-	motor_l->loop_mode = ANGLE_MODE;
-	motor_r->loop_mode = ANGLE_MODE;
+	motor_l->loop_mode = SPEED_MODE;
+	motor_r->loop_mode = SPEED_MODE;
 	//计算差速轮输出
 	float left_speed = chassis_cmd_receive.remote_forward - chassis_cmd_receive.remote_turn;
 	float right_speed = chassis_cmd_receive.remote_forward + chassis_cmd_receive.remote_turn;
 
-	left_out += left_speed;
-	right_out += right_speed;
+	// left_out += left_speed;
+	// right_out += right_speed;
 
 	motor_l->State = ENABLE;
 	motor_r->State = ENABLE;
@@ -210,8 +217,9 @@ static void Chassis_RemoteControl(void)
 	Stop_Flag = 0;
 	Spin_start_flag = 0;
 	Spin_succeed_flag = 0;
-	DCMotor_SetTraceCompensation(motor_l, 0.0f);
-	DCMotor_SetTraceCompensation(motor_r, 0.0f);
+	// DCMotor_SetTraceCompensation(motor_l, 0.0f);
+	// DCMotor_SetTraceCompensation(motor_r, 0.0f);
+	Chassis_Trace_Cal();
 
 	if (remote_mode_active == 0U)
 	{
@@ -220,8 +228,8 @@ static void Chassis_RemoteControl(void)
 		remote_mode_active = 1U;
 	}
 
-	DC_Motor_SetRef(motor_l, left_out/150);
-	DC_Motor_SetRef(motor_r, right_out/150);
+	DC_Motor_SetRef(motor_l, left_speed);
+	DC_Motor_SetRef(motor_r, right_speed);
 }
 
 static void Chassis_ClearRemoteSpeed(void)
@@ -233,6 +241,16 @@ static void Chassis_ClearRemoteSpeed(void)
 
 	DC_Motor_SetRef(motor_l, 0.0f);
 	DC_Motor_SetRef(motor_r, 0.0f);
+}
+
+static void Chassis_RemoteLostDisable(void)
+{
+	// ELRS断线时直接关闭H桥输入，避免保持最后一次遥控输出。
+	Chassis_ClearRemoteSpeed();
+	DC_Motor_SetRef(motor_l, 0.0f);
+	DC_Motor_SetRef(motor_r, 0.0f);
+	DCMotor_Cmd(motor_l, DISABLE);
+	DCMotor_Cmd(motor_r, DISABLE);
 }
 
 void Motor_Cmd_CallBack(uint8_t i)

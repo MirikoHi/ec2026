@@ -30,15 +30,19 @@ typedef struct
     ELRS_LinkStatistics_s link;
     uint32_t rc_frame_count;
     uint32_t link_frame_count;
+    uint32_t uart_error_count;
     uint8_t frame_updated;
     uint8_t link_updated;
+    uint8_t online;
 } ELRS_Data_s;
 
 void ELRS_Init(void);
 void ELRS_ReceiveByte(uint8_t data);
 const volatile ELRS_Data_s *ELRS_GetData(void);
 uint16_t ELRS_GetChannel(uint8_t index);
+uint8_t ELRS_IsOnline(void);
 uint8_t ELRS_IsFrameUpdated(void);
 void ELRS_ClearFrameUpdated(void);
+uint32_t ELRS_GetUartErrorCount(void);
 
 #endif
