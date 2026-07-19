@@ -74,9 +74,91 @@ float Cal_Trace_Err(uint8_t current_trace) {
     return (float)sum / (float)active_count;
 }
 
+/**
+ * @brief 从 8 路灰度传感器原始数据计算黑线位置误差
+ *
+ * 映射法则：找最大连续 0 块 → 中心位置 c → error = 7 - 2*c
+ * - 2+ 相邻传感器见线 → 直接有效
+ * - 单传感器见线 → 上下文感知 debounce（在线 2 帧 / 离线 8 帧）
+ * - 全白 0xFF → 保持上一帧位置（间隙）
+ * - 一阶 LPF 平滑输出
+ *
+ * @param raw 8 路传感器数字量（bit=0 表示黑线）
+ * @return 线位置误差，范围约 -7.0 ~ +7.0，0 表示居中
+ */
+static float CalcLineError(uint8_t raw)
+{
+    static float   last_output = 0.0f;    // 上一帧输出（LPF 状态 + keep）
+    static int     single_pos  = -1;      // 跟踪的孤立 0 位置，-1=无
+    static uint8_t single_cnt  = 0;       // 同一孤立 0 连续帧数
+    static uint8_t ff_gap_cnt  = 0;       // 当前孤立 0 出现前，连续 0xFF 帧数
+
+    /* ---- 找最大连续 0 块 ---- */
+    int best_start = -1, best_len = 0;
+    int cur_start  = -1, cur_len  = 0;
+
+    for (int i = 0; i < 8; i++) {
+        if (!(raw & (1 << i))) {            // bit=0 → 黑线
+            if (cur_start < 0) cur_start = i;
+            cur_len++;
+        } else {
+            if (cur_len > best_len) {
+                best_start = cur_start;
+                best_len   = cur_len;
+            }
+            cur_start = -1;
+            cur_len   = 0;
+        }
+    }
+    if (cur_len > best_len) { best_start = cur_start; best_len = cur_len; }
+
+    float raw_err;
+    int   len = best_len;
+    float c   = (len > 0) ? ((float)best_start + (float)(len - 1) * 0.5f) : 0.0f;
+
+    /* ---- 分类处理 ---- */
+    if (len >= 2) {
+        /* 2+ 相邻传感器 → 有效线 */
+        raw_err = 7.0f - 2.0f * c;
+        single_pos  = -1;
+        single_cnt  = 0;
+        ff_gap_cnt  = 0;
+    } else if (len == 1) {
+        /* 单传感器 → 上下文感知 debounce */
+        if (single_pos == best_start) {
+            single_cnt++;
+        } else {
+            single_pos = best_start;
+            single_cnt = 1;
+        }
+
+        uint8_t threshold = (ff_gap_cnt <= 1) ? 2 : 8;
+
+        if (single_cnt >= threshold) {
+            /* 确认有效 */
+            raw_err = 7.0f - 2.0f * c;
+        } else {
+            /* debounce 中：保持上一帧 */
+            raw_err = last_output;
+        }
+    } else {
+        /* raw == 0xFF：全白 → 保持上一帧位置 */
+        raw_err = last_output;
+        ff_gap_cnt++;
+        single_pos = -1;
+        single_cnt = 0;
+    }
+
+    /* ---- LPF 平滑 ---- */
+    float output = last_output + 0.8 * (raw_err - last_output);  //这里滤波系数可以调，越靠近0越平滑
+    last_output = output;
+
+    return output;
+}
+
 float Trace_task(void)
 {
-	// 定时调用传感器任务，包含模拟数据采集和数字化一整个流程
+    // 定时调用传感器任务，包含模拟数据采集和数字化一整个流程
 #ifdef USE_GRAY_SERIAL
     Digtal = Gray_Serial_Read();
 #else
@@ -84,10 +166,17 @@ float Trace_task(void)
     // 定时调用传感器任务，包含模拟数据采集和数字化一整个流程
 //            No_Mcu_Ganv_Sensor_Task_With_tick(&sensor)
     // 获取数字量传感器数据（只有当黑白值填进去之后才会有数字量输出）
-    Digtal=Get_Digtal_For_User(&sensor);
+    Digtal = Get_Digtal_For_User(&sensor);
 #endif
-    track_err = Cal_Trace_Err(Digtal);
+
+    track_err = CalcLineError(Digtal); //todo:需新增一个从中间线出来，清除掉残留输出
+
+    // LOGINFO("Digtal: %d %d %d %d %d %d %d %d  err:%.2f",
+    //         (Digtal >> 7) & 1, (Digtal >> 6) & 1, (Digtal >> 5) & 1, (Digtal >> 4) & 1,
+    //         (Digtal >> 3) & 1, (Digtal >> 2) & 1, (Digtal >> 1) & 1, (Digtal >> 0) & 1,
+    //         track_err);
+
     // 循迹任务频率1kHz只需要delay 1ms，如果是100Hz需要delay 10ms，根据需求选择使用
-		PID_calc(&Trace_PID,0,track_err);
-	return Trace_PID.out;
+    PID_calc(&Trace_PID, 0, -(track_err * (1.0f + 0.05f * fabsf(track_err)))); //todo:这里从原来的权重换成了-7到7的数据，边缘速度减小了，得细调
+    return Trace_PID.out;
 }

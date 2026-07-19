@@ -376,9 +376,9 @@ static void TraceTask(void *pvParameters)
 			Trace_start = DWT_GetTimeline_ms();
 			Trace_task();
 			Trace_dt = DWT_GetTimeline_ms() - Trace_start;
-			if (Trace_dt > 5)
+			if (Trace_dt > 1)
             LOGERROR("[freeRTOS] Trace Task is being DELAY! dt = [%f]", Trace_dt);
-			vTaskDelay(pdMS_TO_TICKS(5));
+			vTaskDelay(pdMS_TO_TICKS(1));
 			
 		}
 }
