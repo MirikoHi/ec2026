@@ -146,7 +146,7 @@ void Chassis(void)
 	//更新ICM陀螺仪数据
 	IMU_getYawPitchRoll((float *)IMU_data);  //耗时约1ms
 
-	if (chassis_cmd_receive.remote_lost_disable != 0U)
+	if (chassis_cmd_receive.remote_disable != 0U)
 	{
 		Chassis_RemoteLostDisable();
 		return;

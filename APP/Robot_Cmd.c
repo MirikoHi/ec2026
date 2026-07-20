@@ -38,9 +38,11 @@ float now_time=0;
 State robotcmd_control_state = DISABLE;
 
 #define ELRS_REMOTE_ENABLE_CH       5U
+#define ELRS_REMOTE_DISABLE_CH      6U
 #define ELRS_REMOTE_TURN_CH         1U
 #define ELRS_REMOTE_FORWARD_CH      2U
 #define ELRS_REMOTE_ENABLE_VALUE    900U
+#define ELRS_REMOTE_DISABLE_VALUE   ELRS_CHANNEL_VALUE_MID
 #define ELRS_REMOTE_DEADBAND        0.04f
 #define ELRS_REMOTE_MAX_FORWARD     0.25f
 #define ELRS_REMOTE_MAX_TURN        0.18f
@@ -51,6 +53,7 @@ void Gimbal_Pid_Cal(void);
 static void RobotCmd_UpdateRemoteMode(void);
 static void RobotCmd_ExitRemoteMode(Chassis_Mode_e restore_mode);
 static uint8_t RobotCmd_IsRemoteSwitchOn(uint16_t channel);
+static uint8_t RobotCmd_IsRemoteDisableOn(uint16_t channel);
 static float RobotCmd_ELRSChannelToNorm(uint16_t channel);
 void RobotCmd_Init(void)
 {
@@ -199,6 +202,7 @@ static void RobotCmd_UpdateRemoteMode(void)
 	uint16_t ch1;
 	uint16_t ch2;
 	uint16_t ch5;
+	uint16_t ch6;
 
 	/* ELRS尚未初始化时，不接管原有菜单/循迹模式。 */
 	if (robotcmd_elrs == NULL)
@@ -218,15 +222,28 @@ static void RobotCmd_UpdateRemoteMode(void)
 	 */
 	if (ELRS_IsOnline() == 0U)
 	{
-		chassis_cmd_send.remote_lost_disable = 1U;
+		chassis_cmd_send.remote_disable = 1U;
 		RobotCmd_ExitRemoteMode(last_non_remote_mode);
 		return;
 	}
 
-	chassis_cmd_send.remote_lost_disable = 0U;
 	ch1 = robotcmd_elrs->channel[ELRS_REMOTE_TURN_CH - 1U];
 	ch2 = robotcmd_elrs->channel[ELRS_REMOTE_FORWARD_CH - 1U];
 	ch5 = robotcmd_elrs->channel[ELRS_REMOTE_ENABLE_CH - 1U];
+	ch6 = robotcmd_elrs->channel[ELRS_REMOTE_DISABLE_CH - 1U];
+
+	/*
+	 * CH6 is the safety disable switch. It has higher priority than CH5
+	 * remote-enable, so a high CH6 always disables chassis motors.
+	 */
+	if (RobotCmd_IsRemoteDisableOn(ch6) != 0U)
+	{
+		chassis_cmd_send.remote_disable = 1U;
+		RobotCmd_ExitRemoteMode(last_non_remote_mode);
+		return;
+	}
+
+	chassis_cmd_send.remote_disable = 0U;
 
 	/* 进入遥控前记录当前模式，退出遥控时恢复到这个模式。 */
 	if (chassis_cmd_send.Chassis_Mode != REMOTE_MODE)
@@ -259,6 +276,11 @@ static void RobotCmd_ExitRemoteMode(Chassis_Mode_e restore_mode)
 static uint8_t RobotCmd_IsRemoteSwitchOn(uint16_t channel)
 {
 	return channel > ELRS_REMOTE_ENABLE_VALUE;
+}
+
+static uint8_t RobotCmd_IsRemoteDisableOn(uint16_t channel)
+{
+	return channel > ELRS_REMOTE_DISABLE_VALUE;
 }
 
 static float RobotCmd_ELRSChannelToNorm(uint16_t channel)
