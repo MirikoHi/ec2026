@@ -11,7 +11,7 @@
 #define PulseofCirlce 	(13*10*40/3) 
 #define MOTOR_MAX_NUM 2
 #define ENCODER_TO_SPEED_MS (100 * 0.065 * PI * 3 / 10 / 13 / 2 / 40)  // 编码器到速度的转换系数//最大0.5m/s
-#define ENCODER_TO_DISDAN_M (0.065 * PI * 3 / 13 / 10 / 2 / 40) //0.01==10cm
+#define ENCODER_TO_DISDAN_M (0.065 * PI  / 13 / 28 /2 /2) //0.01==10cm
 
 
 
