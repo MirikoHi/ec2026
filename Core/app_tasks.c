@@ -224,10 +224,6 @@ void app_tasks_init(void)
 //            NULL);
 // 			configASSERT(xResult == pdPASS);
 
-		xResult=xTaskCreate(TraceTask, "Trace", TRACE_TASK_STACK_DEPTH,
-            (void *) Trace_PARAMETER, tskIDLE_PRIORITY+2,
-            STACK_HANDLE(Trace));
-		configASSERT(xResult == pdPASS);	
 
 			xResult=xTaskCreate(RobotCmdTask, "RobotCmd", ROBOTCMD_TASK_STACK_DEPTH,
             (void *) RobotCmd_PARAMETER, tskIDLE_PRIORITY+2,
@@ -361,24 +357,6 @@ static void KeyTask(void *pvParameters)
 			if (Key_dt > 5)
             LOGERROR("[freeRTOS] Key Task is being DELAY! dt = [%f]", Key_dt);
 			vTaskDelay(pdMS_TO_TICKS(5));
-			
-		}
-}
-static void TraceTask(void *pvParameters)
-{
-  /* Check the task parameter is as expected. */
-    configASSERT(
-        ((unsigned long) pvParameters) == Trace_PARAMETER);
-	vTaskDelay(1000);
-		static float Trace_dt;
-    static float Trace_start;
-		for (;;){
-			Trace_start = DWT_GetTimeline_ms();
-			Trace_task();
-			Trace_dt = DWT_GetTimeline_ms() - Trace_start;
-			if (Trace_dt > 1)
-            LOGERROR("[freeRTOS] Trace Task is being DELAY! dt = [%f]", Trace_dt);
-			vTaskDelay(pdMS_TO_TICKS(1));
 			
 		}
 }
