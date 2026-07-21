@@ -27,7 +27,7 @@ typedef enum {
 typedef struct {
 		Chassis_Mode_e Chassis_Mode;
 		uint8_t circle_set;
-		uint8_t remote_lost_disable;
+		uint8_t remote_disable;
 		float remote_forward;
 		float remote_turn;
 }chassis_cmd_q;
