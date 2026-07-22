@@ -48,8 +48,6 @@ static void set_motor(DCMotorInstance *motor)
 			DL_GPIO_clearPins(motor->PortPin.EN_1_PORT,motor->PortPin.EN_1_pin);
 		}
 	}
-	    
-	
 	Abs(speed);
 	DL_TimerG_setCaptureCompareValue(motor->PortPin.inst,speed,motor->PortPin.idx);
 		
@@ -72,6 +70,7 @@ static float DCMotor_Speed_Filter(Motor_Speed_Filter_e *filter,float speed)
 	filter->speed_filtered = filtered_MotorSpeed;
 	return filtered_MotorSpeed;
 }
+
 void DCMotor_SetTraceCompensation(DCMotorInstance *motor,float compensation)
 {
 	motor->Trace_Compensation = compensation;

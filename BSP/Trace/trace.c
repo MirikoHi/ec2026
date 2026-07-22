@@ -37,7 +37,7 @@ void Trace_Init(void)
 #endif
 	pid_init_config_s trace_config={
 		.mode = PID_POSITION,
-		.Kp = 0.08f,
+		.Kp = 0.01f,
 		.Kd = 0.0f,
 		.Ki = 0.0f,
 		.max_out = 500.0f,

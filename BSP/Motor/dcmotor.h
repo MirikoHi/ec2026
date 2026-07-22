@@ -62,6 +62,7 @@ typedef struct {
 		float speed_measure;//rpm
 		float position_measure;
 		float Trace_Compensation;
+		float wheel_sync;
 		State State;
 }__attribute__((aligned(4)))DCMotorInstance;
 
