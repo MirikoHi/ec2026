@@ -43,14 +43,12 @@ Desktop.ini
 $RECYCLE.BIN/
 
 # ============================================================
-# CLion / CMake build directories & files
+# CLion / CMake build directories (这里只忽略编译产生的临时垃圾)
 # ============================================================
 cmake-build-*/
 build/
 CMakeFiles/
 CMakeCache.txt
-cmake/
-CMakeLists.txt
 
 # ============================================================
 # Editors
