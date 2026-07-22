@@ -142,9 +142,13 @@ static float CalcLineError(uint8_t raw)
             raw_err = last_output;
         }
     } else {
-        /* raw == 0xFF：全白 → 保持上一帧位置 */
-        raw_err = last_output;
         ff_gap_cnt++;
+        if (ff_gap_cnt > 50) {  // 丢线超过 50 帧（约 50ms @ 1kHz）
+            // 让输出向 0 衰减，而不是保持 last_output
+            raw_err = 0.0f;     // 或 last_output * 0.95f 逐步衰减
+        } else {
+            raw_err = last_output;  // 短暂丢线，保持上一帧（过间隙）
+        }
         single_pos = -1;
         single_cnt = 0;
     }

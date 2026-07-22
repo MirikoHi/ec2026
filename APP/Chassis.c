@@ -358,7 +358,7 @@ void Chassis_State_Turn(void)
 			if(quan < chassis_cmd_receive.circle_set)
 			{
 				state ++;
-				Chassis_Set_Line(0.08);
+				Chassis_Set_Line(1);
 			}
 		break;
 		case 1:
@@ -371,7 +371,7 @@ void Chassis_State_Turn(void)
 		case 2:
 			if(Spin_succeed_flag)
 			{
-				Chassis_Set_Line(0.082);
+				Chassis_Set_Line(1);
 				state ++;
 			}
 		break;
@@ -385,7 +385,7 @@ void Chassis_State_Turn(void)
 		case 4:
 			if(Spin_succeed_flag)
 			{
-				Chassis_Set_Line(0.082);
+				Chassis_Set_Line(1);
 				state ++;
 			}
 		break;
@@ -399,7 +399,7 @@ void Chassis_State_Turn(void)
 			case 6:
 			if(Spin_succeed_flag)
 			{
-				Chassis_Set_Line(0.082);
+				Chassis_Set_Line(1);
 				state ++;
 			}
 		break;
