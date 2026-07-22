@@ -716,7 +716,7 @@ static float Chassis_GetForwardOdom(void)
  */
 static float Chassis_GetYawDeg(void)
 {
-	// Chassis() 每周期调用 IMU_getYawPitchRoll()，IMU_data[0] 为 ICM42688 yaw，单位 deg。
+	// Chassis() 每周期调用 IMU_getYawPitchRoll()，IMU_data[0] 为 ICM42688 yaw，单位 deg。 1是pitch，2是roll
 	return IMU_data[0];
 }
 

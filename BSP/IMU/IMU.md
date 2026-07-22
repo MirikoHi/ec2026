@@ -1,5 +1,16 @@
 ## 📊 IMU姿态解算完整流程
 
+
+BMI088 模块引脚	功能描述	MSPM0 单片机引脚	芯片物理脚编号 (Package Pin)	代码中对应的 SysConfig 宏定义
+VCC / VDD	电源正极	3.3V	-	-
+GND	电源地	GND	-	-
+CSB1 / ACC_CS	加速度计片选	GPIOA.29	Pin 36	ICM42688_CS_CS_PIN
+CSB2 / GYR_CS	陀螺仪片选	GPIOA.16	Pin 9	bmi088_cs2_cs2_PIN
+SCL / SCLK	SPI 时钟线	GPIOA.11	PinCM22	GPIO_ICM42688_SCLK_PIN
+SDA / MOSI	SPI 主出从入	GPIOB.17	PinCM43	GPIO_ICM42688_PICO_PIN
+SDO / MISO	SPI 主入从出	GPIOA.10	PinCM21	GPIO_ICM42688_POCI_PIN
+PS (若有)	协议选择	接 GND	-	保持低电平以固定为 SPI 模式
+
 ### 1️⃣ **函数调用链与频率**
 
 ```

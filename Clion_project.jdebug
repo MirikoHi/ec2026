@@ -22,19 +22,19 @@ void OnProjectLoad (void) {
   //
   // Dialog-generated settings
   //
-  Project.AddPathSubstitute ("D:/Code/ElectricCompetitionProject/electric-competition-training", "$(ProjectDir)");
-  Project.AddPathSubstitute ("d:/code/electriccompetitionproject/electric-competition-training", "$(ProjectDir)");
   Project.SetDevice ("MSPM0G3507");
-  Project.SetHostIF ("USB", "602712552");
+  Project.SetHostIF ("USB", "69653628");
   Project.SetTargetIF ("SWD");
   Project.SetTIFSpeed ("4 MHz");
+  Project.AddPathSubstitute ("D:/Code/ElectricCompetitionProject/electric-competition-training", "$(ProjectDir)");
+  Project.AddPathSubstitute ("d:/code/electriccompetitionproject/electric-competition-training", "$(ProjectDir)");
   Project.AddSvdFile ("$(InstallDir)/Config/CPU/Cortex-M0.svd");
   Project.AddSvdFile ("$(InstallDir)/Config/Peripherals/STM32F103xx.svd");
   //
   // User settings
   //
+  Edit.SysVar (VAR_HSS_SPEED, FREQ_100_HZ);
   File.Open ("$(ProjectDir)/cmake-build-debug/electric-competition-robot.elf");
-  Edit.SysVar (VAR_HSS_SPEED, FREQ_10_KHZ);
 }
 
 /*********************************************************************
