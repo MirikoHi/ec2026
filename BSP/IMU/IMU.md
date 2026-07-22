@@ -1,6 +1,6 @@
 ## 📊 IMU姿态解算完整流程
 
-
+使用前先看imu.h头文件，选择是使用bmi088还是icm42688
 BMI088 模块引脚	功能描述	MSPM0 单片机引脚	芯片物理脚编号 (Package Pin)	代码中对应的 SysConfig 宏定义
 VCC / VDD	电源正极	3.3V	-	-
 GND	电源地	GND	-	-
