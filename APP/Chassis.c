@@ -24,6 +24,7 @@ uint8_t Spin_start_flag = 0, Spin_succeed_flag = 0 ;
 uint8_t Stop_Flag = 0;
 uint8_t Line_flag = 0, Turn_flag = 0 ;  // 1表示正在执行巡线/转弯任务，0表示未在巡线/转弯
 uint8_t state = 0;						//底盘巡线状态，从0到9个状态
+static float turn_start_yaw = 0.0f;   // 转弯起始时的 yaw 角度
 static float trace_compensation;		//巡线补偿量
 
 static uint8_t remote_mode_active = 0;
@@ -38,6 +39,8 @@ static void Chassis_RemoteControl(void);
 static void Chassis_ClearRemoteSpeed(void);
 static void Chassis_RemoteLostDisable(void);
 static void Chassis_Trace_Cal(void);
+void Chassis_Set_Line(float position);
+void Chassis_Set_Turn_IMU(int8_t direction);
 static void Motor_FeedForward_Update(void);
 /**
  * @brief 初始化底盘左右电机和IMU
@@ -88,7 +91,7 @@ void Chassis_Init(void)
 
 	DCMotorInitConfig_s motor_r_config ={
 		.Input_Dir = MOTOR_REVERSAL,
-		.Output_Dir = MOTOR_REVERSAL,
+		.Output_Dir = MOTOR_NORMAL,
 		.PortPin ={
 			.EN_1_PORT = Motor_dir_EN1_A_PORT,
 			.EN_1_pin = Motor_dir_EN1_A_PIN,
@@ -156,7 +159,7 @@ void Chassis(void)
 	{
 		Chassis_ClearRemoteSpeed();
 	}
-	switch(chassis_cmd_receive.Chassis_Mode)
+	switch(TRACE_MODE)
 	{
 		case TRACE_MODE:
 			//计算并设定巡线补偿量
@@ -170,8 +173,15 @@ void Chassis(void)
 
 			break;
 		case NORMAL_MODE:
-
-			Chassis_Set_Turn();
+			static int init_flag=1;
+			// Chassis_Trace_Cal();
+			if (init_flag) {
+				// DCMotor_SetTraceCompensation(motor_l, 0.0f);
+				// DCMotor_SetTraceCompensation(motor_r, 0.0f);
+				Chassis_Set_Line(1);
+				// Chassis_Set_Turn();
+				init_flag=0;
+			}
 
 			break;
 		case POSITION_MODE:
@@ -339,9 +349,9 @@ void Chassis_Set_Line(float position)
 	Spin_succeed_flag = 0;
 	motor_l->encoder->total_count = 0;
 	motor_r->encoder->total_count = 0;
-	motor_l->position_pid.max_out = 0.03;
+	motor_l->position_pid.max_out = 0.8;
 	motor_l->position_pid.max_iout = 0.0;
-	motor_r->position_pid.max_out = 0.03;
+	motor_r->position_pid.max_out = 0.8;
 	motor_r->position_pid.max_iout = 0.0;
 
 	DC_Motor_SetRef(motor_l, position);
@@ -431,4 +441,27 @@ void Chassis_State_Turn(void)
 	
 	
 	
+}
+void Chassis_Set_Turn_IMU(int8_t direction)  // direction: 1=右转, -1=左转
+{
+	motor_l->loop_mode = SPEED_MODE;
+	motor_r->loop_mode = SPEED_MODE;
+	motor_l->State = ENABLE;
+	motor_r->State = ENABLE;
+	Line_flag = 0;
+	Stop_Flag = 0;
+	Spin_start_flag = 1;
+	Spin_succeed_flag = 0;
+
+	// 记录转弯起始 yaw
+	turn_start_yaw = IMU_data[0];
+
+	// 清零巡线补偿，转弯不纠偏
+	DCMotor_SetTraceCompensation(motor_l, 0.0f);
+	DCMotor_SetTraceCompensation(motor_r, 0.0f);
+
+	// 差速转弯：左轮后退、右轮前进 = 右转
+	float turn_speed = 0.06f;  // 转弯速度 m/s，可根据效果调
+	DC_Motor_SetRef(motor_l, -direction * turn_speed);
+	DC_Motor_SetRef(motor_r,  direction * turn_speed);
 }

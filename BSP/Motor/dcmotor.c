@@ -99,9 +99,13 @@ void Hw_Motor_Task(void)
 	for(uint8_t i=0;i<idx_dcmotor;i++)
 	{
 		//计算位置
-		dcmotor_instance[i].position_measure=(dcmotor_instance[i].Input_Dir==MOTOR_REVERSAL? -1:1)*(dcmotor_instance[i].encoder->total_count*ENCODER_TO_DISDAN_M);
+		dcmotor_instance[i].position_measure=
+			(dcmotor_instance[i].Input_Dir==MOTOR_REVERSAL? -1:1)*
+			(dcmotor_instance[i].encoder->total_count*ENCODER_TO_DISDAN_M);
 		//计算速度
-		dcmotor_instance[i].speed_measure=(dcmotor_instance[i].Input_Dir==MOTOR_REVERSAL? -1:1)*(dcmotor_instance[i].encoder->count*ENCODER_TO_SPEED_MS);
+		dcmotor_instance[i].speed_measure=
+			(dcmotor_instance[i].Input_Dir==MOTOR_REVERSAL? -1:1)*
+			(dcmotor_instance[i].encoder->count*ENCODER_TO_SPEED_MS);
 		//滤波
 		DCMotor_Speed_Filter(&dcmotor_instance[i].filter,dcmotor_instance[i].speed_measure);
 		if (dcmotor_instance[i].loop_mode == ANGLE_MODE) {
