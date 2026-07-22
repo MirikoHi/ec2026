@@ -162,12 +162,16 @@ void Chassis(void)
 	switch(TRACE_MODE)
 	{
 		case TRACE_MODE:
-			//计算并设定巡线补偿量
-			Chassis_Trace_Cal();
-			//按照设定的路径前进
+			if (!Line_flag)  // 正在转弯
+			{
+				DCMotor_SetTraceCompensation(motor_l, 0.0f);
+				DCMotor_SetTraceCompensation(motor_r, 0.0f);
+			}
+			else  // 直走
+			{
+				Chassis_Trace_Cal();
+			}
 			Chassis_State_Turn();
-			//检测直行/转弯是否完成，更新标志位
-			Stop_Detect();
 			break;
 		case IMU_MODE:
 
@@ -278,6 +282,43 @@ void Motor_Cmd_CallBack(uint8_t i)
 	
 }
 
+// void Stop_Detect(void)
+// {
+// 	if(Line_flag)
+// 		{
+// 				if((abs_out(motor_l->position_pid.Ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_pid.Ref-motor_r->position_measure)<0.008f))
+// 				{
+// 						stop_count++;
+// 						if(stop_count >= 40)
+// 						{
+// 								Line_flag = 0;
+// 								Stop_Flag = 1; //这个标志位可以用来判断是否执行下一阶段任务
+// 								stop_count = 0;
+// 								// motor_l->State = DISABLE;
+// 								// motor_r->State = DISABLE;
+// //								ctrl_mode = MOTOR_CTRL_STOP;
+// 						}
+// 				}
+// 				else
+// 				{
+// 						Stop_Flag = 0;
+// 						stop_count = 0;
+// 				}
+// 		}
+// 		if(Spin_start_flag)
+// 		{
+// 			spin_count++;
+// 			if(spin_count >= 200 &&(abs_out(motor_l->position_pid.Ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_pid.Ref-motor_r->position_measure)<0.008f))
+// 			{
+// 					Spin_start_flag = 0;
+// 					spin_count = 0;
+// 					Spin_succeed_flag = 1;
+// 					// motor_l->State = DISABLE;
+// 					// motor_r->State = DISABLE;
+// 			}
+// 		}
+//
+// }
 void Stop_Detect(void)
 {
 	if(Line_flag)
@@ -301,20 +342,30 @@ void Stop_Detect(void)
 						stop_count = 0;
 				}
 		}
-		if(Spin_start_flag)
+	if (Spin_start_flag)
+	{
+		float yaw_now = IMU_data[0];
+		float yaw_delta = yaw_now - turn_start_yaw;
+
+		// 处理 ±180° 跳变（比如从 179° 转到 -179°）
+		if (yaw_delta > 180.0f)  yaw_delta -= 360.0f;
+		if (yaw_delta < -180.0f) yaw_delta += 360.0f;
+
+		if (fabsf(yaw_delta) >= 88.0f)  // 转了 88° 以上就算完成（留 2° 容差）
 		{
-			spin_count++;
-			if(spin_count >= 200 &&(abs_out(motor_l->position_pid.Ref-motor_l->position_measure)<0.008f)&&(abs_out(motor_r->position_pid.Ref-motor_r->position_measure)<0.008f))
-			{
-					Spin_start_flag = 0;
-					spin_count = 0;
-					Spin_succeed_flag = 1;
-					// motor_l->State = DISABLE;
-					// motor_r->State = DISABLE;
-			}
+			Spin_start_flag = 0;
+			spin_count = 0;
+			Spin_succeed_flag = 1;
+			// 刹车
+			DC_Motor_SetRef(motor_l, 0.0f);
+			DC_Motor_SetRef(motor_r, 0.0f);
 		}
-	
+	}
+
 }
+
+
+
 
 void Chassis_Set_Turn(void)
 {
@@ -328,10 +379,10 @@ void Chassis_Set_Turn(void)
 	Spin_succeed_flag = 0;
 	motor_l->encoder->total_count = 0;
 	motor_r->encoder->total_count = 0;
-	motor_l->position_pid.max_out = 0.08;
-	motor_l->position_pid.max_iout = 0.05;
-	motor_r->position_pid.max_out = 0.08;
-	motor_r->position_pid.max_iout = 0.05;
+	motor_l->position_pid.max_out = 0.3;
+	motor_l->position_pid.max_iout = 0.01;
+	motor_r->position_pid.max_out = 0.3;
+	motor_r->position_pid.max_iout = 0.01;
 
 	DC_Motor_SetRef(motor_l, -0.01);
 	DC_Motor_SetRef(motor_r, 0.01);
@@ -349,119 +400,158 @@ void Chassis_Set_Line(float position)
 	Spin_succeed_flag = 0;
 	motor_l->encoder->total_count = 0;
 	motor_r->encoder->total_count = 0;
-	motor_l->position_pid.max_out = 0.8;
+	motor_l->position_pid.max_out = 0.2;
 	motor_l->position_pid.max_iout = 0.0;
-	motor_r->position_pid.max_out = 0.8;
+	motor_r->position_pid.max_out = 0.2;
 	motor_r->position_pid.max_iout = 0.0;
 
 	DC_Motor_SetRef(motor_l, position);
 	DC_Motor_SetRef(motor_r, position);
 }
 
+// void Chassis_State_Turn(void)
+// {
+//
+// 	static uint8_t quan=0;
+// 	switch(state)
+// 	{
+// 		case 0:
+// 			if(quan < chassis_cmd_receive.circle_set)
+// 			{
+// 				state ++;
+// 				Chassis_Set_Line(1);
+// 			}
+// 		break;
+// 		case 1:
+// 			if(Stop_Flag)
+// 			{
+// 				Chassis_Set_Turn();
+// 				state ++;
+// 			}
+// 		break;
+// 		case 2:
+// 			if(Spin_succeed_flag)
+// 			{
+// 				Chassis_Set_Line(1);
+// 				state ++;
+// 			}
+// 		break;
+// 		case 3:
+// 			if(Stop_Flag)
+// 			{
+// 				Chassis_Set_Turn();
+// 				state ++;
+// 			}
+// 		break;
+// 		case 4:
+// 			if(Spin_succeed_flag)
+// 			{
+// 				Chassis_Set_Line(1);
+// 				state ++;
+// 			}
+// 		break;
+// 			case 5:
+// 			if(Stop_Flag)
+// 			{
+// 				Chassis_Set_Turn();
+// 				state ++;
+// 			}
+// 		break;
+// 			case 6:
+// 			if(Spin_succeed_flag)
+// 			{
+// 				Chassis_Set_Line(1);
+// 				state ++;
+// 			}
+// 		break;
+// 			case 7:
+// 			if(Stop_Flag)
+// 			{
+// 				Chassis_Set_Turn();
+// 				state ++;
+// 			}
+// 		break;
+// 		case 8:
+// 			if(Spin_succeed_flag)
+// 			{
+// 				Chassis_Set_Line(0.01);
+// 				state ++;
+// 			}
+// 		break;
+// 		case 9:
+// 			if(Stop_Flag)
+// 			{
+// 				quan ++;
+// 				state = 0;
+// 			}
+// 		break;
+// 		default:
+// 			break;
+// 	}
+// }
+
 void Chassis_State_Turn(void)
-{
+  {
+      static uint8_t quan        = 0;
+      static uint8_t edge        = 0;
+      static uint8_t last_state  = 255;
+      static float   turn_start  = 0.0f;
 
-	static uint8_t quan=0;
-	switch(state)
-	{
-		case 0:
-			if(quan < chassis_cmd_receive.circle_set)
-			{
-				state ++;
-				Chassis_Set_Line(1);
-			}
-		break;
-		case 1:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 2:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(1);
-				state ++;
-			}
-		break;
-		case 3:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 4:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(1);
-				state ++;
-			}
-		break;
-			case 5:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-			case 6:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(1);
-				state ++;
-			}
-		break;
-			case 7:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 8:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.01);
-				state ++;
-			}
-		break;
-		case 9:
-			if(Stop_Flag)
-			{
-				quan ++;
-				state = 0;
-			}
-		break;
-		default:
-			break;
-	}
+      if (quan >= chassis_cmd_receive.circle_set)
+          return;
 
-	
-	
-	
-}
-void Chassis_Set_Turn_IMU(int8_t direction)  // direction: 1=右转, -1=左转
-{
-	motor_l->loop_mode = SPEED_MODE;
-	motor_r->loop_mode = SPEED_MODE;
-	motor_l->State = ENABLE;
-	motor_r->State = ENABLE;
-	Line_flag = 0;
-	Stop_Flag = 0;
-	Spin_start_flag = 1;
-	Spin_succeed_flag = 0;
+      /* ---- 状态切换时调移动函数 ---- */
+      if (state != last_state)
+      {
+          last_state = state;
 
-	// 记录转弯起始 yaw
-	turn_start_yaw = IMU_data[0];
+          switch (state)
+          {
+              case 0:
+                  edge = 0;
+                  Chassis_Set_Line(1);
+                  break;
+              case 2:
+                  turn_start = IMU_data[0];
+                  Chassis_Set_Turn();
+                  break;
+              default:
+                  break;
+          }
+      }
 
-	// 清零巡线补偿，转弯不纠偏
-	DCMotor_SetTraceCompensation(motor_l, 0.0f);
-	DCMotor_SetTraceCompensation(motor_r, 0.0f);
+      /* ---- 每帧判断完成条件 ---- */
+      switch (state)
+      {
+          case 0:
+              state = 1;
+              break;
 
-	// 差速转弯：左轮后退、右轮前进 = 右转
-	float turn_speed = 0.06f;  // 转弯速度 m/s，可根据效果调
-	DC_Motor_SetRef(motor_l, -direction * turn_speed);
-	DC_Motor_SetRef(motor_r,  direction * turn_speed);
-}
+          case 1:  // 直走：用你原来的位置误差判断
+              {
+                  float err_l = fabsf(motor_l->position_pid.Ref - motor_l->position_measure);
+                  float err_r = fabsf(motor_r->position_pid.Ref - motor_r->position_measure);
+                  if (err_l < 0.008f && err_r < 0.008f)
+                  {
+                          state = 2;
+                  }
+              }
+              break;
+
+          case 2:  // 转弯：用 IMU 替换原来的 spin_count >= 200
+              {
+                  float yaw_delta = IMU_data[0] - turn_start;
+                  if (yaw_delta >  180.0f) yaw_delta -= 360.0f;
+                  if (yaw_delta < -180.0f) yaw_delta += 360.0f;
+
+                  if (fabsf(yaw_delta) >= 88.0f)
+                  {
+                      edge++;
+                      if (edge >= 4) { edge = 0; quan++; }
+                      Chassis_Set_Line(1);
+                      state = 1;
+                  }
+              }
+              break;
+      }
+  }
