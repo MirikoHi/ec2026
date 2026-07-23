@@ -21,5 +21,9 @@ typedef enum {
 	Chassis_Turn,
 	Chassis_Stop,
 }Chassis_Move_State_e;
-
+/**
+ * @brief 获取左右轮滤波后的实际速度，单位m/s
+ */
+void Chassis_GetMotorSpeed(float *left_speed,
+						   float *right_speed);
 #endif

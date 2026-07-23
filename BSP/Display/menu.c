@@ -110,145 +110,106 @@ static void menu_flush_all_pending(void);
  */
 void MenuInit(void)
 {
-MenuInitConfig_s third_menu_config[1] = {
-			[0] = {
-			.string={
-				[0] = "普通",
-				[1] = "巡线",
-				[2] = "陀螺仪",
-				[3] = "位置",
-				[4]	= NULL,
-			},
-			.callback={
-				[0] = Chassis_Mode_Switch_Callback,
-				[1] = Chassis_Mode_Switch_Callback,
-				[2] = Chassis_Mode_Switch_Callback,
-				[3] = Chassis_Mode_Switch_Callback,
-			},
-			.next_menu_config={
-			
-			},
-			.pre_idx=1,
-		},
-};
-MenuInitConfig_s second_menu_config[3]	={
-		[0] = {
-			.string={
-				[0] = "使能",
-				[1] = "失能",
-				[2] = NULL,
-				[3] = NULL,
-				[4]	= NULL,
-			},
-			.callback={
-				[0] = Motor_Cmd_CallBack,
-				[1] = Motor_Cmd_CallBack,
-			},
-			.next_menu_config={
-			
-			},
-			.pre_idx=0,
-		},
-		[1] = {
-			.string={
-				[0] = "程序控制",
-				[1] = "按键控制",
-				[2] = NULL,
-				[3] = NULL,
-				[4]	= NULL,
-			},
-			.callback={
-				[0] = Control_Switch_Callback,
-				[1] = Control_Switch_Callback,
-			},
-			.next_menu_config={
-				[1] = &third_menu_config[0],
-			},
-			.pre_idx=1,
-		},
-		[2] = {
-			.string={
-				[0] = "任务一",
-				[1] = "任务二",
-				[2] = NULL,
-				[3] = NULL,
-				[4]	= NULL,
-			},
-			.callback={
-				[0] = Task_Callback,
-				[1] = Task_Callback,
-			},
-			.next_menu_config={
-			
-			},
-			.pre_idx=2,
-		},
-//		[3] = {
-//			.string={
-//				[0] = "李",
-//				[1] = "志",
-//				[2] = "超",
-//				[3] = "机",
-//				[4]	= "械",
-//			},
-//			.callback={
-//				[0] = ChaoCallback,
-//			},
-//			.next_menu_config={
-//			
-//			},
-//			.pre_idx=3,
-//		},
-//		[4] = {
-//			.string={
-//				[0] = "李",
-//				[1] = "孜",
-//				[2] = "宁",
-//				[3] = "通",
-//				[4]	= "信",
-//			},
-//			.callback={
-//				[0] = NingCallback,
-//			},
-//			.next_menu_config={
-//			
-//			},
-//			.pre_idx=4,
-//		},
-	};
-MenuInitConfig_s first_menu_config={
-		.string={
-				[0] = "电机控制",
-				[1] = "控制方式",
-				[2] = "任务",
-				[3] = NULL,
-				[4]	= NULL,
-				[5] = NULL,
-			},
-			.callback={
-			},
-			.next_menu_config={
-				[0] = &second_menu_config[0],
-				[1] = &second_menu_config[1],
-				[2] = &second_menu_config[2],
-				[3] = NULL,
-				[4] = NULL,
-			},
-			.pre_idx=0,
-	};
-	now_menu = single_menu_init(&first_menu_config,NULL);
-	
-	
-	
-	
-	
-	
-//	//下面为menu具体参数的初始化不需改动
-	OLED_Init();
-	menu_set_selection(0U);
-	menu_redraw();
-	menu_flush_all_pending();
+    // 三级菜单：程序控制下的具体算法模式
+    MenuInitConfig_s third_menu_config[1] = {
+        [0] = {
+            .string={
+                [0] = "普通",
+                [1] = "巡线",
+                [2] = "陀螺仪",
+                [3] = "位置",
+                [4] = NULL,
+            },
+            .callback={
+                [0] = Chassis_Mode_Switch_Callback,
+                [1] = Chassis_Mode_Switch_Callback,
+                [2] = Chassis_Mode_Switch_Callback,
+                [3] = Chassis_Mode_Switch_Callback,
+            },
+            .next_menu_config={},
+            .pre_idx = 0, // 修改为指向 [0] 程序控制
+        },
+    };
+
+    // 二级菜单
+    MenuInitConfig_s second_menu_config[3] = {
+        [0] = {
+            .string={
+                [0] = "使能",
+                [1] = "失能",
+                [2] = NULL,
+            },
+            .callback={
+                [0] = Motor_Cmd_CallBack,
+                [1] = Motor_Cmd_CallBack,
+            },
+            .next_menu_config={},
+            .pre_idx = 0,
+        },
+        [1] = {
+            .string={
+                [0] = "程序控制", // 对应自动/传感器模式
+                [1] = "按键控制", // 对应蓝牙遥控模式 (即远程控制)
+                [2] = NULL,
+            },
+            .callback={
+                [0] = Control_Switch_Callback,
+                [1] = Control_Switch_Callback,
+            },
+            /*
+             * 【关键修复】：
+             * 将三级菜单挂在 [0] 程序控制 下面！
+             * [1] 按键控制 下面设为 NULL (不弹子菜单，点击直接切蓝牙遥控)
+             */
+            .next_menu_config={
+                [0] = &third_menu_config[0], // [0] 程序控制 -> 进入 普通/巡线/陀螺仪/位置
+                [1] = NULL,                 // [1] 按键控制 -> 无子菜单，直接授权蓝牙！
+            },
+            .pre_idx = 1,
+        },
+        [2] = {
+            .string={
+                [0] = "任务一",
+                [1] = "任务二",
+                [2] = NULL,
+            },
+            .callback={
+                [0] = Task_Callback,
+                [1] = Task_Callback,
+            },
+            .next_menu_config={},
+            .pre_idx = 2,
+        },
+    };
+
+    // 一级菜单
+    MenuInitConfig_s first_menu_config = {
+        .string={
+            [0] = "电机控制",
+            [1] = "控制方式",
+            [2] = "任务",
+            [3] = NULL,
+        },
+        .callback={},
+        .next_menu_config={
+            [0] = &second_menu_config[0],
+            [1] = &second_menu_config[1],
+            [2] = &second_menu_config[2],
+            [3] = NULL,
+        },
+        .pre_idx = 0,
+    };
+
+    now_menu = single_menu_init(&first_menu_config, NULL);
+
+    OLED_Init();
+    menu_set_selection(0U);
+    menu_redraw();
+    menu_flush_all_pending();
 }
+
+
+
 
 static uint8_t menu_row_width(uint8_t row, uint8_t upper)
 {
