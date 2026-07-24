@@ -9,7 +9,7 @@ void Chassis_Init(void);
 void Chassis_FillDefaultParams(FlashParam_Data_s *params);
 void Chassis_ApplyParams(const FlashParam_Data_s *params);
 
-void Motor_Cmd_CallBack(uint8_t i);
+// void Motor_Cmd_CallBack(uint8_t i);
 
 void Chassis_get_init_angle(void);
 void Chassis_ResetAction(void);
