@@ -3,9 +3,6 @@
 
 #define BMI088DelayMs(_nms)  DWT_Delay(_nms * 0.001)
 
-/**
- * @brief TI MSPM0 硬件 SPI 单字节收发
- */
 static uint8_t spi_read_write_byte(uint8_t dat)
 {
     uint8_t data = 0;
@@ -132,7 +129,7 @@ int8_t bsp_Bmi088GetRawData(bmi088RealData_t* accData, bmi088RealData_t* GyroDat
     rawGyroY = (int16_t)(gyroBuf[2] | (gyroBuf[3] << 8));
     rawGyroZ = (int16_t)(gyroBuf[4] | (gyroBuf[5] << 8));
 
-    /* 单位换算 */
+    /* 单位换算 (转换为 g 和 deg/s) */
     accData->x = (float)(rawAccX * BMI088_ACCEL_SENSITIVITY_G);
     accData->y = (float)(rawAccY * BMI088_ACCEL_SENSITIVITY_G);
     accData->z = (float)(rawAccZ * BMI088_ACCEL_SENSITIVITY_G);

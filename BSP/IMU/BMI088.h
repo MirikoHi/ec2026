@@ -4,9 +4,7 @@
 #include <stdint.h>
 #include "ti_msp_dl_config.h"
 
-/* ═══════════════════════════════════════════════════════════════════════
-   BMI088 寄存器定义
-   ═══════════════════════════════════════════════════════════════════════ */
+/* 寄存器宏定义保持不变 */
 #define BMI088_ACC_CHIP_ID          0x00
 #define BMI088_ACC_X_LSB            0x12
 #define BMI088_ACC_CONF             0x40
@@ -29,16 +27,10 @@ typedef struct {
     float z;
 } bmi088RealData_t;
 
-/* ═══════════════════════════════════════════════════════════════════════
-   根据 ti_msp_dl_config.h 生成的 CS 片选宏定义
-   ═══════════════════════════════════════════════════════════════════════ */
-// CS1: 加速度计片选 (GPIOA.29)
+/* CS 片选宏定义 */
 #define BMI088_ACC_CS(x)  ((x) ? DL_GPIO_setPins(ICM42688_CS_PORT, ICM42688_CS_CS_PIN) : DL_GPIO_clearPins(ICM42688_CS_PORT, ICM42688_CS_CS_PIN))
-
-// CS2: 陀螺仪片选 (GPIOA.16)
 #define BMI088_GYRO_CS(x) ((x) ? DL_GPIO_setPins(bmi088_cs2_PORT, bmi088_cs2_cs2_PIN) : DL_GPIO_clearPins(bmi088_cs2_PORT, bmi088_cs2_cs2_PIN))
 
-// SPI 外设映射 (使用 SPI0)
 #define BMI088_SPI_INST   ICM42688_INST
 
 /* API 接口 */

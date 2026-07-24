@@ -281,7 +281,7 @@ void Chassis(void)
 	{
 		case TRACE_MODE:
 			// 计算并设置巡线补偿量。
-			// Chassis_Trace_Cal();
+			Chassis_Trace_Cal();
 			// 按设定路径执行巡线动作。
 			Chassis_State_Turn();
 			// 检测直行/转弯是否完成，并更新完成标志。

@@ -1,39 +1,165 @@
+/**
+ ******************************************************************************
+ * @file    IMU.c
+ * @brief   IMU 姿态解算 — 融合 BMI088/ICM42688 驱动 + Mahony 互补滤波
+ ******************************************************************************
+ */
+
 #include "IMU.h"
-#include <stdio.h>
 #include "dwt.h"
 #include "bsp_log.h"
 
-// 根据宏选择引入不同的硬件驱动
 #if USE_BMI088
-    #include "BMI088.h"  // ✅ 已修改为引入 BMI088.h
+    #include "BMI088.h"
 #else
     #include "icm42688.h"
 #endif
 
-xyz_f_t north, west;
-volatile float exInt, eyInt, ezInt;
-volatile float q0, q1, q2, q3;
-volatile float integralFBhand, handdiff;
-volatile uint32_t lastUpdate, now;
-volatile float yaw[5] = {0};
-int16_t Ax_offset = 0, Ay_offset = 0;
-float TTangles_gyro[7];
-float Angle_Final[3];
+/* ═══════════════════════════════════════════════════════════════════════
+   全局变量定义
+   ═══════════════════════════════════════════════════════════════════════ */
+xyz_f_t north = {0.0f, 0.0f, 0.0f};
+xyz_f_t west  = {0.0f, 0.0f, 0.0f};
 
-uint32_t nowtime = 0;
+volatile float yaw[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+float motion6[7] = {0.0f};
 
-float invSqrt1(float x) {
-    float halfx = 0.5f * x;
-    float y = x;
-    long i = *(long*)&y;
-    i = 0x5f3759df - (i >> 1);
-    y = *(float*)&i;
-    y = y * (1.5f - (halfx * y * y));
-    return y;
+/* ═══════════════════════════════════════════════════════════════════════
+   Mahony 算法内部状态量
+   ═══════════════════════════════════════════════════════════════════════ */
+static float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f; // 姿态四元数
+static float exInt = 0.0f, eyInt = 0.0f, ezInt = 0.0f;   // 陀螺仪零偏积分项
+static float twoKp = 3.0f;                               // 2 * Kp (Kp = 1.5)
+static float twoKi = 0.1f;                               // 2 * Ki (Ki = 0.05)
+
+static float last_update_ms = 0.0f;
+static uint8_t imu_initialized = 0;
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Mahony 算法核心函数
+   ═══════════════════════════════════════════════════════════════════════ */
+
+static void MahonyAHRSinit(void)
+{
+    twoKp = 2.0f * 1.5f;       // 比例增益 (控制加速度计修正权重)
+    twoKi = 2.0f * 0.05f;      // 积分增益 (控制零偏估计收敛速度)
+    q0 = 1.0f; q1 = 0.0f; q2 = 0.0f; q3 = 0.0f;
+    exInt = 0.0f; eyInt = 0.0f; ezInt = 0.0f;
+}
+
+static void normalize_quaternion(void)
+{
+    float n = sqrtf(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+    if (n < 1e-12f) {
+        q0 = 1.0f; q1 = 0.0f; q2 = 0.0f; q3 = 0.0f;
+        return;
+    }
+    float inv = 1.0f / n;
+    q0 *= inv; q1 *= inv; q2 *= inv; q3 *= inv;
 }
 
 /**
- * @brief 初始化 IMU 硬件与姿态算法
+ * @brief Mahony 姿态更新步
+ * @param gx, gy, gz 陀螺仪角速度 [rad/s]
+ * @param ax, ay, az 加速度计数据 [g 或 m/s²]
+ * @param dt 时间间隔 [s]
+ */
+static void MahonyAHRSupdate(float gx, float gy, float gz,
+                             float ax, float ay, float az,
+                             float dt)
+{
+    /* 1. 归一化加速度计数据 */
+    float n = sqrtf(ax * ax + ay * ay + az * az);
+    if (n < 1e-12f) return; // 自由落体或传感器故障时跳过
+    float inv = 1.0f / n;
+    ax *= inv; ay *= inv; az *= inv;
+
+    /* 2. 依据当前四元数推算重力方向向量 (机体坐标系) */
+    float vx = 2.0f * (q1 * q3 - q0 * q2);
+    float vy = 2.0f * (q0 * q1 + q2 * q3);
+    float vz = q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3;
+
+    /* 3. 叉乘计算测量重力与预测重力的误差 e = a_meas × a_pred */
+    float ex = ay * vz - az * vy;
+    float ey = az * vx - ax * vz;
+    float ez = ax * vy - ay * vx;
+
+    /* 4. PI 控制器纠正陀螺仪零偏 */
+    exInt += ex * twoKi * dt;
+    eyInt += ey * twoKi * dt;
+    ezInt += ez * twoKi * dt;
+
+    /* 积分抗饱和限幅 (±0.1 rad/s ≈ ±5.7 deg/s) */
+    float lim = 0.1f;
+    if (exInt >  lim) exInt =  lim;
+    if (exInt < -lim) exInt = -lim;
+    if (eyInt >  lim) eyInt =  lim;
+    if (eyInt < -lim) eyInt = -lim;
+    if (ezInt >  lim) ezInt =  lim;
+    if (ezInt < -lim) ezInt = -lim;
+
+    /* 加上 PI 补偿 */
+    gx += twoKp * ex + exInt;
+    gy += twoKp * ey + eyInt;
+    gz += twoKp * ez + ezInt;
+
+    /* 5. 四元数微分方程积分: q += 0.5 * q ⊗ ω * dt */
+    float qa = q0, qb = q1, qc = q2;
+    float half_dt = 0.5f * dt;
+    q0 += (-qb * gx - qc * gy - q3 * gz) * half_dt;
+    q1 += ( qa * gx + qc * gz - q3 * gy) * half_dt;
+    q2 += ( qa * gy - qb * gz + q3 * gx) * half_dt;
+    q3 += ( qa * gz + qb * gy - qc * gx) * half_dt;
+
+    /* 6. 四元数单位化 */
+    normalize_quaternion();
+}
+
+/**
+ * @brief 四元数转欧拉角 (ZYX 顺序)
+ */
+static void MahonyGetEuler(float *roll, float *pitch, float *yaw)
+{
+    *roll = atan2f(2.0f * (q0 * q1 + q2 * q3),
+                   1.0f - 2.0f * (q1 * q1 + q2 * q2)) * RAD_TO_DEG;
+
+    float arg = 2.0f * (q0 * q2 - q3 * q1);
+    if (arg >  1.0f) arg =  1.0f;
+    if (arg < -1.0f) arg = -1.0f;
+    *pitch = asinf(arg) * RAD_TO_DEG;
+
+    *yaw = atan2f(2.0f * (q0 * q3 + q1 * q2),
+                  1.0f - 2.0f * (q2 * q2 + q3 * q3)) * RAD_TO_DEG;
+}
+
+/**
+ * @brief 获取 3x3 旋转矩阵
+ */
+static void MahonyGetRotationMatrix(float R[3][3])
+{
+    float q1q1 = q1 * q1, q2q2 = q2 * q2, q3q3 = q3 * q3;
+    float q0q1 = q0 * q1, q0q2 = q0 * q2, q0q3 = q0 * q3;
+    float q1q2 = q1 * q2, q1q3 = q1 * q3, q2q3 = q2 * q3;
+
+    R[0][0] = 1.0f - 2.0f * (q2q2 + q3q3);
+    R[0][1] = 2.0f * (q1q2 - q0q3);
+    R[0][2] = 2.0f * (q1q3 + q0q2);
+
+    R[1][0] = 2.0f * (q1q2 + q0q3);
+    R[1][1] = 1.0f - 2.0f * (q1q1 + q3q3);
+    R[1][2] = 2.0f * (q2q3 - q0q1);
+
+    R[2][0] = 2.0f * (q1q3 - q0q2);
+    R[2][1] = 2.0f * (q2q3 + q0q1);
+    R[2][2] = 1.0f - 2.0f * (q1q1 + q2q2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   应用层 API 接口
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * @brief 初始化 IMU 硬件与 Mahony 算法
  */
 void IMU_init(void)
 {
@@ -45,208 +171,98 @@ void IMU_init(void)
     init_status = bsp_Icm42688Init();
 #endif
 
-    if (init_status == 0)
-    {
-        LOGINFO("BMI088 Init Success!");
-    }
-    else
-    {
-        LOGERROR("BMI088 Init Failed, status code: %d", init_status);
-    }
-
-    if (init_status == 0)
-    {
-        q0 = 1.0f;
-        q1 = 0.0f;
-        q2 = 0.0f;
-        q3 = 0.0f;
-        exInt = 0.0f;
-        eyInt = 0.0f;
-        ezInt = 0.0f;
-        lastUpdate = nowtime;
-        now = nowtime;
+    if (init_status == 0) {
+        MahonyAHRSinit();
+        last_update_ms = DWT_GetTimeline_ms();
+        imu_initialized = 1;
+        LOGINFO("IMU Init Success!");
+    } else {
+        LOGERROR("IMU Init Failed, status: %d", init_status);
     }
 }
-
-static float Gyro_fill[3][300];
-static double Gyro_total[3];
-static double sqrGyro_total[3];
-static int GyroinitFlag = 0;
-static int GyroCount = 0;
-
-void calGyroVariance(float data[], int length, float sqrResult[], float avgResult[])
-{
-    int i;
-    double tmplen;
-    if (GyroinitFlag == 0)
-    {
-        for (i = 0; i < 3; i++)
-        {
-            Gyro_fill[i][GyroCount] = data[i];
-            Gyro_total[i] += data[i];
-            sqrGyro_total[i] += data[i] * data[i];
-            sqrResult[i] = 100;
-            avgResult[i] = 0;
-        }
-    }
-    else
-    {
-        for (i = 0; i < 3; i++)
-        {
-            Gyro_total[i] -= Gyro_fill[i][GyroCount];
-            sqrGyro_total[i] -= Gyro_fill[i][GyroCount] * Gyro_fill[i][GyroCount];
-            Gyro_fill[i][GyroCount] = data[i];
-            Gyro_total[i] += Gyro_fill[i][GyroCount];
-            sqrGyro_total[i] += Gyro_fill[i][GyroCount] * Gyro_fill[i][GyroCount];
-        }
-    }
-    GyroCount++;
-    if (GyroCount >= length)
-    {
-        GyroCount = 0;
-        GyroinitFlag = 1;
-    }
-    if (GyroinitFlag == 0) return;
-
-    tmplen = length;
-    for (i = 0; i < 3; i++)
-    {
-        avgResult[i] = (float)(Gyro_total[i] / tmplen);
-        sqrResult[i] = (float)((sqrGyro_total[i] - Gyro_total[i] * Gyro_total[i] / tmplen) / tmplen);
-    }
-}
-
-float gyro_offset[3] = {0};
-int CalCount = 0;
 
 /**
- * @brief 读取传感器底层数据并自动去零偏
+ * @brief  读取传感器数据并执行 Mahony 解算
+ * @param  ypr [out] ypr[0]=Yaw, ypr[1]=Pitch, ypr[2]=Roll (单位：度)
+ * @note   底盘任务中以 ~200Hz 周期调用
  */
-void IMU_getValues(float * values) {
-    float sqrResult_gyro[3];
-    float avgResult_gyro[3];
+void IMU_getYawPitchRoll(float *ypr)
+{
+    if (!imu_initialized) {
+        ypr[0] = 0.0f; ypr[1] = 0.0f; ypr[2] = 0.0f;
+        return;
+    }
 
+    float ax = 0, ay = 0, az = 0;
+    float gx_dps = 0, gy_dps = 0, gz_dps = 0;
+
+/* 1. 读取底层硬件原始物理量数据 */
 #if USE_BMI088
     bmi088RealData_t accval, gyroval;
     bsp_Bmi088GetRawData(&accval, &gyroval);
+    ax = accval.x; ay = accval.y; az = accval.z;
+    gx_dps = gyroval.x; gy_dps = gyroval.y; gz_dps = gyroval.z;
 #else
     icm42688RealData_t accval, gyroval;
     bsp_IcmGetRawData(&accval, &gyroval);
+    ax = accval.x; ay = accval.y; az = accval.z;
+    gx_dps = gyroval.x; gy_dps = gyroval.y; gz_dps = gyroval.z;
 #endif
 
-    TTangles_gyro[0] = accval.x;
-    TTangles_gyro[1] = accval.y;
-    TTangles_gyro[2] = accval.z;
-    TTangles_gyro[3] = gyroval.x;
-    TTangles_gyro[4] = gyroval.y;
-    TTangles_gyro[5] = gyroval.z;
-    TTangles_gyro[6] = 0;
+    /* 备份原始数据 */
+    motion6[0] = ax; motion6[1] = ay; motion6[2] = az;
+    motion6[3] = gx_dps; motion6[4] = gy_dps; motion6[5] = gz_dps;
+    motion6[6] = 0.0f;
 
-    calGyroVariance(&TTangles_gyro[3], 100, sqrResult_gyro, avgResult_gyro);
-    if (sqrResult_gyro[0] < 0.02f && sqrResult_gyro[1] < 0.02f && sqrResult_gyro[2] < 0.02f && CalCount >= 99)
-    {
-        gyro_offset[0] = avgResult_gyro[0];
-        gyro_offset[1] = avgResult_gyro[1];
-        gyro_offset[2] = avgResult_gyro[2];
-        exInt = 0; eyInt = 0; ezInt = 0;
-        CalCount = 0;
-    }
-    else if (CalCount < 100)
-    {
-        CalCount++;
+    /* 2. 计算动态时间间隔 dt (秒) */
+    float now_ms = DWT_GetTimeline_ms();
+    float dt = (now_ms - last_update_ms) / 1000.0f;
+    last_update_ms = now_ms;
+
+    /* dt 异常限幅处理 (卡顿保护) */
+    if (dt > 0.05f || dt <= 0.0f) {
+        dt = 0.005f; // 默认 200Hz (5ms)
     }
 
-    values[0] = accval.x;
-    values[1] = accval.y;
-    values[2] = accval.z;
-    values[3] = gyroval.x - gyro_offset[0];
-    values[4] = gyroval.y - gyro_offset[1];
-    values[5] = gyroval.z - gyro_offset[2];
+    /* 3. 关键一步：将陀螺仪数据从 deg/s 转换为 rad/s 传入 Mahony 解算 */
+    float gx_rad = gx_dps * DEG_TO_RAD;
+    float gy_rad = gy_dps * DEG_TO_RAD;
+    float gz_rad = gz_dps * DEG_TO_RAD;
+
+    MahonyAHRSupdate(gx_rad, gy_rad, gz_rad,
+                     ax, ay, az,
+                     dt);
+
+    /* 4. 提取姿态角欧拉角 */
+    float roll, pitch, yaw_val;
+    MahonyGetEuler(&roll, &pitch, &yaw_val);
+
+    ypr[0] = yaw_val; // Yaw
+    ypr[1] = pitch;   // Pitch
+    ypr[2] = roll;    // Roll
+
+    /* 5. 更新正北/正西方向向量 (供底盘全向导航参考) */
+    float R[3][3];
+    MahonyGetRotationMatrix(R);
+    north.x = R[0][0]; north.y = R[1][0]; north.z = R[2][0];
+    west.x  = R[0][1]; west.y  = R[1][1]; west.z  = R[2][1];
+
+    /* 6. 更新 Yaw 历史队列 */
+    yaw[4] = yaw[3];
+    yaw[3] = yaw[2];
+    yaw[2] = yaw[1];
+    yaw[1] = yaw[0];
+    yaw[0] = yaw_val;
 }
 
-#define Kp 0.5f
-#define Ki 0.001f
-
-void IMU_AHRSupdate(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz) {
-    float norm;
-    float vx, vy, vz;
-    float ex, ey, ez, halfT;
-    float tempq0, tempq1, tempq2, tempq3;
-
-    float q0q0 = q0*q0; float q0q1 = q0*q1; float q0q2 = q0*q2; float q0q3 = q0*q3;
-    float q1q1 = q1*q1; float q1q2 = q1*q2; float q1q3 = q1*q3;
-    float q2q2 = q2*q2; float q2q3 = q2*q3; float q3q3 = q3*q3;
-
-    now = nowtime;
-    if(now < lastUpdate) {
-        halfT = ((float)(now + (0xFFFFFFFF - lastUpdate)) / 2000000.0f);
-    } else {
-        halfT = ((float)(now - lastUpdate) / 2000000.0f);
-    }
-    lastUpdate = now;
-
-    norm = invSqrt1(ax*ax + ay*ay + az*az);
-    ax *= norm; ay *= norm; az *= norm;
-
-    vx = 2*(q1q3 - q0q2);
-    vy = 2*(q0q1 + q2q3);
-    vz = q0q0 - q1q1 - q2q2 + q3q3;
-
-    ex = (ay*vz - az*vy);
-    ey = (az*vx - ax*vz);
-    ez = (ax*vy - ay*vx);
-
-    if(ex != 0.0f && ey != 0.0f && ez != 0.0f) {
-        exInt += ex * Ki * halfT;
-        eyInt += ey * Ki * halfT;
-        ezInt += ez * Ki * halfT;
-
-        gx += Kp*ex + exInt;
-        gy += Kp*ey + eyInt;
-        gz += Kp*ez + ezInt;
-    }
-
-    tempq0 = q0 + (-q1*gx - q2*gy - q3*gz)*halfT;
-    tempq1 = q1 + (q0*gx + q2*gz - q3*gy)*halfT;
-    tempq2 = q2 + (q0*gy - q1*gz + q3*gx)*halfT;
-    tempq3 = q3 + (q0*gz + q1*gy - q2*gx)*halfT;
-
-    norm = invSqrt1(tempq0*tempq0 + tempq1*tempq1 + tempq2*tempq2 + tempq3*tempq3);
-    q0 = tempq0 * norm;
-    q1 = tempq1 * norm;
-    q2 = tempq2 * norm;
-    q3 = tempq3 * norm;
-}
-
-float mygetqval[9];
-void IMU_getQ(float * q) {
-    IMU_getValues(mygetqval);
-    nowtime = (uint32_t)DWT_GetTimeline_us();
-
-    IMU_AHRSupdate(mygetqval[3] * M_PI/180.0f, mygetqval[4] * M_PI/180.0f, mygetqval[5] * M_PI/180.0f,
-                   mygetqval[0], mygetqval[1], mygetqval[2], 0, 0, 0);
-
-    q[0] = q0; q[1] = q1; q[2] = q2; q[3] = q3;
-}
-
-void IMU_getYawPitchRoll(float * angles) {
-    float q[4];
-    IMU_getQ(q);
-
-    angles[0] = -atan2(2 * q[1] * q[2] + 2 * q[0] * q[3], -2 * q[2]*q[2] - 2 * q[3] * q[3] + 1) * 180.0f / M_PI; // yaw
-    angles[1] = -asin(-2 * q[1] * q[3] + 2 * q[0] * q[2]) * 180.0f / M_PI; // pitch
-    angles[2] = atan2(2 * q[2] * q[3] + 2 * q[0] * q[1], -2 * q[1] * q[1] - 2 * q[2] * q[2] + 1) * 180.0f / M_PI; // roll
-}
-
-void IMU_TT_getgyro(float * zsjganda)
+/**
+ * @brief 获取传感器最后一次读取的原始数据
+ */
+void IMU_TT_getgyro(float *zsjganda)
 {
-    zsjganda[0] = TTangles_gyro[0];
-    zsjganda[1] = TTangles_gyro[1];
-    zsjganda[2] = TTangles_gyro[2];
-    zsjganda[3] = TTangles_gyro[3];
-    zsjganda[4] = TTangles_gyro[4];
-    zsjganda[5] = TTangles_gyro[5];
-    zsjganda[6] = TTangles_gyro[6];
+    for (int i = 0; i < 7; i++) {
+        zsjganda[i] = motion6[i];
+    }
 }
 
 void MPU6050_InitAng_Offset(void) {}
