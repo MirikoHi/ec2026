@@ -34,14 +34,14 @@
  *  ============ ti_msp_dl_config.h =============
  *  Configured MSPM0 DriverLib module declarations
  *
- *  DO NOT EDIT - This file is generated for the MSPM0G351X
+ *  DO NOT EDIT - This file is generated for the MSPM0G350X
  *  by the SysConfig tool.
  */
 #ifndef ti_msp_dl_config_h
 #define ti_msp_dl_config_h
 
-#define CONFIG_MSPM0G351X
-#define CONFIG_MSPM0G3519
+#define CONFIG_MSPM0G350X
+#define CONFIG_MSPM0G3507
 
 #if defined(__ti_version__) || defined(__TI_COMPILER_VERSION__)
 #define SYSCONFIG_WEAK __attribute__((weak))
@@ -205,9 +205,9 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_UART_1_IOMUX_TX                                     (IOMUX_PINCM23)
 #define GPIO_UART_1_IOMUX_RX_FUNC                      IOMUX_PINCM24_PF_UART1_RX
 #define GPIO_UART_1_IOMUX_TX_FUNC                      IOMUX_PINCM23_PF_UART1_TX
-#define UART_1_BAUD_RATE                                                (420000)
-#define UART_1_IBRD_40_MHZ_420000_BAUD                                       (5)
-#define UART_1_FBRD_40_MHZ_420000_BAUD                                      (61)
+#define UART_1_BAUD_RATE                                                (115200)
+#define UART_1_IBRD_40_MHZ_115200_BAUD                                      (21)
+#define UART_1_FBRD_40_MHZ_115200_BAUD                                      (45)
 /* Defines for UART_0 */
 #define UART_0_INST                                                        UART3
 #define UART_0_INST_FREQUENCY                                           80000000
@@ -221,22 +221,22 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_UART_0_IOMUX_TX                                     (IOMUX_PINCM29)
 #define GPIO_UART_0_IOMUX_RX_FUNC                      IOMUX_PINCM30_PF_UART3_RX
 #define GPIO_UART_0_IOMUX_TX_FUNC                      IOMUX_PINCM29_PF_UART3_TX
-#define UART_0_BAUD_RATE                                                  (9600)
-#define UART_0_IBRD_80_MHZ_9600_BAUD                                       (520)
-#define UART_0_FBRD_80_MHZ_9600_BAUD                                        (53)
+#define UART_0_BAUD_RATE                                                (420000)
+#define UART_0_IBRD_80_MHZ_420000_BAUD                                      (11)
+#define UART_0_FBRD_80_MHZ_420000_BAUD                                      (58)
 /* Defines for K230 */
-#define K230_INST                                                          UART7
+#define K230_INST                                                          UART2
 #define K230_INST_FREQUENCY                                             40000000
-#define K230_INST_IRQHandler                                    UART7_IRQHandler
-#define K230_INST_INT_IRQN                                        UART7_INT_IRQn
+#define K230_INST_IRQHandler                                    UART2_IRQHandler
+#define K230_INST_INT_IRQN                                        UART2_INT_IRQn
 #define GPIO_K230_RX_PORT                                                  GPIOB
 #define GPIO_K230_TX_PORT                                                  GPIOB
 #define GPIO_K230_RX_PIN                                          DL_GPIO_PIN_16
 #define GPIO_K230_TX_PIN                                          DL_GPIO_PIN_15
 #define GPIO_K230_IOMUX_RX                                       (IOMUX_PINCM33)
 #define GPIO_K230_IOMUX_TX                                       (IOMUX_PINCM32)
-#define GPIO_K230_IOMUX_RX_FUNC                        IOMUX_PINCM33_PF_UART7_RX
-#define GPIO_K230_IOMUX_TX_FUNC                        IOMUX_PINCM32_PF_UART7_TX
+#define GPIO_K230_IOMUX_RX_FUNC                        IOMUX_PINCM33_PF_UART2_RX
+#define GPIO_K230_IOMUX_TX_FUNC                        IOMUX_PINCM32_PF_UART2_TX
 #define K230_BAUD_RATE                                                  (115200)
 #define K230_IBRD_40_MHZ_115200_BAUD                                        (21)
 #define K230_FBRD_40_MHZ_115200_BAUD                                        (45)
@@ -302,7 +302,8 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define ADC1_INST_IRQHandler                                     ADC1_IRQHandler
 #define ADC1_INST_INT_IRQN                                       (ADC1_INT_IRQn)
 #define ADC1_ADCMEM_0                                         DL_ADC12_MEM_IDX_0
-#define ADC1_ADCMEM_0_REF                   DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA
+#define ADC1_ADCMEM_0_REF                        DL_ADC12_REFERENCE_VOLTAGE_VDDA
+#define ADC1_ADCMEM_0_REF_VOLTAGE_V                                          3.3
 #define GPIO_ADC1_C0_PORT                                                  GPIOA
 #define GPIO_ADC1_C0_PIN                                          DL_GPIO_PIN_15
 #define GPIO_ADC1_IOMUX_C0                                       (IOMUX_PINCM37)
@@ -313,7 +314,8 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define ADC0_INST_IRQHandler                                     ADC0_IRQHandler
 #define ADC0_INST_INT_IRQN                                       (ADC0_INT_IRQn)
 #define ADC0_ADCMEM_0                                         DL_ADC12_MEM_IDX_0
-#define ADC0_ADCMEM_0_REF                   DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA
+#define ADC0_ADCMEM_0_REF                        DL_ADC12_REFERENCE_VOLTAGE_VDDA
+#define ADC0_ADCMEM_0_REF_VOLTAGE_V                                          3.3
 #define GPIO_ADC0_C0_PORT                                                  GPIOA
 #define GPIO_ADC0_C0_PIN                                          DL_GPIO_PIN_27
 #define GPIO_ADC0_IOMUX_C0                                       (IOMUX_PINCM60)
@@ -429,12 +431,12 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for CE: GPIOB.20 with pinCMx 48 on package pin 19 */
 #define NRF24L_CE_PIN                                           (DL_GPIO_PIN_20)
 #define NRF24L_CE_IOMUX                                          (IOMUX_PINCM48)
-/* Port definition for Pin Group bmi088_cs2 */
-#define bmi088_cs2_PORT                                                  (GPIOA)
+/* Port definition for Pin Group BMI088_CS2 */
+#define BMI088_CS2_PORT                                                  (GPIOB)
 
-/* Defines for cs2: GPIOA.16 with pinCMx 38 on package pin 9 */
-#define bmi088_cs2_cs2_PIN                                      (DL_GPIO_PIN_16)
-#define bmi088_cs2_cs2_IOMUX                                     (IOMUX_PINCM38)
+/* Defines for CS2: GPIOB.23 with pinCMx 51 on package pin 22 */
+#define BMI088_CS2_CS2_PIN                                      (DL_GPIO_PIN_23)
+#define BMI088_CS2_CS2_IOMUX                                     (IOMUX_PINCM51)
 
 
 /* Defines for MCAN0 */

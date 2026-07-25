@@ -4,7 +4,7 @@
 #include "ti_msp_dl_config.h"
 #include "flash_param_store.h"
 #define CHASSIS_LENGTH_TO_CENTER 0.166 //PAW3395到车体中心的距离,单位m //PAW3395���������ľ���,��λm
-void Chassis(void);
+void Chassis_task(void);
 void Chassis_Init(void);
 void Chassis_FillDefaultParams(FlashParam_Data_s *params);
 void Chassis_ApplyParams(const FlashParam_Data_s *params);

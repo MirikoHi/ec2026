@@ -248,7 +248,7 @@ void Chassis_Init(void)
 /**
  * @brief 底盘主任务，根据菜单模式执行对应动作
  */
-void Chassis(void)
+void Chassis_task(void)
 {
 	// 接收 Robot_Cmd 发来的底盘控制命令。
 	xQueueReceive(chassis_cmd_queue, &chassis_cmd_receive, 1);
