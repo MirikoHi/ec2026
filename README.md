@@ -15,6 +15,9 @@ MCU: TI MSPM0G3507 (ARM Cortex-M0+, 80MHz, 128KB Flash, 32KB SRAM)
 开发板: 嘉立创天猛星MSPM0G3507
 调试器: J-Link / DAPLink (4MHz SWD)
 
+新增支持 TI MSPM0G3519，天猛星升级方法见：
+```【全网首发】天猛星隐藏升级方案！手把手教你3507直接替换3519】https://www.bilibili.com/video/BV1SHN466EyH?vd_source=0ec807ca37217dda15dcd3c1863ba0c9 ```
+
 ## 项目架构
 
 ```
@@ -80,3 +83,6 @@ electric-competition-training/
 记得注释SYSVIEW相关内容，否则daplink运行程序的时候会停在SYSVIEW初始化代码的某个位置
 
 <img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716134158210.png" alt="img" style="float:left;zoom:67%;" />
+
+### 双芯片更换方式：
+CmakeLists中更改开头的option定义即可，同时记得打开robot.syscfg文件，修改MCU型号为MSPM0G3519，冲突的UART2换成UART7即可（引脚相同，只是3519没有UART2这个外设，懒得话也可以直接改代码。。。）然后左上角file-save，右侧再保存，即可重新生成驱动代码
