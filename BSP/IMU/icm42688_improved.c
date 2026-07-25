@@ -88,8 +88,8 @@ static void icm_imp_parse_burst(const uint8_t *buf, float *acc, float *gyro, flo
 static void icm_imp_calibrate_gyro(void)
 {
     enum {
-        ICM_IMP_CAL_WARMUP_SAMPLES = 60,
-        ICM_IMP_CAL_SAMPLES = 400
+        ICM_IMP_CAL_WARMUP_SAMPLES = 100,
+        ICM_IMP_CAL_SAMPLES = 240
     };
     uint8_t buf[ICM42688_IMP_BURST_LEN];
     float acc[3];
@@ -133,8 +133,8 @@ static void icm_imp_calibrate_gyro(void)
     }
 
     const float acc_norm_avg = acc_norm_sum / (float)ICM_IMP_CAL_SAMPLES;
-    const float gyro_var_limit = 0.000015f;
-    const float acc_norm_err_limit = 0.8f;
+    const float gyro_var_limit = 0.000006f;
+    const float acc_norm_err_limit = 0.5f;
 
     if ((variance[0] < gyro_var_limit) &&
         (variance[1] < gyro_var_limit) &&
