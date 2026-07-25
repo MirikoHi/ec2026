@@ -11,13 +11,13 @@ typedef struct
     float z;
 } xyz_f_t;
 extern xyz_f_t north,west;
-extern volatile float yaw[5];   //´¦Àíº½ÏòµÄÔöÖµ
+extern volatile float yaw[5];   //å¤„ç†èˆªå‘çš„å¢å€¼
 extern float motion6[7];
-//Mini IMU AHRS ½âËãµÄAPI
-void IMU_init(void); //³õÊ¼»¯
-void IMU_getYawPitchRoll(float * ypr); //¸üĞÂ×ËÌ¬
+//Mini IMU AHRS è§£ç®—çš„API
+void IMU_init(void); //åˆå§‹åŒ–
+void IMU_getYawPitchRoll(float * ypr); //æ›´æ–°å§¿æ€
 void IMU_TT_getgyro(float * zsjganda);
-//uint32_t micros(void);	//¶ÁÈ¡ÏµÍ³ÉÏµçºóµÄÊ±¼ä  µ¥Î» us 
+//uint32_t micros(void);	//è¯»å–ç³»ç»Ÿä¸Šç”µåçš„æ—¶é—´  å•ä½ us 
 void MPU6050_InitAng_Offset(void);
 #endif
 
