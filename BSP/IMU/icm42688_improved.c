@@ -2,6 +2,7 @@
 #include "dwt.h"
 
 static float gyro_bias[3] = {0.0f, 0.0f, 0.0f};
+static uint8_t gyro_calibrated = 0U;
 
 #define ICM_IMP_CS_LOW()   DL_GPIO_clearPins(ICM42688_CS_PORT, ICM42688_CS_CS_PIN)
 #define ICM_IMP_CS_HIGH()  DL_GPIO_setPins(ICM42688_CS_PORT, ICM42688_CS_CS_PIN)
@@ -84,34 +85,78 @@ static void icm_imp_parse_burst(const uint8_t *buf, float *acc, float *gyro, flo
               ICM42688_IMP_GYRO_SENS_1000 * ICM42688_IMP_PI_DIV_180;
 }
 
-#if 0
 static void icm_imp_calibrate_gyro(void)
 {
+    enum {
+        ICM_IMP_CAL_WARMUP_SAMPLES = 60,
+        ICM_IMP_CAL_SAMPLES = 400
+    };
     uint8_t buf[ICM42688_IMP_BURST_LEN];
     float acc[3];
     float gyro[3];
     float sum[3] = {0.0f, 0.0f, 0.0f};
+    float sum_sq[3] = {0.0f, 0.0f, 0.0f};
+    float acc_norm_sum = 0.0f;
+    float mean[3];
+    float variance[3];
 
-    for (uint16_t i = 0U; i < 500U; i++) {
+    gyro_calibrated = 0U;
+    gyro_bias[0] = 0.0f;
+    gyro_bias[1] = 0.0f;
+    gyro_bias[2] = 0.0f;
+
+    for (uint16_t i = 0U; i < ICM_IMP_CAL_WARMUP_SAMPLES; i++) {
+        icm_imp_read_regs(ICM42688_IMP_BURST_START, buf, ICM42688_IMP_BURST_LEN);
+        DWT_Delay(0.005f);
+    }
+
+    for (uint16_t i = 0U; i < ICM_IMP_CAL_SAMPLES; i++) {
         icm_imp_read_regs(ICM42688_IMP_BURST_START, buf, ICM42688_IMP_BURST_LEN);
         icm_imp_parse_burst(buf, acc, gyro, 0);
         sum[0] += gyro[0];
         sum[1] += gyro[1];
         sum[2] += gyro[2];
-        DWT_Delay(0.002f);
+        sum_sq[0] += gyro[0] * gyro[0];
+        sum_sq[1] += gyro[1] * gyro[1];
+        sum_sq[2] += gyro[2] * gyro[2];
+        acc_norm_sum += sqrtf(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]);
+        DWT_Delay(0.005f);
     }
 
-    gyro_bias[0] = sum[0] / 500.0f;
-    gyro_bias[1] = sum[1] / 500.0f;
-    gyro_bias[2] = sum[2] / 500.0f;
+    for (uint8_t axis = 0U; axis < 3U; axis++) {
+        mean[axis] = sum[axis] / (float)ICM_IMP_CAL_SAMPLES;
+        variance[axis] = (sum_sq[axis] / (float)ICM_IMP_CAL_SAMPLES) -
+                         (mean[axis] * mean[axis]);
+        if (variance[axis] < 0.0f) {
+            variance[axis] = 0.0f;
+        }
+    }
+
+    const float acc_norm_avg = acc_norm_sum / (float)ICM_IMP_CAL_SAMPLES;
+    const float gyro_var_limit = 0.000015f;
+    const float acc_norm_err_limit = 0.8f;
+
+    if ((variance[0] < gyro_var_limit) &&
+        (variance[1] < gyro_var_limit) &&
+        (variance[2] < gyro_var_limit) &&
+        (fabsf(acc_norm_avg - ICM42688_IMP_GRAVITY) < acc_norm_err_limit)) {
+        gyro_bias[0] = mean[0];
+        gyro_bias[1] = mean[1];
+        gyro_bias[2] = mean[2];
+        gyro_calibrated = 1U;
+    }
 }
-#endif
 
 void ICM42688_Improved_CorrectGyroBias(float *gyro)
 {
     gyro[0] -= gyro_bias[0];
     gyro[1] -= gyro_bias[1];
     gyro[2] -= gyro_bias[2];
+}
+
+uint8_t ICM42688_Improved_IsGyroCalibrated(void)
+{
+    return gyro_calibrated;
 }
 
 static int8_t icm_imp_config(void)
@@ -139,6 +184,8 @@ static int8_t icm_imp_config(void)
     icm_imp_write_reg(ICM42688_IMP_PWR_MGMT0, 0x0FU);
     icm_imp_write_reg(ICM42688_IMP_GYRO_ACCEL_CONFIG0, 0x55U);
     DWT_Delay(0.03f);
+
+    icm_imp_calibrate_gyro();
 
     return 0;
 }

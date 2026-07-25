@@ -43,5 +43,6 @@ int8_t ICM42688_Improved_GetTemperature(int16_t *temp);
 int8_t ICM42688_Improved_GetRawData(icm42688_imp_data_t *acc,
                                     icm42688_imp_data_t *gyro);
 void ICM42688_Improved_CorrectGyroBias(float *gyro);
+uint8_t ICM42688_Improved_IsGyroCalibrated(void);
 
 #endif
