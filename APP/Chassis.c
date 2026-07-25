@@ -9,7 +9,7 @@
 #include "misc.h"
 #include "dwt.h"
 #include "trace.h"
-#include "IMU.h"
+#include "IMU_Mahony.h"
 #include "PID.h"
 
 static DCMotorInstance *motor_l,*motor_r;
@@ -152,7 +152,7 @@ void Chassis_Init(void)
 	motor_r = DCMotor_Init(&motor_r_config);
 
 	// ICM42688 陀螺仪初始化，ICM 需要主动轮询读取并解算。
-	IMU_init();
+	IMU_Mahony_Init();
 	// JY901s_IMU_Data = JY901s_IMU_Init();
 	pid_init_config_s line_yaw_pid_config = {
 		.mode = PID_POSITION,
@@ -188,7 +188,7 @@ void Chassis(void)
 	xQueueReceive(chassis_cmd_queue, &chassis_cmd_receive, 1);
 
 	// 更新 ICM42688 姿态数据，耗时约 1ms。
-	IMU_getYawPitchRoll((float *)IMU_data);
+	IMU_Mahony_GetYawPitchRoll((float *)IMU_data);
 
 	if (chassis_cmd_receive.remote_disable != 0U)
 	{
