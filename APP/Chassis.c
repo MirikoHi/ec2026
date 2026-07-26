@@ -42,6 +42,7 @@ static void Chassis_Trace_Cal(void);
 void Chassis_Set_Line(float position);
 void Chassis_Set_Turn_IMU(int8_t direction);
 static void Motor_FeedForward_Update(void);
+static void chassis_motor_test(void);                    // 电机PID测试
 /**
  * @brief 初始化底盘左右电机和IMU
  */
@@ -67,12 +68,12 @@ void Chassis_Init(void)
 		.loop_mode = ANGLE_MODE,
 		.speed_pid_config = {
 			.mode = PID_POSITION,
-			.Kp = 2000.0f,
+			.Kp = 600.0f,
 			.Ki = 0.0f,
 			.Kd = 0.0f,
 			.max_out = 2499.0f,
 			.max_iout = 500.0f,
-			.kf_p = 8000.0f,
+			.kf_p = 2000.0f,
 			.ff_type = FF_Proportional | FF_Velocity ,
 			.ff_lpf_gain = 0.15f,
 			.d_lpf_gain = 0.15f,
@@ -82,7 +83,7 @@ void Chassis_Init(void)
 			.Kp = 15.0f,
 			.Kd = 0.0f,
 			.Ki = 0.5f,
-			.max_out = 0.3f,
+			.max_out = 0.4f,
 			.max_iout = 0.05f,
 		},
 		.feedforward = 85,  //这里的feedforward只是相当于一个阻尼前馈
@@ -109,12 +110,12 @@ void Chassis_Init(void)
 		.loop_mode = ANGLE_MODE,
 		.speed_pid_config = {
 			.mode = PID_POSITION,
-			.Kp = 2000.0f,
+			.Kp = 600.0f,
 			.Ki = 0.0f,
-			.Kd = 500.0f,
+			.Kd = 0.0f,
 			.max_out = 2499.0f,
 			.max_iout = 500.0f,
-			.kf_p = 8000.0f,
+			.kf_p = 2000.0f,
 			.ff_type = FF_Proportional | FF_Velocity ,
 			.ff_lpf_gain = 0.15f,
 			.d_lpf_gain = 0.15f,
@@ -124,7 +125,7 @@ void Chassis_Init(void)
 			.Kp = 15.0f,
 			.Kd = 0.0f,
 			.Ki = 0.5f,
-			.max_out = 0.3f,
+			.max_out = 0.4f,
 			.max_iout = 0.05f,
 		},
 		.feedforward = 85,
@@ -159,7 +160,7 @@ void Chassis(void)
 	{
 		Chassis_ClearRemoteSpeed();
 	}
-	switch(TRACE_MODE)
+	switch(chassis_cmd_receive.Chassis_Mode)
 	{
 		case TRACE_MODE:
 			if (!Line_flag)  // 正在转弯
@@ -177,16 +178,7 @@ void Chassis(void)
 
 			break;
 		case NORMAL_MODE:
-			static int init_flag=1;
-			// Chassis_Trace_Cal();
-			if (init_flag) {
-				// DCMotor_SetTraceCompensation(motor_l, 0.0f);
-				// DCMotor_SetTraceCompensation(motor_r, 0.0f);
-				Chassis_Set_Line(1);
-				// Chassis_Set_Turn();
-				init_flag=0;
-			}
-
+			chassis_motor_test();
 			break;
 		case POSITION_MODE:
 				break;
@@ -555,3 +547,138 @@ void Chassis_State_Turn(void)
               break;
       }
   }
+
+/* ========================================================================
+ * 电机PID测试模块
+ * ========================================================================
+ * Chassis() 运行在 200Hz（5ms周期）。
+ * 在 NORMAL_MODE 下调用，修改 motor_test_config 字段即可切换测试模式。
+ */
+
+typedef enum {
+    TEST_MODE_STEP = 0,    /* 阶跃：周期性在高/低值间跳变 */
+    TEST_MODE_SINE,        /* 正弦：连续正弦波 */
+    TEST_MODE_RAMP,        /* 三角波：线性上升再下降 */
+    TEST_MODE_CONSTANT,    /* 恒定值 */
+} MotorTest_Mode_e;
+
+typedef enum {
+    TEST_LOOP_SPEED = 0,   /* 测试速度环 PID */
+    TEST_LOOP_POSITION,    /* 测试位置环 PID */
+} MotorTest_Loop_e;
+
+typedef struct {
+    MotorTest_Mode_e mode;      /* 信号模式 */
+    MotorTest_Loop_e loop_type; /* 测试哪个闭环 */
+    float amplitude;            /* 正弦幅值 / 恒定值 */
+    float frequency;            /* 正弦频率 (Hz) */
+    float step_high;            /* 阶跃高位值 */
+    float step_low;             /* 阶跃低位值 */
+    float half_period;          /* 阶跃半周期 (秒) */
+    float ramp_max;             /* 三角波峰值 */
+    float ramp_period;          /* 三角波周期 (秒) */
+    uint8_t enable;             /* 1=启用, 0=关闭 */
+    uint8_t diff_mode;          /* 1=左右反向（差速）, 0=同向 */
+} MotorTest_Config_s;
+
+/* 默认配置：位置环阶跃测试 */
+static MotorTest_Config_s motor_test_config = {
+    .mode        = TEST_MODE_STEP,
+    .loop_type   = TEST_LOOP_SPEED,
+    .amplitude   = 0.80f,
+    .frequency   = 0.5f,
+    .step_high   = 0.2f,
+    .step_low    = -0.2f,
+    .half_period = 2.0f,
+    .ramp_max    = 0.2f,
+    .ramp_period = 4.0f,
+    .enable      = 1,
+    .diff_mode   = 0,
+};
+
+static float motor_test_gen_ref(float t)
+{
+    switch (motor_test_config.mode) {
+        case TEST_MODE_STEP: {
+            float period = motor_test_config.half_period * 2.0f;
+            float phase  = t;
+            while (phase >= period) phase -= period;
+            return (phase < motor_test_config.half_period)
+                       ? motor_test_config.step_high
+                       : motor_test_config.step_low;
+        }
+        case TEST_MODE_SINE:
+            return motor_test_config.amplitude
+                   * sinf(2.0f * PI * motor_test_config.frequency * t);
+
+        case TEST_MODE_RAMP: {
+            float period = motor_test_config.ramp_period;
+            float half   = period * 0.5f;
+            float phase  = t;
+            while (phase >= period) phase -= period;
+            if (phase < half)
+                return (phase / half) * motor_test_config.ramp_max;
+            else
+                return ((period - phase) / half) * motor_test_config.ramp_max;
+        }
+        case TEST_MODE_CONSTANT:
+        default:
+            return motor_test_config.amplitude;
+    }
+}
+
+void chassis_motor_test(void)
+{
+    static uint32_t frame = 0;
+    static uint8_t  init  = 1;
+    float t, ref_l, ref_r;
+
+    if (!motor_test_config.enable) {
+        DCMotor_Cmd(motor_l, DISABLE);
+        DCMotor_Cmd(motor_r, DISABLE);
+        frame = 0;
+        init  = 1;
+        return;
+    }
+
+    if (init) {
+        if (motor_test_config.loop_type == TEST_LOOP_SPEED) {
+            motor_l->loop_mode = SPEED_MODE;
+            motor_r->loop_mode = SPEED_MODE;
+        } else {
+            motor_l->loop_mode = ANGLE_MODE;
+            motor_r->loop_mode = ANGLE_MODE;
+        }
+
+        DCMotor_Cmd(motor_l, ENABLE);
+        DCMotor_Cmd(motor_r, ENABLE);
+
+        PID_clear(&motor_l->speed_pid);
+        PID_clear(&motor_r->speed_pid);
+        PID_clear(&motor_l->position_pid);
+        PID_clear(&motor_r->position_pid);
+
+        motor_l->encoder->total_count = 0;
+        motor_r->encoder->total_count = 0;
+
+        DCMotor_SetTraceCompensation(motor_l, 0.0f);
+        DCMotor_SetTraceCompensation(motor_r, 0.0f);
+
+        Line_flag = 0;
+        Stop_Flag = 0;
+        Spin_start_flag = 0;
+        Spin_succeed_flag = 0;
+
+        frame = 0;
+        init  = 0;
+    }
+
+    frame++;
+    t = (float)frame * 0.005f;          /* 200Hz → 5ms */
+
+    ref_l = motor_test_gen_ref(t);
+    ref_r = motor_test_config.diff_mode ? -ref_l : ref_l;
+
+    DC_Motor_SetRef(motor_l, ref_l);
+    DC_Motor_SetRef(motor_r, ref_r);
+}
