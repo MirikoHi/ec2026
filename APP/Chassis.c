@@ -83,7 +83,7 @@ void Chassis_Init(void)
 			.Kp = 15.0f,
 			.Kd = 0.0f,
 			.Ki = 0.5f,
-			.max_out = 0.4f,
+			.max_out = 0.3f,
 			.max_iout = 0.05f,
 		},
 		.feedforward = 85,  //这里的feedforward只是相当于一个阻尼前馈
@@ -142,6 +142,11 @@ void Chassis_Init(void)
 /**
  * @brief 底盘主要任务，根据菜单不同模式执行对应任务，目前以200Hz运行
  */
+float turn_start=0;
+float cycles=0;
+float yaw_last=0;
+float yaw_total=0;
+int init_flag=1;
 void Chassis(void)
 {
 	//接收Cmd发来的控制指令
@@ -149,6 +154,14 @@ void Chassis(void)
 
 	//更新ICM陀螺仪数据
 	IMU_getYawPitchRoll((float *)IMU_data);  //耗时约1ms
+
+	for (int i=0;i<3;i++) {
+		if (IMU_data[i]<0)IMU_data[i]+=360;
+	}
+	if (IMU_data[0]-yaw_last<-350)cycles+=1;
+	if (IMU_data[0]-yaw_last>350)cycles-=1;
+	yaw_last=IMU_data[0];
+	yaw_total=IMU_data[0]+cycles*360;
 
 	if (chassis_cmd_receive.remote_disable != 0U)
 	{

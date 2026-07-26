@@ -12,9 +12,6 @@
 #include "math.h"
 #include "K230.h"
 #include "elrs.h"
-#include "../BSP/IMU/icm42688.h"
-icm42688RawData_t Chassis_Gyro;
-
 static CANCommInstance *chasiss_can_comm; // 双板通信CAN comm
 
 static Chassis_Ctrl_Cmd_s chassis_cmd_recv;         // 底盘接收到的控制命令

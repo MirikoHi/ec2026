@@ -469,7 +469,7 @@ DL_I2C_setControllerTXFIFOThreshold(I2C_0_INST, DL_I2C_TX_FIFO_LEVEL_BYTES_1);
 	NVIC_EnableIRQ(I2C_0_INST_INT_IRQN);
 	
 	/*写入一系列的命令，对OLED进行初始化配置*/
-	OLED_WriteCommand(0xAE);	//设置显示开启/关闭，0xAE关闭，0xAF开启
+	OLED_WriteCommand(0xAF);	//设置显示开启/关闭，0xAE关闭，0xAF开启
 	
 	OLED_WriteCommand(0xD5);	//设置显示时钟分频比/振荡器频率
 	OLED_WriteCommand(0x80);	//0x00~0xFF
