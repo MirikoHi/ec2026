@@ -11,6 +11,7 @@ CLion + CMake
 Keil MDK
 
 ## 硬件平台
+
 MCU: TI MSPM0G3507 (ARM Cortex-M0+, 80MHz, 128KB Flash, 32KB SRAM)
 开发板: 嘉立创天猛星MSPM0G3507
 调试器: J-Link / DAPLink (4MHz SWD)
@@ -48,7 +49,8 @@ electric-competition-training/
 ## 快速开始
 
 ### 环境准备
-参考天猛星入门手册 | 立创开发板技术文档中心的环境配置
+
+参考[天猛星入门手册 | 立创开发板技术文档中心](https://wiki.lckfb.com/zh-hans/tmx-mspm0g3507/keil-beginner/)
 
 ### CLion开发
 
@@ -56,33 +58,53 @@ electric-competition-training/
 
  ==配置CMake选项：-DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-arm-none-eabi.cmake（确保指向正确的cmake/toolchain-arm-none-eabi.cmake）==
 
-<img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716133817149.png" alt="img" style="float: left; zoom: 50%;" />
+<img src="assets/image-20260727141747342.png" alt="image-20260727141747342" style="zoom:50%;" />
 
 编译并 使用jlink+ozone烧录，记得勾选：
 
-<img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716133901491.png" alt="img" style="float: left; zoom: 50%;" />
+<img src="assets/image-20260727141807897.png" alt="image-20260727141807897" style="zoom:67%;" />
 
 ### Keil开发
 
 项目路径为：Vendor/target/keil/
 
-<img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716134009047.png" alt="img" style="float:left;zoom:67%;" />
-
 编译产物在Vendor/target/keil/Objects/
 
 ### 引脚配置
+
 使用TI SysConfig直接打开 robot.syscfg文件进行引脚配置
-配置完成后File-Save可重新生成驱动代码
+
+配置完成后File-Save以及右边的保存，可重新生成驱动代码，ti_msp_dl_config.c和.h会更新
+
+<img src="assets/image-20260727141846148.png" alt="image-20260727141846148" style="zoom:50%;" />
+
+
 
 ### Daplink无线调试
 
 用keil打开项目工程，勾选Daplink即可
 
-<img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716134322729.png" alt="img" style="float:left;zoom:67%;" />
-
 记得注释SYSVIEW相关内容，否则daplink运行程序的时候会停在SYSVIEW初始化代码的某个位置
 
-<img src="https://gitee.com/xiaofangxing/electric-competition-project/raw/f9b3cedad026900b872b328229f09ded1de941ce/README.assets/image-20260716134158210.png" alt="img" style="float:left;zoom:67%;" />
+<img src="assets/image-20260727141910700.png" alt="image-20260727141910700" style="zoom:50%;" />
 
 ### 双芯片更换方式：
 CmakeLists中更改开头的option定义即可，同时记得打开robot.syscfg文件，修改MCU型号为MSPM0G3519，冲突的UART2换成UART7即可（引脚相同，只是3519没有UART2这个外设，懒得话也可以直接改代码。。。）然后左上角file-save，右侧再保存，即可重新生成驱动代码
+
+
+
+<img src="assets/image-20260727142040287.png" alt="image-20260727142040287" style="zoom:50%;" />
+
+
+
+<img src="assets/image-20260727142105656.png" alt="image-20260727142105656" style="zoom:50%;" />
+
+这里记得一定要勾选LQFP-64(PM)
+
+这里冲突的直接勾选UART2或者下面提示的<u>clear</u>
+
+<img src="assets/image-20260727142433577.png" alt="image-20260727142433577" style="zoom:50%;" />
+
+CmakeLists里面修改如下（见注释，选择合适的芯片型号）：
+
+<img src="assets/image-20260727141950140.png" alt="image-20260727141950140" style="zoom:50%;" />
