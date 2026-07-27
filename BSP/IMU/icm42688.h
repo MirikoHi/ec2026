@@ -1,14 +1,3 @@
-/**
- ******************************************************************************
- * @file    icm42688.h
- * @author  Geng LX (ported from Legacy by Geng LX)
- * @brief   ICM42688 6-axis IMU SPI driver header
- *
- * @note    Uses MSPM0 DL SPI API. Register definitions based on
- *          DS-ICM-42688v1.2 datasheet.
- ******************************************************************************
- */
-
 #ifndef __BSP_ICM42688_H__
 #define __BSP_ICM42688_H__
 
