@@ -4,6 +4,9 @@
 #include "ti_msp_dl_config.h"
 #include "PID.h"
 
+extern volatile float track_err;
+extern unsigned char Digtal;
+
 float Trace_task(void);
 void Trace_Init(void);
 float raw_transform_easy(uint8_t current_trace);
@@ -17,6 +20,7 @@ typedef enum {
 	TRACE_LOST,
 }trace_state_e;
 
+extern trace_state_e trace_state;
 
 typedef struct {
 		float pid_output;
