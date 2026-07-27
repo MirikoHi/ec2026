@@ -5,8 +5,8 @@
  *
  * These arguments were used when this file was generated. They will be automatically applied on subsequent loads
  * via the GUI or CLI. Run CLI with '--help' for additional information on how to override these arguments.
- * @cliArgs --device "MSPM0G351X" --part "Default" --package "LQFP-64(PM)" --product "mspm0_sdk@2.10.00.04"
- * @v2CliArgs --device "MSPM0G3519" --package "LQFP-64(PM)" --product "mspm0_sdk@2.10.00.04"
+ * @cliArgs --device "MSPM0G350X" --part "Default" --package "LQFP-64(PM)" --product "mspm0_sdk@2.10.00.04"
+ * @v2CliArgs --device "MSPM0G3507" --package "LQFP-64(PM)" --product "mspm0_sdk@2.10.00.04"
  * @versions {"tool":"1.28.0+4712"}
  */
 
@@ -436,7 +436,7 @@ UART2.rxPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric12";
 UART3.$name                            = "K230";
 UART3.enabledInterrupts                = ["RX"];
 UART3.targetBaudRate                   = 115200;
-UART3.peripheral.$assign               = "UART7";
+UART3.peripheral.$assign               = "UART2";
 UART3.peripheral.rxPin.$assign         = "PB16";
 UART3.peripheral.txPin.$assign         = "PB15";
 UART3.txPinConfig.direction            = scripting.forceWrite("OUTPUT");
@@ -466,3 +466,11 @@ UART4.rxPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric21";
 ProjectConfig.genDisable         = true;
 ProjectConfig.migrationCondition = true;
 scripting.suppress("Project Configuration File generation is disabled for this project\\. SysConfig Project Migration is not currently supported for this project\\.", ProjectConfig);
+
+/**
+ * Pinmux solution for unlocked pins/peripherals. This ensures that minor changes to the automatic solver in a future
+ * version of the tool will not impact the pinmux you originally saw.  These lines can be completely deleted in order to
+ * re-solve from scratch.
+ */
+UART3.peripheral.$assign               = "UART2";
+UART3.peripheral.$suggestSolution = "UART2";
