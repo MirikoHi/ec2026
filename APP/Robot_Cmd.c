@@ -24,6 +24,9 @@ QueueHandle_t chassis_cmd_queue = NULL,gimbal_cmd_queue =NULL;
 QueueHandle_t chassis_fetch_data_queue = NULL;
 QueueHandle_t trace_fetch_data_queue = NULL;
 
+BlueTooth_Tx_t g_bt_tx = {0};
+volatile BlueTooth_Rx_t g_bt_rx = {0};
+
 chassis_cmd_q chassis_cmd_send={0};
 gimbal_cmd_q gimbal_cmd_send ={0};
 trace_fetch_data_q trace_fetch_data={0};
@@ -65,6 +68,9 @@ void RobotCmd_Init(void)
 	BSPLogInit();
 	ELRS_Init();
 	robotcmd_elrs = ELRS_GetData();
+
+	// 蓝牙初始化，请在CmakeLists里面指定是1/2哪个蓝牙模块
+	// BlueToothUart_Init();
 	
 
 	chassis_cmd_send.Chassis_Mode = TRACE_MODE;  //todo:这里记得改回默认值，调试用
@@ -139,6 +145,14 @@ void Robot_Cmd(void)
 	xQueueSend(gimbal_cmd_queue,&gimbal_cmd_send,0U);
 
 	//CANCommSend(chasiss_can_comm, (void *)&chassis_feedback_data);
+
+	// // 蓝牙收发，需要时取消注释
+	// BlueToothUart_Send(&g_bt_tx);
+	// volatile BlueTooth_Rx_t *new_rx = BlueToothUart_Get();
+	// if (new_rx != NULL)
+	// {
+	// 	g_bt_rx = *new_rx;
+	// }
 }
 void Chassis_Mode_Switch_Callback(uint8_t i)
 {

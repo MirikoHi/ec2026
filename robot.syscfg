@@ -450,6 +450,8 @@ UART3.rxPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
 UART3.rxPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric16";
 
 UART4.$name                            = "UART_2";
+UART4.targetBaudRate                   = 115200;
+UART4.enabledInterrupts                = ["RX"];
 UART4.peripheral.$assign               = "UART0";
 UART4.peripheral.rxPin.$assign         = "PA1";
 UART4.peripheral.txPin.$assign         = "PA0";
