@@ -1,265 +1,389 @@
-/**
- ******************************************************************************
- * @file    icm42688.c
- * @author  Geng LX (ported from Legacy verified driver)
- * @brief   ICM42688 6-axis IMU SPI driver for MSPM0 platform
- *
- * @note    Ported from Legacy/icm42688.c (STM32 HAL) to MSPM0 DL SPI API.
- *          Fixed: signedness bug, unit conversions (accel→m/s², gyro→rad/s),
- *          bank switching, register configuration.
- ******************************************************************************
- */
-
+#include <stdio.h>
 #include "icm42688.h"
+#include "board.h"
 #include "dwt.h"
-#include <string.h>
+#define ICM_USE_HARD_SPI
+#define SPI_CS(x)  ( (x) ? DL_GPIO_setPins(ICM42688_CS_PORT,ICM42688_CS_CS_PIN) : DL_GPIO_clearPins(ICM42688_CS_PORT,ICM42688_CS_CS_PIN) )
 
-/* ═══════════════════════════════════════════════════════════════════════
- * Static / Module-level Variables
- * ═══════════════════════════════════════════════════════════════════════ */
+#if defined(ICM_USE_HARD_SPI)
+#elif defined(ICM_USE_I2C)
+#include "myiic.h"
+#endif
 
-static float gyro_bias[3] = {0.0f, 0.0f, 0.0f};
+static float accSensitivity   = 0.244f;   //加速度的最小分辨率 mg/LSB
+static float gyroSensitivity  = 32.8f;    //陀螺仪的最小分辨率
 
-/* ═══════════════════════════════════════════════════════════════════════
- * SPI Low-level Helpers (MSPM0 DL API)
- * ═══════════════════════════════════════════════════════════════════════ */
 
-/** CS pin control */
-#define ICM_CS_LOW()   DL_GPIO_clearPins(ICM42688_CS_PORT, ICM42688_CS_CS_PIN)
-#define ICM_CS_HIGH()  DL_GPIO_setPins(ICM42688_CS_PORT, ICM42688_CS_CS_PIN)
+/*ICM42688使用的ms级延时函数，须由用户提供。*/
+#define ICM42688DelayMs(_nms)  DWT_Delay(_nms*0.001)
 
-/** Blocking SPI byte exchange */
-static uint8_t spi_transfer(uint8_t tx)
+#if defined(ICM_USE_HARD_SPI)
+uint8_t spi_read_write_byte(uint8_t dat)
 {
-    uint8_t rx;
-    DL_SPI_transmitData8(ICM42688_INST, tx);
-    while (DL_SPI_isBusy(ICM42688_INST));
-    rx = DL_SPI_receiveData8(ICM42688_INST);
-    while (DL_SPI_isBusy(ICM42688_INST));
-    return rx;
+        uint8_t data = 0;
+        
+        //发送数据
+        DL_SPI_transmitData8(ICM42688_INST,dat);
+        //等待SPI总线空闲
+        while(DL_SPI_isBusy(ICM42688_INST));
+        //接收数据
+        data = DL_SPI_receiveData8(ICM42688_INST);
+        //等待SPI总线空闲
+        while(DL_SPI_isBusy(ICM42688_INST));
+        
+        return data;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- * Bank Switching
- *
- * ICM42688 has multiple register banks. You MUST switch banks before
- * accessing registers in non-zero banks. REG_BANK_SEL (0x76) controls this.
- * ═══════════════════════════════════════════════════════════════════════ */
 
-static void icm_select_bank(uint8_t bank)
+/*******************************************************************************
+* 名    称： Icm_Spi_ReadWriteNbytes
+* 功    能： 使用SPI读写n个字节
+* 入口参数： pBuffer: 写入的数组  len:写入数组的长度
+* 出口参数： 无
+* 作　　者： Baxiange
+* 创建日期： 2024-07-25
+* 修    改：
+* 修改日期：
+* 备    注：
+*******************************************************************************/
+static void Icm_Spi_ReadWriteNbytes(uint8_t* pBuffer, uint8_t len)
 {
-    ICM_CS_LOW();
-    spi_transfer(0x76);              // REG_BANK_SEL
-    spi_transfer(bank & 0x07);       // only bits [2:0] used
-    ICM_CS_HIGH();
-}
+    uint8_t i = 0;
 
-/* ═══════════════════════════════════════════════════════════════════════
- * Register Read / Write
- * ═══════════════════════════════════════════════════════════════════════ */
-
-static void icm_write_reg(uint8_t reg, uint8_t value)
-{
-    ICM_CS_LOW();
-    spi_transfer(reg & 0x7F);        // bit7=0: write
-    spi_transfer(value);
-    ICM_CS_HIGH();
-}
-
-static uint8_t icm_read_reg(uint8_t reg)
-{
-    uint8_t val;
-    ICM_CS_LOW();
-    spi_transfer(reg | 0x80);        // bit7=1: read
-    val = spi_transfer(0x00);        // dummy byte to clock out data
-    ICM_CS_HIGH();
-    return val;
-}
-
-/** Multi-byte burst read */
-static void icm_read_regs(uint8_t reg, uint8_t *buf, uint16_t len)
-{
-    ICM_CS_LOW();
-    spi_transfer(reg | 0x80);        // bit7=1: read
-    while (len--) {
-        *buf++ = spi_transfer(0x00);
-    }
-    ICM_CS_HIGH();
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
- * Data Conversion Helpers
- * ═══════════════════════════════════════════════════════════════════════ */
-
-/** Big-endian two-byte → signed int16 */
-static inline int16_t be16_to_i16(const uint8_t *b)
-{
-    return (int16_t)((b[0] << 8) | b[1]);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
- * Raw Data Parsing
- *
- * buf layout (14 bytes):
- *   [ 0: 1] TEMP_DATA1:TEMP_DATA0
- *   [ 2: 3] ACCEL_DATA_X1:X0
- *   [ 4: 5] ACCEL_DATA_Y1:Y0
- *   [ 6: 7] ACCEL_DATA_Z1:Z0
- *   [ 8: 9] GYRO_DATA_X1:X0
- *   [10:11] GYRO_DATA_Y1:Y0
- *   [12:13] GYRO_DATA_Z1:Z0
- *
- * Output:
- *   acc[0..2] — acceleration [m/s²]
- *   gyro[0..2] — angular velocity [rad/s]
- *   temp       — temperature [°C] (can be NULL)
- * ═══════════════════════════════════════════════════════════════════════ */
-
-static void icm42688_parse(const uint8_t *buf, float *acc, float *gyro, float *temp)
-{
-    if (temp) {
-        *temp = (float)be16_to_i16(&buf[0]) * 0.007548309f + 25.0f;
-    }
-    /* Accel: raw * (16/32768) [g] * 9.8 [m/s² per g] = [m/s²] */
-    acc[0]  = (float)be16_to_i16(&buf[2])  * ICM_ACCEL_SENSITIVITY_16G * g_gravity;
-    acc[1]  = (float)be16_to_i16(&buf[4])  * ICM_ACCEL_SENSITIVITY_16G * g_gravity;
-    acc[2]  = (float)be16_to_i16(&buf[6])  * ICM_ACCEL_SENSITIVITY_16G * g_gravity;
-    /* Gyro: raw * (2000/32768) [dps] * (pi/180) [rad/s per dps] = [rad/s] */
-    gyro[0] = (float)be16_to_i16(&buf[8])  * ICM_GYRO_SENSITIVITY_2000 * pidivide180;
-    gyro[1] = (float)be16_to_i16(&buf[10]) * ICM_GYRO_SENSITIVITY_2000 * pidivide180;
-    gyro[2] = (float)be16_to_i16(&buf[12]) * ICM_GYRO_SENSITIVITY_2000 * pidivide180;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
- * Gyro Bias Calibration
- *
- * Averages 500 samples while the robot is stationary.
- * Call once at startup.
- * ═══════════════════════════════════════════════════════════════════════ */
-
-static void icm_calibrate_gyro(void)
-{
-    float sum[3] = {0.0f, 0.0f, 0.0f};
-    uint8_t buf[14];
-
-    for (int i = 0; i < 500; i++) {
-        icm_read_regs(ICM_BURST_START, buf, ICM_BURST_LEN);
-        float acc[3], gyro[3];
-        icm42688_parse(buf, acc, gyro, NULL);
-        sum[0] += gyro[0];
-        sum[1] += gyro[1];
-        sum[2] += gyro[2];
-        DWT_Delay(0.002f);  // 2ms between samples
-    }
-    gyro_bias[0] = sum[0] / 500.0f;
-    gyro_bias[1] = sum[1] / 500.0f;
-    gyro_bias[2] = sum[2] / 500.0f;
-}
-
-void icm42688_correct_gyro_bias(float *gyro)
-{
-    gyro[0] -= gyro_bias[0];
-    gyro[1] -= gyro_bias[1];
-    gyro[2] -= gyro_bias[2];
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
- * Register Configuration
- * ═══════════════════════════════════════════════════════════════════════ */
-
-static int8_t bsp_Icm42688RegCfg(void)
-{
-    uint8_t reg_val;
-
-    /* Check WHO_AM_I */
-    reg_val = icm_read_reg(ICM42688_WHO_AM_I);
-    if (reg_val != ICM42688_ID) {
-        return -1;
+    for(i = 0; i < len; i ++)
+    {
+		*pBuffer = spi_read_write_byte(*pBuffer);
+        pBuffer++;
     }
 
-    /* ── Software reset ── */
-    icm_write_reg(ICM42688_DEVICE_CONFIG, 0x01);
-    DWT_Delay(0.05f);  // 50ms
+}
+#endif
 
-    /* Re-check WHO_AM_I after reset */
-    reg_val = icm_read_reg(ICM42688_WHO_AM_I);
-    if (reg_val != ICM42688_ID) {
-        return -1;
-    }
+/*******************************************************************************
+* 名    称： icm42688_read_reg
+* 功    能： 读取单个寄存器的值
+* 入口参数： reg: 寄存器地址
+* 出口参数： 当前寄存器地址的值
+* 作　　者： Baxiange
+* 创建日期： 2024-07-25
+* 修    改：
+* 修改日期：
+* 备    注： 使用SPI读取寄存器时要注意:最高位为读写位，详见datasheet page51.
+*******************************************************************************/
+static uint8_t icm42688_read_reg(uint8_t reg)
+{
+    uint8_t regval = 0;
 
-    /* ── Bank 0: configure sensor ── */
-    icm_select_bank(0);
+#if defined(ICM_USE_HARD_SPI)
+    SPI_CS(0);
+    reg |= 0x80;
+    /* 写入要读的寄存器地址 */
+    spi_read_write_byte(reg);
+    /* 读取寄存器数据 */
+    regval = spi_read_write_byte(0xFF);
+    SPI_CS(1);
+#elif defined(ICM_USE_I2C)
+	IICreadBytes(ICM42688_ADDRESS, reg, 1, &regval);
+#endif
 
-    /* GYRO_CONFIG0: 2000dps, 1kHz ODR
-     *   bits [7:5] = GFS_2000DPS (0b000)
-     *   bits [3:0] = GODR_1000Hz (0b0110) */
-    icm_write_reg(ICM42688_GYRO_CONFIG0, (GFS_2000DPS << 5) | GODR_1000Hz);
+    return regval;
+}
 
-    /* ACCEL_CONFIG0: ±16g, 1kHz ODR
-     *   bits [7:5] = AFS_16G (0b000)
-     *   bits [3:0] = AODR_1000Hz (0b0110) */
-    icm_write_reg(ICM42688_ACCEL_CONFIG0, (AFS_16G << 5) | AODR_1000Hz);
+/*******************************************************************************
+* 名    称： icm42688_read_regs
+* 功    能： 连续读取多个寄存器的值
+* 入口参数： reg: 起始寄存器地址 *buf数据指针,uint16_t len长度
+* 出口参数： 无
+* 作　　者： Baxiange
+* 创建日期： 2024-07-25
+* 修    改：
+* 修改日期：
+* 备    注： 使用SPI读取寄存器时要注意:最高位为读写位，详见datasheet page50.
+*******************************************************************************/
+static void icm42688_read_regs(uint8_t reg, uint8_t* buf, uint16_t len)
+{
+#if defined(ICM_USE_HARD_SPI)
+    reg |= 0x80;
+    SPI_CS(0);
+    /* 写入要读的寄存器地址 */
+    spi_read_write_byte(reg);
+    /* 读取寄存器数据 */
+    while(len)
+	{
+		*buf = spi_read_write_byte(0x00);
+		len--;
+		buf++;
+	}
+    SPI_CS(1);
+#elif defined(ICM_USE_I2C)
+	IICreadBytes(ICM42688_ADDRESS, reg, len, buf);
+#endif
+}
 
-    /* PWR_MGMT0: Gyro LN mode + Accel LN mode + temp enabled
-     *   bit 5  = 0 (TEMP_DIS = 0, temperature enabled)
-     *   bits [3:2] = 0b11 (GYRO_MODE = Low Noise)
-     *   bits [1:0] = 0b11 (ACCEL_MODE = Low Noise) */
-    icm_write_reg(ICM42688_PWR_MGMT0, 0x0F);
 
-    /* GYRO_ACCEL_CONFIG0: default anti-aliasing filter settings */
-    icm_write_reg(ICM42688_GYRO_ACCEL_CONFIG0, 0x55);
-
-    DWT_Delay(0.03f);  // 30ms stabilization
-
-    /* ── Gyro bias calibration ── */
-    icm_calibrate_gyro();  // Uncomment to enable auto-calibration
-
+/*******************************************************************************
+* 名    称： icm42688_write_reg
+* 功    能： 向单个寄存器写数据
+* 入口参数： reg: 寄存器地址 value:数据
+* 出口参数： 0
+* 作　　者： Baxiange
+* 创建日期： 2024-07-25
+* 修    改：
+* 修改日期：
+* 备    注： 使用SPI读取寄存器时要注意:最高位为读写位，详见datasheet page50.
+*******************************************************************************/
+static uint8_t icm42688_write_reg(uint8_t reg, uint8_t value)
+{
+#if defined(ICM_USE_HARD_SPI)
+    SPI_CS(0);
+    /* 写入要读的寄存器地址 */
+    /* 写入要读的寄存器地址 */
+    spi_read_write_byte(reg);
+    /* 读取寄存器数据 */
+    spi_read_write_byte(value);
+    SPI_CS(1);
+#elif defined(ICM_USE_I2C)
+	IICwriteBytes(ICM42688_ADDRESS, reg, 1, &value);
+#endif
     return 0;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- * Public API
- * ═══════════════════════════════════════════════════════════════════════ */
 
+
+float bsp_Icm42688GetAres(uint8_t Ascale)
+{
+    switch(Ascale)
+    {
+    // Possible accelerometer scales (and their register bit settings) are:
+    // 2 Gs (11), 4 Gs (10), 8 Gs (01), and 16 Gs  (00).
+    case AFS_2G:
+        accSensitivity = 2000 / 32768.0f;
+        break;
+    case AFS_4G:
+        accSensitivity = 4000 / 32768.0f;
+        break;
+    case AFS_8G:
+        accSensitivity = 8000 / 32768.0f;
+        break;
+    case AFS_16G:
+        accSensitivity = 16000 / 32768.0f;
+        break;
+    }
+
+    return accSensitivity;
+}
+
+float bsp_Icm42688GetGres(uint8_t Gscale)
+{
+    switch(Gscale)
+    {
+    case GFS_15_125DPS:
+        gyroSensitivity = 15.125f / 32768.0f;
+        break;
+    case GFS_31_25DPS:
+        gyroSensitivity = 31.25f / 32768.0f;
+        break;
+    case GFS_62_5DPS:
+        gyroSensitivity = 62.5f / 32768.0f;
+        break;
+    case GFS_125DPS:
+        gyroSensitivity = 125.0f / 32768.0f;
+        break;
+    case GFS_250DPS:
+        gyroSensitivity = 250.0f / 32768.0f;
+        break;
+    case GFS_500DPS:
+        gyroSensitivity = 500.0f / 32768.0f;
+        break;
+    case GFS_1000DPS:
+        gyroSensitivity = 1000.0f / 32768.0f;
+        break;
+    case GFS_2000DPS:
+        gyroSensitivity = 2000.0f / 32768.0f;
+        break;
+    }
+    return gyroSensitivity;
+}
+
+/*******************************************************************************
+* 名    称： bsp_Icm42688RegCfg
+* 功    能： Icm42688 寄存器配置
+* 入口参数： 无
+* 出口参数： 无
+* 作　　者： Baxiange
+* 创建日期： 2024-07-25
+* 修    改：
+* 修改日期：
+* 备    注：
+*******************************************************************************/
+int8_t bsp_Icm42688RegCfg(void)
+{
+    uint8_t reg_val = 0;
+    /* 读取 who am i 寄存器 */
+    reg_val = icm42688_read_reg(ICM42688_WHO_AM_I);
+    icm42688_write_reg(ICM42688_REG_BANK_SEL, 0); //设置bank 0区域寄存器
+    icm42688_write_reg(ICM42688_REG_BANK_SEL, 0x01); //软复位传感器
+    ICM42688DelayMs(100);
+
+
+    if(reg_val == ICM42688_ID)
+    {
+
+        bsp_Icm42688GetAres(AFS_4G);
+        icm42688_write_reg(ICM42688_REG_BANK_SEL, 0x00);
+        //reg_val = icm42688_read_reg(ICM42688_ACCEL_CONFIG0);//page74
+        reg_val = (AFS_4G << 5);   //量程 ±2g
+        reg_val |= (AODR_100Hz);     //输出速率 100HZ
+        icm42688_write_reg(ICM42688_ACCEL_CONFIG0, reg_val);
+
+        bsp_Icm42688GetGres(GFS_1000DPS);
+        icm42688_write_reg(ICM42688_REG_BANK_SEL, 0x00);
+        //reg_val = icm42688_read_reg(ICM42688_GYRO_CONFIG0);//page73
+        reg_val = (GFS_1000DPS << 5);   //量程 ±1000dps
+        reg_val |= (GODR_100Hz);     //输出速率 100HZ
+        icm42688_write_reg(ICM42688_GYRO_CONFIG0, reg_val);
+
+        icm42688_write_reg(ICM42688_REG_BANK_SEL, 0x00);
+        reg_val = icm42688_read_reg(ICM42688_PWR_MGMT0); //读取PWR―MGMT0当前寄存器的值(page72)
+        reg_val &= ~(1 << 5);//使能温度测量
+        reg_val |= ((3) << 2);//设置GYRO_MODE  0:关闭 1:待机 2:预留 3:低噪声
+        reg_val |= (3);//设置ACCEL_MODE 0:关闭 1:关闭 2:低功耗 3:低噪声
+        icm42688_write_reg(ICM42688_PWR_MGMT0, reg_val);
+        ICM42688DelayMs(1); //操作完PWR―MGMT0寄存器后 200us内不能有任何读写寄存器的操作
+
+        return 0;
+    }
+    return -1;
+}
+/*******************************************************************************
+* 名    称： bsp_Icm42688Init
+* 功    能： Icm42688 传感器初始化
+* 入口参数： 无
+* 出口参数： 0: 初始化成功  其他值: 初始化失败
+* 作　　者： Baxiange
+* 创建日期： 2024-07-25
+* 修    改：
+* 修改日期：
+* 备    注：
+*******************************************************************************/
 int8_t bsp_Icm42688Init(void)
 {
-    return bsp_Icm42688RegCfg();
+    return(bsp_Icm42688RegCfg());
+
 }
 
-int8_t bsp_IcmGetTemperature(int16_t *pTemp)
+/*******************************************************************************
+* 名    称： bsp_IcmGetTemperature
+* 功    能： 读取Icm42688 内部传感器温度
+* 入口参数： 无
+* 出口参数： 无
+* 作　　者： Baxiange
+* 创建日期： 2024-07-25
+* 修    改：
+* 修改日期：
+* 备    注： datasheet page62
+*******************************************************************************/
+int8_t bsp_IcmGetTemperature(int16_t* pTemp)
 {
-    uint8_t buf[2];
-    icm_read_regs(ICM42688_TEMP_DATA1, buf, 2);
-    *pTemp = (int16_t)(((int16_t)((buf[0] << 8) | buf[1])) / 132.48f + 25.0f);
+    uint8_t buffer[2] = {0};
+
+    icm42688_read_regs(ICM42688_TEMP_DATA1, buffer, 2);
+
+    *pTemp = (int16_t)(((int16_t)((buffer[0] << 8) | buffer[1])) / 132.48 + 25);
     return 0;
 }
 
-/**
- * @brief  Burst-read accelerometer + gyroscope data
- * @param  accData  [out] acceleration [m/s²]
- * @param  gyroData [out] angular velocity [rad/s]
- * @retval 0 = success
- */
-int8_t bsp_IcmGetRawData(icm42688RealData_t *accData, icm42688RealData_t *gyroData)
+/*******************************************************************************
+* 名    称： bsp_IcmGetAccelerometer
+* 功    能： 读取Icm42688 加速度的值
+* 入口参数： 三轴加速度的值
+* 出口参数： 无
+* 作　　者： Baxiange
+* 创建日期： 2024-07-25
+* 修    改：
+* 修改日期：
+* 备    注： datasheet page62
+*******************************************************************************/
+int8_t bsp_IcmGetAccelerometer(icm42688RawData_t* accData)
 {
-    uint8_t buf[14];
+    uint8_t buffer[6] = {0};
 
-    /* Burst read: TEMP(2) + ACCEL_XYZ(6) + GYRO_XYZ(6) = 14 bytes from 0x1D */
-    icm_read_regs(ICM_BURST_START, buf, ICM_BURST_LEN);
+    icm42688_read_regs(ICM42688_ACCEL_DATA_X1, buffer, 6);
 
-    /* Parse: acc → m/s², gyro → rad/s */
-    float acc[3], gyro[3];
-    icm42688_parse(buf, acc, gyro, NULL);
+    accData->x = ((uint16_t)buffer[0] << 8) | buffer[1];
+    accData->y = ((uint16_t)buffer[2] << 8) | buffer[3];
+    accData->z = ((uint16_t)buffer[4] << 8) | buffer[5];
 
-    /* Apply gyro bias correction */
-    icm42688_correct_gyro_bias(gyro);
-
-    accData->x  = acc[0];
-    accData->y  = acc[1];
-    accData->z  = acc[2];
-    gyroData->x = gyro[0];
-    gyroData->y = gyro[1];
-    gyroData->z = gyro[2];
+    accData->x = (int16_t)(accData->x * accSensitivity);
+    accData->y = (int16_t)(accData->y * accSensitivity);
+    accData->z = (int16_t)(accData->z * accSensitivity);
 
     return 0;
 }
+
+/*******************************************************************************
+* 名    称： bsp_IcmGetGyroscope
+* 功    能： 读取Icm42688 陀螺仪的值
+* 入口参数： 三轴陀螺仪的值
+* 出口参数： 无
+* 作　　者： Baxiange
+* 创建日期： 2024-07-25
+* 修    改：
+* 修改日期：
+* 备    注： datasheet page63
+*******************************************************************************/
+int8_t bsp_IcmGetGyroscope(icm42688RawData_t* GyroData)
+{
+    uint8_t buffer[6] = {0};
+
+    icm42688_read_regs(ICM42688_GYRO_DATA_X1, buffer, 6);
+
+    GyroData->x = ((uint16_t)buffer[0] << 8) | buffer[1];
+    GyroData->y = ((uint16_t)buffer[2] << 8) | buffer[3];
+    GyroData->z = ((uint16_t)buffer[4] << 8) | buffer[5];
+
+    GyroData->x = (int16_t)(GyroData->x * gyroSensitivity);
+    GyroData->y = (int16_t)(GyroData->y * gyroSensitivity);
+    GyroData->z = (int16_t)(GyroData->z * gyroSensitivity);
+    return 0;
+}
+
+/*******************************************************************************
+* 名    称： bsp_IcmGetRawData
+* 功    能： 读取Icm42688加速度陀螺仪数据
+* 入口参数： 六轴
+* 出口参数： 无
+* 作　　者： Baxiange
+* 创建日期： 2024-07-25
+* 修    改：
+* 修改日期：
+* 备    注： datasheet page62,63
+*******************************************************************************/
+int8_t bsp_IcmGetRawData(icm42688RealData_t* accData, icm42688RealData_t* GyroData)
+{
+    uint8_t buffer[12] = {0};
+	icm42688RawData_t accRaw;
+	icm42688RawData_t gyroRaw;
+
+    icm42688_read_regs(ICM42688_ACCEL_DATA_X1, buffer, 12);
+
+    accRaw.x  = ((uint16_t)buffer[0] << 8)  | buffer[1];
+    accRaw.y  = ((uint16_t)buffer[2] << 8)  | buffer[3];
+    accRaw.z  = ((uint16_t)buffer[4] << 8)  | buffer[5];
+    gyroRaw.x = ((uint16_t)buffer[6] << 8)  | buffer[7];
+    gyroRaw.y = ((uint16_t)buffer[8] << 8)  | buffer[9];
+    gyroRaw.z = ((uint16_t)buffer[10] << 8) | buffer[11];
+
+
+    accData->x = (float)(accRaw.x * accSensitivity);
+    accData->y = (float)(accRaw.y * accSensitivity);
+    accData->z = (float)(accRaw.z * accSensitivity);
+
+    GyroData->x = (float)(gyroRaw.x * gyroSensitivity);
+    GyroData->y = (float)(gyroRaw.y * gyroSensitivity);
+    GyroData->z = (float)(gyroRaw.z * gyroSensitivity);
+
+    return 0;
+}
+
+
