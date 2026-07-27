@@ -152,7 +152,7 @@ static void RobotCmdTask(void *pvParameters);
 static void ChassisTask(void *pvParameters);
 static void DaemonTask(void *pvParameters);
 static void NRF24L01Task(void *pvParameters);
-// static void GimbalTask(void *pvParameters);
+static void GimbalTask(void *pvParameters);
 static void StepMotorTask(void *pvParameters);
 static void MotorTask(void *pvParameters);
 static void MenuTask(void *pvParameters);
@@ -168,7 +168,7 @@ static QueueHandle_t xQueue = NULL;
 static TaskHandle_t xKeyTaskHandle       = NULL;
 static TaskHandle_t xRobotCmdTaskHandle  = NULL;
 static TaskHandle_t xChassisTaskHandle   = NULL;
-// static TaskHandle_t xGimbalTaskHandle    = NULL;
+static TaskHandle_t xGimbalTaskHandle    = NULL;
 static TaskHandle_t xDaemonTaskHandle    = NULL;
 static TaskHandle_t xMenuTaskHandle      = NULL;
 static TaskHandle_t xHwmotorTaskHandle   = NULL;
@@ -235,10 +235,10 @@ void app_tasks_init(void)
             STACK_HANDLE(Chassis));
 			configASSERT(xResult == pdPASS);
    //
-			// xResult=xTaskCreate(GimbalTask, "Gimbal", GIMBAL_TASK_STACK_DEPTH,
-   //          (void *) Gimbal_PARAMETER, tskIDLE_PRIORITY+2,
-   //          STACK_HANDLE(Gimbal));
-			// configASSERT(xResult == pdPASS);
+			xResult=xTaskCreate(GimbalTask, "Gimbal", GIMBAL_TASK_STACK_DEPTH,
+             (void *) Gimbal_PARAMETER, tskIDLE_PRIORITY+2,
+             STACK_HANDLE(Gimbal));
+			configASSERT(xResult == pdPASS);
 
 			// xResult=xTaskCreate(MotorTask, "Motor", MOTOR_TASK_STACK_DEPTH,
    //          (void *) MotorTask_PARAMETER, tskIDLE_PRIORITY+2,
@@ -435,24 +435,24 @@ static void ChassisTask(void *pvParameters)
 		}
 }
 
-// static void GimbalTask(void *pvParameters)
-// {
-// 	configASSERT(
-//         ((unsigned long) pvParameters) == Gimbal_PARAMETER);
-// 	Gimbal_Init();
-// 	vTaskDelay(2000);
-// 	static float Gimbal_dt;
-//   static float Gimbal_start;
-// 	for (;;){
-// 			Gimbal_start = DWT_GetTimeline_ms();
-// 			Gimbal();
-// 			Gimbal_dt = DWT_GetTimeline_ms() - Gimbal_start;
-// 			if (Gimbal_dt > 5)
-//           LOGERROR("[freeRTOS] Gimbal Task is being DELAY! dt = [%f]", Gimbal_dt);
-// 			vTaskDelay(pdMS_TO_TICKS(5));
+static void GimbalTask(void *pvParameters)
+{
+	configASSERT(
+        ((unsigned long) pvParameters) == Gimbal_PARAMETER);
+	Gimbal_Init();
+	vTaskDelay(2000);
+	static float Gimbal_dt;
+  static float Gimbal_start;
+	for (;;){
+			Gimbal_start = DWT_GetTimeline_ms();
+			Gimbal();
+			Gimbal_dt = DWT_GetTimeline_ms() - Gimbal_start;
+			if (Gimbal_dt > 5)
+          LOGERROR("[freeRTOS] Gimbal Task is being DELAY! dt = [%f]", Gimbal_dt);
+			vTaskDelay(pdMS_TO_TICKS(5));
 //
-// 		}
-// }
+		}
+}
 static void DaemonTask(void *pvParameters)
 {
 	configASSERT(
@@ -486,9 +486,9 @@ static void DaemonTask(void *pvParameters)
 				LOGWARNING("[stack] Chassis free: %u / %u",
 				           (unsigned)uxTaskGetStackHighWaterMark(xChassisTaskHandle),
 				           CHASSIS_TASK_STACK_DEPTH);
-				// LOGWARNING("[stack] Gimbal  free: %u / %u",
-				//            (unsigned)uxTaskGetStackHighWaterMark(xGimbalTaskHandle),
-				//            GIMBAL_TASK_STACK_DEPTH);
+				LOGWARNING("[stack] Gimbal  free: %u / %u",
+				           (unsigned)uxTaskGetStackHighWaterMark(xGimbalTaskHandle),
+				           GIMBAL_TASK_STACK_DEPTH);
 				LOGWARNING("[stack] Daemon  free: %u / %u",
 				           (unsigned)uxTaskGetStackHighWaterMark(xDaemonTaskHandle),
 				           DAEMON_TASK_STACK_DEPTH);

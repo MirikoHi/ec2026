@@ -7,6 +7,7 @@
 #include "K230.h"
 #include "daemon.h"
 #include "dwt.h"
+#include "Servo.h"
 
 ZDT_Motor_t *yaw_motor,*pitch_motor;
 float angle_debug;
@@ -15,6 +16,8 @@ gimbal_cmd_q gimbal_cmd_receive={0};
 float relay_on_time;
 uint8_t relay_first_on_flag=0;
 void Gimbal_Attitude_Solving(void);
+
+ServoInstance*  servo_yaw;
 
 void Gimbal_task_2(void);
 void Gimbal_Init(void)
@@ -43,28 +46,41 @@ void Gimbal_Init(void)
 	// pitch_motor = ZDT_Motor_Init(&pitch_config);
 	ZDT_TICK_Init();
 
-	
-	
+	Servo_Init_Config_s servo_yaw_config = {
+		.Servo_type = Servo180,
+		.inst = Servo_INST,
+		.idx = 0,    //对应DL_TIMER_CC_0_INDEX，PA17
+	};
+	servo_yaw = ServoInit(&servo_yaw_config);
+	Servo_Motor_Type_Select(servo_yaw, Free_Angle_mode);
 }
 
 void Gimbal(void)
 {
 	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
-//	
-//	Gimbal_Attitude_Solving();
-	ZDT_Set_Position(yaw_motor,gimbal_cmd_receive.yaw);
-	ZDT_Set_Position(pitch_motor,gimbal_cmd_receive.pitch);
-	switch(gimbal_cmd_receive.task_flag)
-	{
-		case 1:
-			break;
-		case 2:
-			Gimbal_task_2();
-			break;
-		default:
-			break;
-	}
-	
+
+	// //舵机控制，需要时取消注释
+	// int16_t angle;
+	// Servo_Motor_FreeAngle_Set(servo_yaw, angle);
+	// ServeoMotorControl();
+
+	// if (yaw_motor != NULL) {
+	// 	ZDT_Set_Position(yaw_motor, gimbal_cmd_receive.yaw);
+	// }
+	// if (pitch_motor != NULL) {
+	// 	ZDT_Set_Position(pitch_motor, gimbal_cmd_receive.pitch);
+	// }
+	// switch(gimbal_cmd_receive.task_flag)
+	// {
+	// 	case 1:
+	// 		break;
+	// 	case 2:
+	// 		Gimbal_task_2();
+	// 		break;
+	// 	default:
+	// 		break;
+	// }
+
 }
 
 
