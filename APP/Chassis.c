@@ -169,10 +169,10 @@ void Chassis_Init(void)
 	pid_init_config_s turn_pid_config = {
 		.mode = PID_POSITION,
 		.Kp = 0.0008f,
-		.Ki = 0.00009f,
+		.Ki = 0.000009f,
 		.Kd = 0.000003f,
-		.max_out = 0.3f,
-		.max_iout = 0.1f,
+		.max_out = 0.08f,
+		.max_iout = 0.01f,
 		.deadzone = 0.001f,
 	};
 	PID_init(&chassis_turn_pid, &turn_pid_config);
@@ -215,8 +215,8 @@ void Chassis(void)
 	switch(chassis_cmd_receive.Chassis_Mode)
 	{
 		case TRACE_MODE:
-			// 灰度传感器实时巡线补偿，转弯时由 Chassis_Set_Turn 清零。
-			Chassis_Trace_Cal();
+			// 计算并设置巡线补偿量。
+			// Chassis_Trace_Cal();
 			// 按设定路径执行巡线动作。
 			Chassis_State_Turn();
 			// 检测直行/转弯是否完成，并更新完成标志。
@@ -258,8 +258,8 @@ static void Chassis_ImuModeAction(void)
 	switch (chassis_imu_action_step)
 	{
 		case 0:
-			// 第一条边：使用 ICM42688 yaw 做方向保持，直行 1.0m。
-			if (Chassis_MoveStraight(1.0f, 0.35f) == CHASSIS_ACTION_DONE)
+			// 第一条边：使用 ICM42688 yaw 做方向保持，直行 0.2m。
+			if (Chassis_MoveStraight(0.2f, 0.035f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 1U;
 			}
@@ -272,43 +272,43 @@ static void Chassis_ImuModeAction(void)
 			}
 			break;
 		case 2:
-			// 第二条边：直行 1.0m。
-			if (Chassis_MoveStraight(1.0f, 0.35f) == CHASSIS_ACTION_DONE)
+			// 第二条边：直行 0.2m。
+			if (Chassis_MoveStraight(0.2f, 0.035f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 3U;
 			}
 			break;
 		case 3:
 			// 第二次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(90.0f, 0.2f) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(90.0f, 0.02f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 4U;
 			}
 			break;
 		case 4:
-			// 第三条边：直行 1.0m。
-			if (Chassis_MoveStraight(1.0f, 0.35f) == CHASSIS_ACTION_DONE)
+			// 第三条边：直行 0.2m。
+			if (Chassis_MoveStraight(0.2f, 0.035f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 5U;
 			}
 			break;
 		case 5:
 			// 第三次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(90.0f, 0.2f) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(90.0f, 0.02f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 6U;
 			}
 			break;
 		case 6:
-			// 第四条边：直行 1.0m。
-			if (Chassis_MoveStraight(0.2f, 0.35f) == CHASSIS_ACTION_DONE)
+			// 第四条边：直行 0.2m。
+			if (Chassis_MoveStraight(0.2f, 0.035f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 7U;
 			}
 			break;
 		case 7:
 			// 第四次转角完成后回到第一条边，形成正方形循环。
-			if (Chassis_TurnAngle(90.0f, 0.2f) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(90.0f, 0.02f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 0U;
 			}
@@ -515,9 +515,6 @@ uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed)
 	motor_l->State = ENABLE;
 	motor_r->State = ENABLE;
 
-		DCMotor_SetTraceCompensation(motor_l, 0.0f);
-		DCMotor_SetTraceCompensation(motor_r, 0.0f);
-
 	// 直接读取当前归一化 yaw，和启动时锁定的目标 yaw 做最短角误差。
 	yaw_error = Chassis_AngleNormalize(chassis_action_target_yaw - Chassis_GetYawDeg());
 	if (fabsf(yaw_error) <= CHASSIS_TURN_DONE_ERR_DEG)
@@ -678,17 +675,13 @@ void Chassis_Set_Turn(void)
 	Spin_succeed_flag = 0;
 	motor_l->encoder->total_count = 0;
 	motor_r->encoder->total_count = 0;
-	motor_l->position_pid.max_out = 0.2;
-	motor_l->position_pid.max_iout = 0.1;
-	motor_r->position_pid.max_out = 0.2;
-	motor_r->position_pid.max_iout = 0.1;
+	motor_l->position_pid.max_out = 0.08;
+	motor_l->position_pid.max_iout = 0.05;
+	motor_r->position_pid.max_out = 0.08;
+	motor_r->position_pid.max_iout = 0.05;
 
-	// 转弯时清除巡线补偿，避免传感器误读干扰转弯
-	DCMotor_SetTraceCompensation(motor_l, 0.0f);
-	DCMotor_SetTraceCompensation(motor_r, 0.0f);
-
-	DC_Motor_SetRef(motor_l, -0.1);
-	DC_Motor_SetRef(motor_r, 0.1);
+	DC_Motor_SetRef(motor_l, -0.01);
+	DC_Motor_SetRef(motor_r, 0.01);
 }
 
 void Chassis_Set_Line(float position)
@@ -703,116 +696,81 @@ void Chassis_Set_Line(float position)
 	Spin_succeed_flag = 0;
 	motor_l->encoder->total_count = 0;
 	motor_r->encoder->total_count = 0;
-	motor_l->position_pid.max_out = 0.3;
+	motor_l->position_pid.max_out = 0.03;
 	motor_l->position_pid.max_iout = 0.0;
-	motor_r->position_pid.max_out = 0.3;
+	motor_r->position_pid.max_out = 0.03;
 	motor_r->position_pid.max_iout = 0.0;
 
 	DC_Motor_SetRef(motor_l, position);
 	DC_Motor_SetRef(motor_r, position);
 }
 
-/**
- * @brief 根据灰度传感器原始数据判断转弯方向
- * @return 90.0f=右转, -90.0f=左转, 0.0f=无法判断
- */
-static float Chassis_DetectTurnDirection(void)
-{
-	int left_zeros  = 0;  // 左侧传感器(bit0-2)的黑线计数
-	int right_zeros = 0;  // 右侧传感器(bit5-7)的黑线计数
-
-	for (int i = 0; i < 3; i++) {
-		if (!(Digtal & (1 << i)))      left_zeros++;
-	}
-	for (int i = 5; i < 8; i++) {
-		if (!(Digtal & (1 << i)))      right_zeros++;
-	}
-
-	if (right_zeros > left_zeros && right_zeros >= 2)  return  90.0f;  // 黑线在右→右转
-	if (left_zeros > right_zeros && left_zeros >= 2)   return -90.0f;  // 黑线在左→左转
-	return 0.0f;  // 无法判断，沿用上次方向
-}
-
-/**
- * @brief TRACE_MODE 巡线状态机：1m 正方形循迹
- *
- * 直行：灰度传感器巡线 + 编码器位置环，到达目标后进入拐角状态。
- * 拐角：根据传感器数据自动判断左/右转，用 IMU 闭环精确转 90°。
- * 四条边各 1.0m，圈数由 menu 的 circle_set 控制。
- */
 void Chassis_State_Turn(void)
 {
-	static uint8_t quan = 0;
-	static float turn_dir = 90.0f;  // 默认右转，首次拐角时自动更新
-	float detected;
 
+	static uint8_t quan=0;
 	switch(state)
 	{
 		case 0:
 			if(quan < chassis_cmd_receive.circle_set)
 			{
 				state ++;
-				Chassis_Set_Line(1.0f);
+				Chassis_Set_Line(0.08);
 			}
 		break;
 		case 1:
 			if(Stop_Flag)
 			{
-				// 到达拐角，根据传感器黑线位置判断转弯方向
-				detected = Chassis_DetectTurnDirection();
-				if (detected != 0.0f) { turn_dir = detected; }
-				state ++;   // 进入 IMU 转弯
+				Chassis_Set_Turn();
+				state ++;
 			}
 		break;
 		case 2:
-			if(Chassis_TurnAngle(turn_dir, 0.02f) == CHASSIS_ACTION_DONE)
+			if(Spin_succeed_flag)
 			{
-				Chassis_Set_Line(1.0f);
+				Chassis_Set_Line(0.082);
 				state ++;
 			}
 		break;
 		case 3:
 			if(Stop_Flag)
 			{
-				detected = Chassis_DetectTurnDirection();
-				if (detected != 0.0f) { turn_dir = detected; }
+				Chassis_Set_Turn();
 				state ++;
 			}
 		break;
 		case 4:
-			if(Chassis_TurnAngle(turn_dir, 0.02f) == CHASSIS_ACTION_DONE)
+			if(Spin_succeed_flag)
 			{
-				Chassis_Set_Line(1.0f);
+				Chassis_Set_Line(0.082);
 				state ++;
 			}
 		break;
-		case 5:
+			case 5:
 			if(Stop_Flag)
 			{
-				detected = Chassis_DetectTurnDirection();
-				if (detected != 0.0f) { turn_dir = detected; }
+				Chassis_Set_Turn();
 				state ++;
 			}
 		break;
-		case 6:
-			if(Chassis_TurnAngle(turn_dir, 0.02f) == CHASSIS_ACTION_DONE)
+			case 6:
+			if(Spin_succeed_flag)
 			{
-				Chassis_Set_Line(1.0f);
+				Chassis_Set_Line(0.082);
 				state ++;
 			}
 		break;
-		case 7:
+			case 7:
 			if(Stop_Flag)
 			{
-				detected = Chassis_DetectTurnDirection();
-				if (detected != 0.0f) { turn_dir = detected; }
+				Chassis_Set_Turn();
 				state ++;
 			}
 		break;
 		case 8:
-			if(Chassis_TurnAngle(turn_dir, 0.02f) == CHASSIS_ACTION_DONE)
+			if(Spin_succeed_flag)
 			{
-				Chassis_Set_Line(0.01f);  // 回到起点
+				Chassis_Set_Line(0.01);
 				state ++;
 			}
 		break;
@@ -826,6 +784,10 @@ void Chassis_State_Turn(void)
 		default:
 			break;
 	}
+
+
+
+
 }
 
 /* ========================================================================
