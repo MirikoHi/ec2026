@@ -240,22 +240,22 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define K230_BAUD_RATE                                                  (115200)
 #define K230_IBRD_40_MHZ_115200_BAUD                                        (21)
 #define K230_FBRD_40_MHZ_115200_BAUD                                        (45)
-/* Defines for UART_2 */
-#define UART_2_INST                                                        UART0
-#define UART_2_INST_FREQUENCY                                           40000000
-#define UART_2_INST_IRQHandler                                  UART0_IRQHandler
-#define UART_2_INST_INT_IRQN                                      UART0_INT_IRQn
-#define GPIO_UART_2_RX_PORT                                                GPIOA
-#define GPIO_UART_2_TX_PORT                                                GPIOA
-#define GPIO_UART_2_RX_PIN                                         DL_GPIO_PIN_1
-#define GPIO_UART_2_TX_PIN                                         DL_GPIO_PIN_0
-#define GPIO_UART_2_IOMUX_RX                                      (IOMUX_PINCM2)
-#define GPIO_UART_2_IOMUX_TX                                      (IOMUX_PINCM1)
-#define GPIO_UART_2_IOMUX_RX_FUNC                       IOMUX_PINCM2_PF_UART0_RX
-#define GPIO_UART_2_IOMUX_TX_FUNC                       IOMUX_PINCM1_PF_UART0_TX
-#define UART_2_BAUD_RATE                                                  (9600)
-#define UART_2_IBRD_40_MHZ_9600_BAUD                                       (260)
-#define UART_2_FBRD_40_MHZ_9600_BAUD                                        (27)
+/* Defines for Licheervnano */
+#define Licheervnano_INST                                                  UART0
+#define Licheervnano_INST_FREQUENCY                                     40000000
+#define Licheervnano_INST_IRQHandler                            UART0_IRQHandler
+#define Licheervnano_INST_INT_IRQN                                UART0_INT_IRQn
+#define GPIO_Licheervnano_RX_PORT                                          GPIOA
+#define GPIO_Licheervnano_TX_PORT                                          GPIOA
+#define GPIO_Licheervnano_RX_PIN                                   DL_GPIO_PIN_1
+#define GPIO_Licheervnano_TX_PIN                                   DL_GPIO_PIN_0
+#define GPIO_Licheervnano_IOMUX_RX                                (IOMUX_PINCM2)
+#define GPIO_Licheervnano_IOMUX_TX                                (IOMUX_PINCM1)
+#define GPIO_Licheervnano_IOMUX_RX_FUNC                 IOMUX_PINCM2_PF_UART0_RX
+#define GPIO_Licheervnano_IOMUX_TX_FUNC                 IOMUX_PINCM1_PF_UART0_TX
+#define Licheervnano_BAUD_RATE                                          (115200)
+#define Licheervnano_IBRD_40_MHZ_115200_BAUD                                (21)
+#define Licheervnano_FBRD_40_MHZ_115200_BAUD                                (45)
 
 
 
@@ -493,7 +493,7 @@ void SYSCFG_DL_I2C_1_init(void);
 void SYSCFG_DL_UART_1_init(void);
 void SYSCFG_DL_UART_0_init(void);
 void SYSCFG_DL_K230_init(void);
-void SYSCFG_DL_UART_2_init(void);
+void SYSCFG_DL_Licheervnano_init(void);
 void SYSCFG_DL_ICM42688_init(void);
 void SYSCFG_DL_NRF24L01_init(void);
 void SYSCFG_DL_ADC1_init(void);

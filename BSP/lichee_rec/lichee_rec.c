@@ -12,8 +12,8 @@
 #include <string.h>
 
 /* ── UART 实例映射 ─────────────────────────────────────────── */
-#define LICHEE_REC_UART      UART_2_INST            /* UART0 peripheral */
-#define LICHEE_REC_UART_IRQN UART_2_INST_INT_IRQN   /* UART0_INT_IRQn  */
+#define LICHEE_REC_UART      Licheervnano_INST           /* UART0 peripheral */
+#define LICHEE_REC_UART_IRQN Licheervnano_INST_INT_IRQN   /* UART0_INT_IRQn  */
 
 /* ── float / uint8_t 联合体 ────────────────────────────────── */
 typedef union {

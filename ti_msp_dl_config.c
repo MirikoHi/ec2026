@@ -69,7 +69,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_UART_1_init();
     SYSCFG_DL_UART_0_init();
     SYSCFG_DL_K230_init();
-    SYSCFG_DL_UART_2_init();
+    SYSCFG_DL_Licheervnano_init();
     SYSCFG_DL_ICM42688_init();
     SYSCFG_DL_NRF24L01_init();
     SYSCFG_DL_ADC1_init();
@@ -136,7 +136,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_reset(UART_1_INST);
     DL_UART_Main_reset(UART_0_INST);
     DL_UART_Main_reset(K230_INST);
-    DL_UART_Main_reset(UART_2_INST);
+    DL_UART_Main_reset(Licheervnano_INST);
     DL_SPI_reset(ICM42688_INST);
     DL_SPI_reset(NRF24L01_INST);
     DL_ADC12_reset(ADC1_INST);
@@ -156,7 +156,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_enablePower(UART_1_INST);
     DL_UART_Main_enablePower(UART_0_INST);
     DL_UART_Main_enablePower(K230_INST);
-    DL_UART_Main_enablePower(UART_2_INST);
+    DL_UART_Main_enablePower(Licheervnano_INST);
     DL_SPI_enablePower(ICM42688_INST);
     DL_SPI_enablePower(NRF24L01_INST);
     DL_ADC12_enablePower(ADC1_INST);
@@ -219,9 +219,9 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_initPeripheralInputFunction(
         GPIO_K230_IOMUX_RX, GPIO_K230_IOMUX_RX_FUNC);
     DL_GPIO_initPeripheralOutputFunction(
-        GPIO_UART_2_IOMUX_TX, GPIO_UART_2_IOMUX_TX_FUNC);
+        GPIO_Licheervnano_IOMUX_TX, GPIO_Licheervnano_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
-        GPIO_UART_2_IOMUX_RX, GPIO_UART_2_IOMUX_RX_FUNC);
+        GPIO_Licheervnano_IOMUX_RX, GPIO_Licheervnano_IOMUX_RX_FUNC);
 
     DL_GPIO_initPeripheralOutputFunction(
         GPIO_ICM42688_IOMUX_SCLK, GPIO_ICM42688_IOMUX_SCLK_FUNC);
@@ -888,12 +888,12 @@ SYSCONFIG_WEAK void SYSCFG_DL_K230_init(void)
 
     DL_UART_Main_enable(K230_INST);
 }
-static const DL_UART_Main_ClockConfig gUART_2ClockConfig = {
+static const DL_UART_Main_ClockConfig gLicheervnanoClockConfig = {
     .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,
     .divideRatio = DL_UART_MAIN_CLOCK_DIVIDE_RATIO_1
 };
 
-static const DL_UART_Main_Config gUART_2Config = {
+static const DL_UART_Main_Config gLicheervnanoConfig = {
     .mode        = DL_UART_MAIN_MODE_NORMAL,
     .direction   = DL_UART_MAIN_DIRECTION_TX_RX,
     .flowControl = DL_UART_MAIN_FLOW_CONTROL_NONE,
@@ -902,22 +902,22 @@ static const DL_UART_Main_Config gUART_2Config = {
     .stopBits    = DL_UART_MAIN_STOP_BITS_ONE
 };
 
-SYSCONFIG_WEAK void SYSCFG_DL_UART_2_init(void)
+SYSCONFIG_WEAK void SYSCFG_DL_Licheervnano_init(void)
 {
-    DL_UART_Main_setClockConfig(UART_2_INST, (DL_UART_Main_ClockConfig *) &gUART_2ClockConfig);
+    DL_UART_Main_setClockConfig(Licheervnano_INST, (DL_UART_Main_ClockConfig *) &gLicheervnanoClockConfig);
 
-    DL_UART_Main_init(UART_2_INST, (DL_UART_Main_Config *) &gUART_2Config);
+    DL_UART_Main_init(Licheervnano_INST, (DL_UART_Main_Config *) &gLicheervnanoConfig);
     /*
      * Configure baud rate by setting oversampling and baud rate divisors.
-     *  Target baud rate: 9600
-     *  Actual baud rate: 9599.81
+     *  Target baud rate: 115200
+     *  Actual baud rate: 115190.78
      */
-    DL_UART_Main_setOversampling(UART_2_INST, DL_UART_OVERSAMPLING_RATE_16X);
-    DL_UART_Main_setBaudRateDivisor(UART_2_INST, UART_2_IBRD_40_MHZ_9600_BAUD, UART_2_FBRD_40_MHZ_9600_BAUD);
+    DL_UART_Main_setOversampling(Licheervnano_INST, DL_UART_OVERSAMPLING_RATE_16X);
+    DL_UART_Main_setBaudRateDivisor(Licheervnano_INST, Licheervnano_IBRD_40_MHZ_115200_BAUD, Licheervnano_FBRD_40_MHZ_115200_BAUD);
 
 
 
-    DL_UART_Main_enable(UART_2_INST);
+    DL_UART_Main_enable(Licheervnano_INST);
 }
 
 static const DL_SPI_Config gICM42688_config = {
