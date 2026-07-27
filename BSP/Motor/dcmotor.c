@@ -48,6 +48,8 @@ static void set_motor(DCMotorInstance *motor)
 			DL_GPIO_clearPins(motor->PortPin.EN_1_PORT,motor->PortPin.EN_1_pin);
 		}
 	}
+
+
 	Abs(speed);
 	DL_TimerG_setCaptureCompareValue(motor->PortPin.inst,speed,motor->PortPin.idx);
 		
@@ -70,7 +72,6 @@ static float DCMotor_Speed_Filter(Motor_Speed_Filter_e *filter,float speed)
 	filter->speed_filtered = filtered_MotorSpeed;
 	return filtered_MotorSpeed;
 }
-
 void DCMotor_SetTraceCompensation(DCMotorInstance *motor,float compensation)
 {
 	motor->Trace_Compensation = compensation;
@@ -98,13 +99,9 @@ void Hw_Motor_Task(void)
 	for(uint8_t i=0;i<idx_dcmotor;i++)
 	{
 		//计算位置
-		dcmotor_instance[i].position_measure=
-			(dcmotor_instance[i].Input_Dir==MOTOR_REVERSAL? -1:1)*
-			(dcmotor_instance[i].encoder->total_count*ENCODER_TO_DISDAN_M);
+		dcmotor_instance[i].position_measure=(dcmotor_instance[i].Input_Dir==MOTOR_REVERSAL? -1:1)*(dcmotor_instance[i].encoder->total_count*ENCODER_TO_DISDAN_M);
 		//计算速度
-		dcmotor_instance[i].speed_measure=
-			(dcmotor_instance[i].Input_Dir==MOTOR_REVERSAL? -1:1)*
-			(dcmotor_instance[i].encoder->count*ENCODER_TO_SPEED_MS);
+		dcmotor_instance[i].speed_measure=(dcmotor_instance[i].Input_Dir==MOTOR_REVERSAL? -1:1)*(dcmotor_instance[i].encoder->count*ENCODER_TO_SPEED_MS);
 		//滤波
 		DCMotor_Speed_Filter(&dcmotor_instance[i].filter,dcmotor_instance[i].speed_measure);
 		if (dcmotor_instance[i].loop_mode == ANGLE_MODE) {

@@ -12,6 +12,9 @@
 #include "math.h"
 #include "K230.h"
 #include "elrs.h"
+#include "../BSP/IMU/icm42688.h"
+icm42688RawData_t Chassis_Gyro;
+
 static CANCommInstance *chasiss_can_comm; // 双板通信CAN comm
 
 static Chassis_Ctrl_Cmd_s chassis_cmd_recv;         // 底盘接收到的控制命令
@@ -63,8 +66,8 @@ void RobotCmd_Init(void)
 	ELRS_Init();
 	robotcmd_elrs = ELRS_GetData();
 	
-	chassis_cmd_send.circle_set=1;
-	chassis_cmd_send.Chassis_Mode = NORMAL_MODE;  //todo:这里记得改回默认值，调试用
+
+	chassis_cmd_send.Chassis_Mode = TRACE_MODE;  //todo:这里记得改回默认值，调试用
 		pid_init_config_s gimbal_yaw_pid_config={
 		.mode = PID_POSITION,
 		.Kp = 0.003f,
