@@ -89,7 +89,7 @@ void Chassis_Init(void)
 			.mode = PID_POSITION,
 			.Kp = 2000.0f,
 			.Ki = 0.0f,
-			.Kd = 0.0f,
+			.Kd = 500.0f,
 			.max_out = 2499.0f,
 			.max_iout = 500.0f,
 			.kf_p = 8000.0f,
