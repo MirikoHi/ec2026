@@ -287,6 +287,7 @@ PWM1.peripheral.ccp1Pin.$assign         = "PB11";
 PWM1.PWM_CHANNEL_0.$name                = "ti_driverlib_pwm_PWMTimerCC2";
 PWM1.PWM_CHANNEL_0.invert               = true;
 PWM1.PWM_CHANNEL_1.$name                = "ti_driverlib_pwm_PWMTimerCC1";
+PWM1.PWM_CHANNEL_1.invert               = true;
 PWM1.ccp0PinConfig.direction            = scripting.forceWrite("OUTPUT");
 PWM1.ccp0PinConfig.hideOutputInversion  = scripting.forceWrite(false);
 PWM1.ccp0PinConfig.onlyInternalResistor = scripting.forceWrite(false);
