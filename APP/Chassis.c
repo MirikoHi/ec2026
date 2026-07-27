@@ -343,7 +343,7 @@ static void Chassis_RemoteControl(void)
 	Spin_succeed_flag = 0;
 	// DCMotor_SetTraceCompensation(motor_l, 0.0f);
 	// DCMotor_SetTraceCompensation(motor_r, 0.0f);
-	// Chassis_Trace_Cal();
+	Chassis_Trace_Cal();
 
 	if (remote_mode_active == 0U)
 	{

@@ -45,8 +45,8 @@ void ELRS_Init(void)
     ELRS_ResetData();
     ELRS_ClearUartFifo();
 
-    DL_UART_Main_enableInterrupt(UART_0_INST, ELRS_UART_HANDLED_INTERRUPTS);
-    DL_UART_clearInterruptStatus(UART_0_INST, ELRS_UART_HANDLED_INTERRUPTS);
+        DL_UART_Main_enableInterrupt(ELRS_INST, ELRS_UART_HANDLED_INTERRUPTS);
+    DL_UART_clearInterruptStatus(ELRS_INST, ELRS_UART_HANDLED_INTERRUPTS);
 
     Daemon_Init_Config_s daemon_config = {
         .callback = ELRS_LostCallback,
@@ -55,8 +55,8 @@ void ELRS_Init(void)
     };
     elrs_daemon = DaemonRegister(&daemon_config);
 
-    NVIC_ClearPendingIRQ(UART_0_INST_INT_IRQN);
-    NVIC_EnableIRQ(UART_0_INST_INT_IRQN);
+    NVIC_ClearPendingIRQ(ELRS_INST_INT_IRQN);
+    NVIC_EnableIRQ(ELRS_INST_INT_IRQN);
 }
 
 void ELRS_ReceiveByte(uint8_t data)
@@ -280,9 +280,9 @@ static void ELRS_SetOfflineState(void)
 
 static void ELRS_ClearUartFifo(void)
 {
-    while (!DL_UART_isRXFIFOEmpty(UART_0_INST))
+    while (!DL_UART_isRXFIFOEmpty(ELRS_INST))
     {
-        (void)DL_UART_receiveData(UART_0_INST);
+        (void)DL_UART_receiveData(ELRS_INST);
     }
 }
 
@@ -292,13 +292,13 @@ static void ELRS_LostCallback(void *ptr)
     ELRS_SetOfflineState();
 }
 
-void UART_0_INST_IRQHandler(void)
+void ELRS_INST_IRQHandler(void)
 {
-    uint32_t status = DL_UART_getEnabledInterruptStatus(UART_0_INST, ELRS_UART_HANDLED_INTERRUPTS);
+    uint32_t status = DL_UART_getEnabledInterruptStatus(ELRS_INST, ELRS_UART_HANDLED_INTERRUPTS);
 
     if (status != 0U)
     {
-        DL_UART_clearInterruptStatus(UART_0_INST, status);
+        DL_UART_clearInterruptStatus(ELRS_INST, status);
     }
 
     if ((status & ELRS_UART_ERROR_INTERRUPTS) != 0U)
@@ -311,9 +311,9 @@ void UART_0_INST_IRQHandler(void)
 
     if ((status & ELRS_UART_RX_INTERRUPTS) != 0U)
     {
-        while (!DL_UART_isRXFIFOEmpty(UART_0_INST))
+        while (!DL_UART_isRXFIFOEmpty(ELRS_INST))
         {
-            ELRS_ReceiveByte(DL_UART_receiveData(UART_0_INST));
+            ELRS_ReceiveByte(DL_UART_receiveData(ELRS_INST));
         }
     }
 }

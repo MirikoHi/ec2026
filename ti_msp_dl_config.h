@@ -192,38 +192,38 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_I2C_1_IOMUX_SCL_FUNC                       IOMUX_PINCM9_PF_I2C1_SCL
 
 
-/* Defines for UART_1 */
-#define UART_1_INST                                                        UART1
-#define UART_1_INST_FREQUENCY                                           40000000
-#define UART_1_INST_IRQHandler                                  UART1_IRQHandler
-#define UART_1_INST_INT_IRQN                                      UART1_INT_IRQn
-#define GPIO_UART_1_RX_PORT                                                GPIOB
-#define GPIO_UART_1_TX_PORT                                                GPIOB
-#define GPIO_UART_1_RX_PIN                                         DL_GPIO_PIN_7
-#define GPIO_UART_1_TX_PIN                                         DL_GPIO_PIN_6
-#define GPIO_UART_1_IOMUX_RX                                     (IOMUX_PINCM24)
-#define GPIO_UART_1_IOMUX_TX                                     (IOMUX_PINCM23)
-#define GPIO_UART_1_IOMUX_RX_FUNC                      IOMUX_PINCM24_PF_UART1_RX
-#define GPIO_UART_1_IOMUX_TX_FUNC                      IOMUX_PINCM23_PF_UART1_TX
-#define UART_1_BAUD_RATE                                                (115200)
-#define UART_1_IBRD_40_MHZ_115200_BAUD                                      (21)
-#define UART_1_FBRD_40_MHZ_115200_BAUD                                      (45)
-/* Defines for UART_0 */
-#define UART_0_INST                                                        UART3
-#define UART_0_INST_FREQUENCY                                           80000000
-#define UART_0_INST_IRQHandler                                  UART3_IRQHandler
-#define UART_0_INST_INT_IRQN                                      UART3_INT_IRQn
-#define GPIO_UART_0_RX_PORT                                                GPIOB
-#define GPIO_UART_0_TX_PORT                                                GPIOB
-#define GPIO_UART_0_RX_PIN                                        DL_GPIO_PIN_13
-#define GPIO_UART_0_TX_PIN                                        DL_GPIO_PIN_12
-#define GPIO_UART_0_IOMUX_RX                                     (IOMUX_PINCM30)
-#define GPIO_UART_0_IOMUX_TX                                     (IOMUX_PINCM29)
-#define GPIO_UART_0_IOMUX_RX_FUNC                      IOMUX_PINCM30_PF_UART3_RX
-#define GPIO_UART_0_IOMUX_TX_FUNC                      IOMUX_PINCM29_PF_UART3_TX
-#define UART_0_BAUD_RATE                                                (420000)
-#define UART_0_IBRD_80_MHZ_420000_BAUD                                      (11)
-#define UART_0_FBRD_80_MHZ_420000_BAUD                                      (58)
+/* Defines for JY901s */
+#define JY901s_INST                                                        UART1
+#define JY901s_INST_FREQUENCY                                           40000000
+#define JY901s_INST_IRQHandler                                  UART1_IRQHandler
+#define JY901s_INST_INT_IRQN                                      UART1_INT_IRQn
+#define GPIO_JY901s_RX_PORT                                                GPIOB
+#define GPIO_JY901s_TX_PORT                                                GPIOB
+#define GPIO_JY901s_RX_PIN                                         DL_GPIO_PIN_7
+#define GPIO_JY901s_TX_PIN                                         DL_GPIO_PIN_6
+#define GPIO_JY901s_IOMUX_RX                                     (IOMUX_PINCM24)
+#define GPIO_JY901s_IOMUX_TX                                     (IOMUX_PINCM23)
+#define GPIO_JY901s_IOMUX_RX_FUNC                      IOMUX_PINCM24_PF_UART1_RX
+#define GPIO_JY901s_IOMUX_TX_FUNC                      IOMUX_PINCM23_PF_UART1_TX
+#define JY901s_BAUD_RATE                                                (115200)
+#define JY901s_IBRD_40_MHZ_115200_BAUD                                      (21)
+#define JY901s_FBRD_40_MHZ_115200_BAUD                                      (45)
+/* Defines for ELRS */
+#define ELRS_INST                                                          UART3
+#define ELRS_INST_FREQUENCY                                             80000000
+#define ELRS_INST_IRQHandler                                    UART3_IRQHandler
+#define ELRS_INST_INT_IRQN                                        UART3_INT_IRQn
+#define GPIO_ELRS_RX_PORT                                                  GPIOB
+#define GPIO_ELRS_TX_PORT                                                  GPIOB
+#define GPIO_ELRS_RX_PIN                                          DL_GPIO_PIN_13
+#define GPIO_ELRS_TX_PIN                                          DL_GPIO_PIN_12
+#define GPIO_ELRS_IOMUX_RX                                       (IOMUX_PINCM30)
+#define GPIO_ELRS_IOMUX_TX                                       (IOMUX_PINCM29)
+#define GPIO_ELRS_IOMUX_RX_FUNC                        IOMUX_PINCM30_PF_UART3_RX
+#define GPIO_ELRS_IOMUX_TX_FUNC                        IOMUX_PINCM29_PF_UART3_TX
+#define ELRS_BAUD_RATE                                                  (420000)
+#define ELRS_IBRD_80_MHZ_420000_BAUD                                        (11)
+#define ELRS_FBRD_80_MHZ_420000_BAUD                                        (58)
 /* Defines for K230 */
 #define K230_INST                                                          UART7
 #define K230_INST_FREQUENCY                                             40000000
@@ -482,8 +482,8 @@ void SYSCFG_DL_dwt_init(void);
 void SYSCFG_DL_ZDT_MOTOR_TICK_init(void);
 void SYSCFG_DL_I2C_0_init(void);
 void SYSCFG_DL_I2C_1_init(void);
-void SYSCFG_DL_UART_1_init(void);
-void SYSCFG_DL_UART_0_init(void);
+void SYSCFG_DL_JY901s_init(void);
+void SYSCFG_DL_ELRS_init(void);
 void SYSCFG_DL_K230_init(void);
 void SYSCFG_DL_UART_2_init(void);
 void SYSCFG_DL_ICM42688_init(void);

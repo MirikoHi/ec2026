@@ -44,7 +44,7 @@ DL_TimerA_backupConfig gServoBackup;
 DL_TimerG_backupConfig gPWM_0Backup;
 DL_TimerA_backupConfig gTIMER_TICKBackup;
 DL_TimerG_backupConfig gZDT_MOTOR_TICKBackup;
-DL_UART_Main_backupConfig gUART_0Backup;
+DL_UART_Main_backupConfig gELRSBackup;
 DL_SPI_backupConfig gICM42688Backup;
 DL_SPI_backupConfig gNRF24L01Backup;
 
@@ -66,8 +66,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_ZDT_MOTOR_TICK_init();
     SYSCFG_DL_I2C_0_init();
     SYSCFG_DL_I2C_1_init();
-    SYSCFG_DL_UART_1_init();
-    SYSCFG_DL_UART_0_init();
+    SYSCFG_DL_JY901s_init();
+    SYSCFG_DL_ELRS_init();
     SYSCFG_DL_K230_init();
     SYSCFG_DL_UART_2_init();
     SYSCFG_DL_ICM42688_init();
@@ -80,7 +80,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
 	gPWM_0Backup.backupRdy 	= false;
 	gTIMER_TICKBackup.backupRdy 	= false;
 	gZDT_MOTOR_TICKBackup.backupRdy 	= false;
-	gUART_0Backup.backupRdy 	= false;
+	gELRSBackup.backupRdy 	= false;
 	gICM42688Backup.backupRdy 	= false;
 	gNRF24L01Backup.backupRdy 	= false;
 
@@ -98,7 +98,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_saveConfiguration(void)
 	retStatus &= DL_TimerG_saveConfiguration(PWM_0_INST, &gPWM_0Backup);
 	retStatus &= DL_TimerA_saveConfiguration(TIMER_TICK_INST, &gTIMER_TICKBackup);
 	retStatus &= DL_TimerG_saveConfiguration(ZDT_MOTOR_TICK_INST, &gZDT_MOTOR_TICKBackup);
-	retStatus &= DL_UART_Main_saveConfiguration(UART_0_INST, &gUART_0Backup);
+	retStatus &= DL_UART_Main_saveConfiguration(ELRS_INST, &gELRSBackup);
 	retStatus &= DL_SPI_saveConfiguration(ICM42688_INST, &gICM42688Backup);
 	retStatus &= DL_SPI_saveConfiguration(NRF24L01_INST, &gNRF24L01Backup);
 
@@ -114,7 +114,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_restoreConfiguration(void)
 	retStatus &= DL_TimerG_restoreConfiguration(PWM_0_INST, &gPWM_0Backup, false);
 	retStatus &= DL_TimerA_restoreConfiguration(TIMER_TICK_INST, &gTIMER_TICKBackup, false);
 	retStatus &= DL_TimerG_restoreConfiguration(ZDT_MOTOR_TICK_INST, &gZDT_MOTOR_TICKBackup, false);
-	retStatus &= DL_UART_Main_restoreConfiguration(UART_0_INST, &gUART_0Backup);
+	retStatus &= DL_UART_Main_restoreConfiguration(ELRS_INST, &gELRSBackup);
 	retStatus &= DL_SPI_restoreConfiguration(ICM42688_INST, &gICM42688Backup);
 	retStatus &= DL_SPI_restoreConfiguration(NRF24L01_INST, &gNRF24L01Backup);
 
@@ -133,8 +133,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_TimerG_reset(ZDT_MOTOR_TICK_INST);
     DL_I2C_reset(I2C_0_INST);
     DL_I2C_reset(I2C_1_INST);
-    DL_UART_Main_reset(UART_1_INST);
-    DL_UART_Main_reset(UART_0_INST);
+    DL_UART_Main_reset(JY901s_INST);
+    DL_UART_Main_reset(ELRS_INST);
     DL_UART_Main_reset(K230_INST);
     DL_UART_Main_reset(UART_2_INST);
     DL_SPI_reset(ICM42688_INST);
@@ -153,8 +153,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_TimerG_enablePower(ZDT_MOTOR_TICK_INST);
     DL_I2C_enablePower(I2C_0_INST);
     DL_I2C_enablePower(I2C_1_INST);
-    DL_UART_Main_enablePower(UART_1_INST);
-    DL_UART_Main_enablePower(UART_0_INST);
+    DL_UART_Main_enablePower(JY901s_INST);
+    DL_UART_Main_enablePower(ELRS_INST);
     DL_UART_Main_enablePower(K230_INST);
     DL_UART_Main_enablePower(UART_2_INST);
     DL_SPI_enablePower(ICM42688_INST);
@@ -207,13 +207,13 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_enableHiZ(GPIO_I2C_1_IOMUX_SCL);
 
     DL_GPIO_initPeripheralOutputFunction(
-        GPIO_UART_1_IOMUX_TX, GPIO_UART_1_IOMUX_TX_FUNC);
+        GPIO_JY901s_IOMUX_TX, GPIO_JY901s_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
-        GPIO_UART_1_IOMUX_RX, GPIO_UART_1_IOMUX_RX_FUNC);
+        GPIO_JY901s_IOMUX_RX, GPIO_JY901s_IOMUX_RX_FUNC);
     DL_GPIO_initPeripheralOutputFunction(
-        GPIO_UART_0_IOMUX_TX, GPIO_UART_0_IOMUX_TX_FUNC);
+        GPIO_ELRS_IOMUX_TX, GPIO_ELRS_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
-        GPIO_UART_0_IOMUX_RX, GPIO_UART_0_IOMUX_RX_FUNC);
+        GPIO_ELRS_IOMUX_RX, GPIO_ELRS_IOMUX_RX_FUNC);
     DL_GPIO_initPeripheralOutputFunction(
         GPIO_K230_IOMUX_TX, GPIO_K230_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
@@ -779,12 +779,12 @@ SYSCONFIG_WEAK void SYSCFG_DL_I2C_1_init(void) {
 
 }
 
-static const DL_UART_Main_ClockConfig gUART_1ClockConfig = {
+static const DL_UART_Main_ClockConfig gJY901sClockConfig = {
     .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,
     .divideRatio = DL_UART_MAIN_CLOCK_DIVIDE_RATIO_1
 };
 
-static const DL_UART_Main_Config gUART_1Config = {
+static const DL_UART_Main_Config gJY901sConfig = {
     .mode        = DL_UART_MAIN_MODE_NORMAL,
     .direction   = DL_UART_MAIN_DIRECTION_TX_RX,
     .flowControl = DL_UART_MAIN_FLOW_CONTROL_NONE,
@@ -793,33 +793,33 @@ static const DL_UART_Main_Config gUART_1Config = {
     .stopBits    = DL_UART_MAIN_STOP_BITS_ONE
 };
 
-SYSCONFIG_WEAK void SYSCFG_DL_UART_1_init(void)
+SYSCONFIG_WEAK void SYSCFG_DL_JY901s_init(void)
 {
-    DL_UART_Main_setClockConfig(UART_1_INST, (DL_UART_Main_ClockConfig *) &gUART_1ClockConfig);
+    DL_UART_Main_setClockConfig(JY901s_INST, (DL_UART_Main_ClockConfig *) &gJY901sClockConfig);
 
-    DL_UART_Main_init(UART_1_INST, (DL_UART_Main_Config *) &gUART_1Config);
+    DL_UART_Main_init(JY901s_INST, (DL_UART_Main_Config *) &gJY901sConfig);
     /*
      * Configure baud rate by setting oversampling and baud rate divisors.
      *  Target baud rate: 115200
      *  Actual baud rate: 115190.78
      */
-    DL_UART_Main_setOversampling(UART_1_INST, DL_UART_OVERSAMPLING_RATE_16X);
-    DL_UART_Main_setBaudRateDivisor(UART_1_INST, UART_1_IBRD_40_MHZ_115200_BAUD, UART_1_FBRD_40_MHZ_115200_BAUD);
+    DL_UART_Main_setOversampling(JY901s_INST, DL_UART_OVERSAMPLING_RATE_16X);
+    DL_UART_Main_setBaudRateDivisor(JY901s_INST, JY901s_IBRD_40_MHZ_115200_BAUD, JY901s_FBRD_40_MHZ_115200_BAUD);
 
 
     /* Configure Interrupts */
-    DL_UART_Main_enableInterrupt(UART_1_INST,
+    DL_UART_Main_enableInterrupt(JY901s_INST,
                                  DL_UART_MAIN_INTERRUPT_RX);
 
 
-    DL_UART_Main_enable(UART_1_INST);
+    DL_UART_Main_enable(JY901s_INST);
 }
-static const DL_UART_Main_ClockConfig gUART_0ClockConfig = {
+static const DL_UART_Main_ClockConfig gELRSClockConfig = {
     .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,
     .divideRatio = DL_UART_MAIN_CLOCK_DIVIDE_RATIO_1
 };
 
-static const DL_UART_Main_Config gUART_0Config = {
+static const DL_UART_Main_Config gELRSConfig = {
     .mode        = DL_UART_MAIN_MODE_NORMAL,
     .direction   = DL_UART_MAIN_DIRECTION_TX_RX,
     .flowControl = DL_UART_MAIN_FLOW_CONTROL_NONE,
@@ -828,26 +828,26 @@ static const DL_UART_Main_Config gUART_0Config = {
     .stopBits    = DL_UART_MAIN_STOP_BITS_ONE
 };
 
-SYSCONFIG_WEAK void SYSCFG_DL_UART_0_init(void)
+SYSCONFIG_WEAK void SYSCFG_DL_ELRS_init(void)
 {
-    DL_UART_Main_setClockConfig(UART_0_INST, (DL_UART_Main_ClockConfig *) &gUART_0ClockConfig);
+    DL_UART_Main_setClockConfig(ELRS_INST, (DL_UART_Main_ClockConfig *) &gELRSClockConfig);
 
-    DL_UART_Main_init(UART_0_INST, (DL_UART_Main_Config *) &gUART_0Config);
+    DL_UART_Main_init(ELRS_INST, (DL_UART_Main_Config *) &gELRSConfig);
     /*
      * Configure baud rate by setting oversampling and baud rate divisors.
      *  Target baud rate: 420000
      *  Actual baud rate: 419947.51
      */
-    DL_UART_Main_setOversampling(UART_0_INST, DL_UART_OVERSAMPLING_RATE_16X);
-    DL_UART_Main_setBaudRateDivisor(UART_0_INST, UART_0_IBRD_80_MHZ_420000_BAUD, UART_0_FBRD_80_MHZ_420000_BAUD);
+    DL_UART_Main_setOversampling(ELRS_INST, DL_UART_OVERSAMPLING_RATE_16X);
+    DL_UART_Main_setBaudRateDivisor(ELRS_INST, ELRS_IBRD_80_MHZ_420000_BAUD, ELRS_FBRD_80_MHZ_420000_BAUD);
 
 
     /* Configure Interrupts */
-    DL_UART_Main_enableInterrupt(UART_0_INST,
+    DL_UART_Main_enableInterrupt(ELRS_INST,
                                  DL_UART_MAIN_INTERRUPT_RX);
 
 
-    DL_UART_Main_enable(UART_0_INST);
+    DL_UART_Main_enable(ELRS_INST);
 }
 static const DL_UART_Main_ClockConfig gK230ClockConfig = {
     .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,
