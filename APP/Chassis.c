@@ -209,8 +209,9 @@ void Chassis_Init(void)
 
 	// 上电参数已经由 FlashParam_Init() 读取，这里复制一份给底盘动作使用。
 	chassis_param = *FlashParam_GetActive();
-	LOGINFO("[param] chassis apply source=%d, seq=%u",
+	LOGINFO("[param] chassis apply source=%d, rev=%u, seq=%u",
 	        FlashParam_GetSource(),
+	        FlashParam_GetDefaultRevision(),
 	        FlashParam_GetSequence());
 	LOGINFO("[param] line=%.3f %.3f %.3f %.3f, turn=%.1f %.1f %.1f %.1f",
 	        chassis_param.line_distance_m[0],

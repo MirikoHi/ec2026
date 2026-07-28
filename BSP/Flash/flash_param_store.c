@@ -18,6 +18,7 @@ typedef struct
     uint16_t version;
     uint16_t payload_size;
     uint32_t sequence;
+    uint32_t default_revision;
     uint32_t crc32;
 } FlashParam_RecordHeader_s;
 
@@ -150,6 +151,7 @@ static void FlashParam_SetDefaultState(void)
     FlashParam_BuildDefault(&flash_param_state.params);
     flash_param_state.source = FLASH_PARAM_SOURCE_DEFAULT;
     flash_param_state.sequence = 0U;
+    flash_param_state.default_revision = FLASH_PARAM_DEFAULT_REVISION;
 }
 
 /**
@@ -341,6 +343,7 @@ FlashParam_Status_e FlashParam_WriteSlot(uint8_t slot,
     record.header.version = FLASH_PARAM_VERSION;
     record.header.payload_size = sizeof(FlashParam_Data_s);
     record.header.sequence = sequence;
+    record.header.default_revision = FLASH_PARAM_DEFAULT_REVISION;
     record.data = *params;
     record.header.crc32 = FlashParam_Crc32(&record.data, sizeof(record.data));
 
@@ -372,7 +375,10 @@ FlashParam_Status_e FlashParam_WriteSlot(uint8_t slot,
         return FLASH_PARAM_ERR_INVALID;
     }
 
-    LOGINFO("[param] save slot%u seq=%u OK", slot, sequence);
+    LOGINFO("[param] save slot%u rev=%u seq=%u OK",
+            slot,
+            FLASH_PARAM_DEFAULT_REVISION,
+            sequence);
     return FLASH_PARAM_OK;
 }
 
@@ -414,8 +420,9 @@ FlashParam_Status_e FlashParam_Load(FlashParam_Data_s *params,
         if (slot_status[slot] == FLASH_PARAM_OK)
         {
             flash_param_state.slot_valid[slot] = 1U;
-            LOGINFO("[param] slot%u valid, seq=%u",
+            LOGINFO("[param] slot%u valid, rev=%u, seq=%u",
                     slot,
+                    slot_record[slot].header.default_revision,
                     slot_record[slot].header.sequence);
         }
         else
@@ -424,19 +431,24 @@ FlashParam_Status_e FlashParam_Load(FlashParam_Data_s *params,
         }
     }
 
-    if (flash_param_state.slot_valid[0] && flash_param_state.slot_valid[1])
+    selected_slot = FLASH_PARAM_SLOT_COUNT;
+    for (uint8_t slot = 0U; slot < FLASH_PARAM_SLOT_COUNT; slot++)
     {
-        selected_slot = (slot_record[1].header.sequence > slot_record[0].header.sequence) ? 1U : 0U;
+        if (flash_param_state.slot_valid[slot] == 0U)
+        {
+            continue;
+        }
+
+        if ((selected_slot >= FLASH_PARAM_SLOT_COUNT) ||
+            (slot_record[slot].header.default_revision > slot_record[selected_slot].header.default_revision) ||
+            ((slot_record[slot].header.default_revision == slot_record[selected_slot].header.default_revision) &&
+             (slot_record[slot].header.sequence > slot_record[selected_slot].header.sequence)))
+        {
+            selected_slot = slot;
+        }
     }
-    else if (flash_param_state.slot_valid[1])
-    {
-        selected_slot = 1U;
-    }
-    else if (flash_param_state.slot_valid[0])
-    {
-        selected_slot = 0U;
-    }
-    else
+
+    if (selected_slot >= FLASH_PARAM_SLOT_COUNT)
     {
         LOGWARNING("[param] no valid slot, use defaults");
         status = FlashParam_WriteSlot(0U, &flash_param_state.params, 1U);
@@ -444,6 +456,7 @@ FlashParam_Status_e FlashParam_Load(FlashParam_Data_s *params,
         {
             flash_param_state.source = FLASH_PARAM_SOURCE_SLOT0;
             flash_param_state.sequence = 1U;
+            flash_param_state.default_revision = FLASH_PARAM_DEFAULT_REVISION;
             flash_param_state.slot_valid[0] = 1U;
             LOGINFO("[param] repair empty slots with defaults OK");
         }
@@ -466,12 +479,50 @@ FlashParam_Status_e FlashParam_Load(FlashParam_Data_s *params,
         return FLASH_PARAM_OK;
     }
 
+    if (slot_record[selected_slot].header.default_revision < FLASH_PARAM_DEFAULT_REVISION)
+    {
+        LOGWARNING("[param] code defaults newer, flash rev=%u, code rev=%u",
+                   slot_record[selected_slot].header.default_revision,
+                   FLASH_PARAM_DEFAULT_REVISION);
+        status = FlashParam_WriteSlot(0U, &flash_param_state.params, slot_record[selected_slot].header.sequence + 1U);
+        if (status == FLASH_PARAM_OK)
+        {
+            flash_param_state.source = FLASH_PARAM_SOURCE_SLOT0;
+            flash_param_state.sequence = slot_record[selected_slot].header.sequence + 1U;
+            flash_param_state.default_revision = FLASH_PARAM_DEFAULT_REVISION;
+            flash_param_state.slot_valid[0] = 1U;
+            LOGINFO("[param] update flash with code defaults OK, rev=%u, seq=%u",
+                    flash_param_state.default_revision,
+                    flash_param_state.sequence);
+        }
+        else
+        {
+            LOGERROR("[param] update flash with code defaults fail, err=%d", status);
+        }
+
+        if (params != NULL)
+        {
+            *params = flash_param_state.params;
+        }
+        if (source != NULL)
+        {
+            *source = flash_param_state.source;
+        }
+        if (sequence != NULL)
+        {
+            *sequence = flash_param_state.sequence;
+        }
+        return FLASH_PARAM_OK;
+    }
+
     flash_param_state.params = slot_record[selected_slot].data;
     flash_param_state.source = FlashParam_SlotToSource(selected_slot);
     flash_param_state.sequence = slot_record[selected_slot].header.sequence;
+    flash_param_state.default_revision = slot_record[selected_slot].header.default_revision;
 
-    LOGINFO("[param] load slot%u, seq=%u",
+    LOGINFO("[param] load slot%u, rev=%u, seq=%u",
             selected_slot,
+            flash_param_state.default_revision,
             flash_param_state.sequence);
 
     if (flash_param_state.slot_valid[0] != flash_param_state.slot_valid[1])
@@ -492,9 +543,11 @@ FlashParam_Status_e FlashParam_Load(FlashParam_Data_s *params,
         {
             flash_param_state.source = FlashParam_SlotToSource(repair_slot);
             flash_param_state.sequence = repair_sequence;
+            flash_param_state.default_revision = FLASH_PARAM_DEFAULT_REVISION;
             flash_param_state.slot_valid[repair_slot] = 1U;
-            LOGINFO("[param] repair slot%u OK, seq=%u",
+            LOGINFO("[param] repair slot%u OK, rev=%u, seq=%u",
                     repair_slot,
+                    flash_param_state.default_revision,
                     repair_sequence);
         }
         else
@@ -554,6 +607,7 @@ FlashParam_Status_e FlashParam_Save(const FlashParam_Data_s *params)
     flash_param_state.params = *params;
     flash_param_state.source = FlashParam_SlotToSource(target_slot);
     flash_param_state.sequence = next_sequence;
+    flash_param_state.default_revision = FLASH_PARAM_DEFAULT_REVISION;
     flash_param_state.slot_valid[target_slot] = 1U;
 
     return FLASH_PARAM_OK;
@@ -616,8 +670,8 @@ FlashParam_Status_e FlashParam_RunSelfTest(void)
 
     status = FlashParam_TestExpect(1U,
                                    &default_params,
-                                   FLASH_PARAM_SOURCE_DEFAULT,
-                                   0U);
+                                   FLASH_PARAM_SOURCE_SLOT0,
+                                   1U);
     if (status != FLASH_PARAM_OK)
     {
         result = status;
@@ -633,8 +687,8 @@ FlashParam_Status_e FlashParam_RunSelfTest(void)
 
     status = FlashParam_TestExpect(2U,
                                    &test_slot0,
-                                   FLASH_PARAM_SOURCE_SLOT0,
-                                   FLASH_PARAM_TEST_SEQ0);
+                                   FLASH_PARAM_SOURCE_SLOT1,
+                                   FLASH_PARAM_TEST_SEQ1);
     if (status != FLASH_PARAM_OK)
     {
         result = status;
@@ -670,8 +724,8 @@ FlashParam_Status_e FlashParam_RunSelfTest(void)
 
     status = FlashParam_TestExpect(4U,
                                    &test_slot0,
-                                   FLASH_PARAM_SOURCE_SLOT0,
-                                   FLASH_PARAM_TEST_SEQ0);
+                                   FLASH_PARAM_SOURCE_SLOT1,
+                                   FLASH_PARAM_TEST_SEQ1);
     if (status != FLASH_PARAM_OK)
     {
         result = status;
@@ -724,4 +778,9 @@ FlashParam_Source_e FlashParam_GetSource(void)
 uint32_t FlashParam_GetSequence(void)
 {
     return flash_param_state.sequence;
+}
+
+uint32_t FlashParam_GetDefaultRevision(void)
+{
+    return flash_param_state.default_revision;
 }

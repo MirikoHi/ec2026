@@ -20,6 +20,9 @@
 #define FLASH_PARAM_SLOT0_ADDR          (W25Q128JV_TOTAL_SIZE - (2U * W25Q128JV_SECTOR_SIZE))
 #define FLASH_PARAM_SLOT1_ADDR          (W25Q128JV_TOTAL_SIZE - W25Q128JV_SECTOR_SIZE)
 
+/* 编辑器中修改默认参数后，把该版本号加 1；上电发现 Flash 版本更低时会使用代码默认值覆盖 Flash。 */
+#define FLASH_PARAM_DEFAULT_REVISION    1U
+
 /* 当前比赛动作预留 4 段直线和 4 次转弯，后续扩展需要同步提升版本号。 */
 #define FLASH_PARAM_LINE_SEGMENT_COUNT  4U
 #define FLASH_PARAM_TURN_SEGMENT_COUNT  4U
@@ -71,6 +74,7 @@ typedef struct
     FlashParam_Data_s params;
     FlashParam_Source_e source;
     uint32_t sequence;
+    uint32_t default_revision;
     uint8_t slot_valid[FLASH_PARAM_SLOT_COUNT];
 } FlashParam_State_s;
 
@@ -182,5 +186,6 @@ FlashParam_Source_e FlashParam_GetSource(void);
   * @note 用法：调试或日志输出时判断当前参数新旧
   */
 uint32_t FlashParam_GetSequence(void);
+uint32_t FlashParam_GetDefaultRevision(void);
 
 #endif
