@@ -20,6 +20,7 @@ unsigned short Normal[8];
 unsigned char rx_buff[256]={0};
 //巡线状态机
 trace_state_e trace_state;
+trace_mode_e trace_mode;
 //原始数据
 unsigned char Digtal;
 // //滤除多余数据后的8位数据
@@ -31,6 +32,12 @@ No_MCU_Sensor sensor;
 
 //处理原始八路数据后获得的-7.0-7.0的映射值
 volatile float track_err;
+
+/* ---- CalcLineError 状态变量（文件作用域，供 Trace_ResetLineError 访问） ---- */
+static float   calcline_last_output = 0.0f;
+static int     calcline_single_pos  = -1;
+static uint8_t calcline_single_cnt  = 0;
+static uint8_t calcline_ff_gap_cnt  = 0;
 
 void Trace_Init(void)
 {
@@ -365,11 +372,6 @@ float raw_transform_easy(uint8_t current_trace)
  */
 static float CalcLineError(uint8_t raw)
 {
-    static float   last_output = 0.0f;    // 上一帧输出（LPF 状态 + keep）
-    static int     single_pos  = -1;      // 跟踪的孤立 0 位置，-1=无
-    static uint8_t single_cnt  = 0;       // 同一孤立 0 连续帧数
-    static uint8_t ff_gap_cnt  = 0;       // 当前孤立 0 出现前，连续 0xFF 帧数
-
     /* ---- 找最大连续 0 块 ---- */
     int best_start = -1, best_len = 0;
     int cur_start  = -1, cur_len  = 0;
@@ -397,41 +399,58 @@ static float CalcLineError(uint8_t raw)
     if (len >= 2) {
         /* 2+ 相邻传感器 → 有效线 */
         raw_err = 7.0f - 2.0f * c;
-        single_pos  = -1;
-        single_cnt  = 0;
-        ff_gap_cnt  = 0;
+        calcline_single_pos  = -1;
+        calcline_single_cnt  = 0;
+        calcline_ff_gap_cnt  = 0;
     } else if (len == 1) {
         /* 单传感器 → 上下文感知 debounce */
-        if (single_pos == best_start) {
-            single_cnt++;
+        if (calcline_single_pos == best_start) {
+            calcline_single_cnt++;
         } else {
-            single_pos = best_start;
-            single_cnt = 1;
+            calcline_single_pos = best_start;
+            calcline_single_cnt = 1;
         }
 
-        uint8_t threshold = (ff_gap_cnt <= 1) ? 2 : 8;
+        uint8_t threshold = (calcline_ff_gap_cnt <= 1) ? 2 : 8;
 
-        if (single_cnt >= threshold) {
+        if (calcline_single_cnt >= threshold) {
             /* 确认有效 */
             raw_err = 7.0f - 2.0f * c;
         } else {
             /* debounce 中：保持上一帧 */
-            raw_err = last_output;
+            raw_err = calcline_last_output;
         }
     } else {
         /* raw == 0xFF：全白 → 保持上一帧位置 */
-        raw_err = last_output;
-        ff_gap_cnt++;
-        single_pos = -1;
-        single_cnt = 0;
+        raw_err = calcline_last_output;
+        calcline_ff_gap_cnt++;
+        calcline_single_pos = -1;
+        calcline_single_cnt = 0;
     }
 
     /* ---- LPF 平滑 ---- */
-    float output = last_output + 0.8 * (raw_err - last_output);  //这里滤波系数可以调，越靠近0越平滑
-    last_output = output;
+    float output = calcline_last_output + 0.8 * (raw_err - calcline_last_output);  //这里滤波系数可以调，越靠近0越平滑
+    calcline_last_output = output;
 
     //这里反转一下方向，为了和PID输出对应
     return -output;
+}
+
+/**
+ * @brief 清除 CalcLineError 的静态残留值
+ *
+ * 将 last_output 归零，同时重置单比特去抖动状态和丢线间隔计数。
+ * 调用后，若持续收到 0xFF，CalcLineError 将输出 ~0.0f，
+ * Trace_State_Judge 会在约 200ms 后自然收敛到 TRACE_END。
+ *
+ * 典型调用时机：巡线任务结束 / 模式切换 / 遥控接管时。
+ */
+void Trace_ResetLineError(void)
+{
+    calcline_last_output = 0.0f;
+    calcline_single_pos  = -1;
+    calcline_single_cnt  = 0;
+    calcline_ff_gap_cnt  = 0;
 }
 
 /**
@@ -476,8 +495,18 @@ float Trace_task(void)
     // 获取数字量传感器数据（只有当黑白值填进去之后才会有数字量输出）
     Digtal = Get_Digtal_For_User(&sensor);
 #endif
-    //第一版数据处理
-    track_err = CalcLineError(Digtal);
+    switch (trace_mode) {
+        case TRACE_NORMAL:
+            track_err =  raw_transform_easy(Digtal);  //仅把八位数据映射成-7到7的数字，无残留
+            break;
+        case TRACE_LOST_DETECT:   //有丢线检测逻辑，但会残留上一丢线次的值作为一个丢线找回的功能
+            track_err = CalcLineError(Digtal);
+            break;
+        default:
+            LOGERROR("trace_mode error");
+            break;
+    }
+
     // //第二版数据处理
     // raw_track_err = filter_raw(Digtal);   //先对原始数据处理优化，保留残留值这个逻辑
     // process_digital = raw_transform_easy(raw_track_err);//把八位数据映射成-7到7的数字
@@ -492,6 +521,6 @@ float Trace_task(void)
     if (trace_state == TRACE_END) {
         temp =  0.0f;
     }
-    PID_calc(&Trace_PID, 0, temp ); //todo:这里从原来的权重换成了-7到7的数据，边缘速度减小了，得细调
+    PID_calc(&Trace_PID, 0, temp );
     return Trace_PID.out;
 }
