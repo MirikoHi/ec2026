@@ -1,34 +1,98 @@
+/**
+ ******************************************************************************
+ * @file    IMU.h
+ * @author  Geng LX
+ * @brief   IMU attitude estimation using Mahony complementary filter
+ *
+ * @note    Uses the Mahony AHRS algorithm (ported from Legacy/Mahony.c)
+ *          to fuse ICM42688 gyroscope + accelerometer data.
+ *          Outputs Euler angles (yaw/pitch/roll) in degrees.
+ ******************************************************************************
+ */
+
 #ifndef __IMU_H
 #define __IMU_H
 
 #include "board.h"
 #include <math.h>
 
+#define M_PI  (float)3.1415926535f
+
 /* ═══════════════════════════════════════════════════════════════════════
-   ★ IMU 传感器选择宏开关
-   1: 使用 BMI088 传感器
-   0: 使用 ICM42688 传感器
-   修改下面的define实现更改
-   ═══════════════════════════════════════════════════════════════════════ */
-#define USE_BMI088   1
+ * Type Definitions
+ * ═══════════════════════════════════════════════════════════════════════ */
 
-#define M_PI  (float)3.14159265358979323846
-
-typedef struct
-{
+typedef struct {
     float x;
     float y;
     float z;
 } xyz_f_t;
 
-extern xyz_f_t north, west;
-extern volatile float yaw[5];
-extern float TTangles_gyro[7];
+/* ═══════════════════════════════════════════════════════════════════════
+ * Global Variables (extern)
+ * ═══════════════════════════════════════════════════════════════════════ */
 
-// API 函数声明
-void IMU_init(void);                    // IMU 初始化
-void IMU_getYawPitchRoll(float * ypr);  // 获取姿态角 [0]:Yaw, [1]:Pitch, [2]:Roll
-void IMU_TT_getgyro(float * zsjganda);  // 获取原始传感器数据
+/** North / West direction vectors in body frame (from rotation matrix) */
+extern xyz_f_t north, west;
+
+/** Raw yaw history buffer */
+extern volatile float yaw[5];
+
+/** Raw sensor data: [ax, ay, az, gx, gy, gz, reserved] */
+extern float motion6[7];
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * Mahony AHRS API (from Legacy/Mahony.c)
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * @brief  Initialize Mahony filter (Kp=1.5, Ki=0.05, quaternion=[1,0,0,0])
+ */
+void MahonyAHRSinit(void);
+
+/**
+ * @brief  Mahony complementary filter update
+ * @param  gx, gy, gz  Gyroscope data [rad/s]
+ * @param  ax, ay, az  Accelerometer data [m/s²]
+ * @param  dt_acc      Time delta for accel correction [s]
+ * @param  dt_gyro     Time delta for gyro integration [s]
+ */
+void MahonyAHRSupdate(float gx, float gy, float gz,
+                      float ax, float ay, float az,
+                      float dt_acc, float dt_gyro);
+
+/**
+ * @brief  Get current quaternion [w, x, y, z]
+ */
+void MahonyGetQuaternion(float *q0, float *q1, float *q2, float *q3);
+
+/**
+ * @brief  Get Euler angles in degrees (ZYX convention)
+ * @param  roll   [out] Roll angle [deg]
+ * @param  pitch  [out] Pitch angle [deg]
+ * @param  yaw    [out] Yaw angle [deg]
+ */
+void MahonyGetEuler(float *roll, float *pitch, float *yaw);
+
+/**
+ * @brief  Get 3x3 rotation matrix (row-major)
+ */
+void MahonyGetRotationMatrix(float R[3][3]);
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * Application-level IMU API (backward compatible)
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/** Initialize IMU hardware + Mahony filter */
+void IMU_init(void);
+
+/** Get current yaw/pitch/roll in degrees: angles[0]=yaw, [1]=pitch, [2]=roll */
+void IMU_getYawPitchRoll(float *ypr);
+
+/** Get raw sensor data from last read */
+void IMU_TT_getgyro(float *zsjganda);
+
+/** Stub (kept for compatibility) */
 void MPU6050_InitAng_Offset(void);
 
 #endif /* __IMU_H */

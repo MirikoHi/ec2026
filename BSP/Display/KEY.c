@@ -73,19 +73,19 @@ uint8_t Key_Check(uint8_t n,uint8_t Flag)
  */
 void Key_Tick(void)
 {
-		static uint8_t Count,i;
-		static uint8_t CurrState[KEY_COUNT],PrevState[KEY_COUNT];
-		static uint8_t S[KEY_COUNT];
-		static uint16_t Time[KEY_COUNT];
+	static uint8_t Count,i;
+	static uint8_t CurrState[KEY_COUNT],PrevState[KEY_COUNT];
+	static uint8_t S[KEY_COUNT];
+	static uint16_t Time[KEY_COUNT];
 	
-		for(i=0;i<KEY_COUNT;i++)
+	for(i=0;i<KEY_COUNT;i++)
 		{
-				if(Time[i] > 0)
+			if(Time[i] > 0)
 				{
-						Time[i] --;
+					Time[i] --;
 				}
 		}
-		Count ++;
+	Count ++;
 	if(Count >= 20)
 	{
 		Count = 0;
