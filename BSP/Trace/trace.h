@@ -19,8 +19,8 @@ typedef enum {
 }trace_state_e;
 
 typedef enum {
-	TRACE_LOST_DETECT = 0,
-	TRACE_NORMAL,
+	TRACE_NORMAL = 0,
+	TRACE_LOST_DETECT ,
 }trace_mode_e;
 
 

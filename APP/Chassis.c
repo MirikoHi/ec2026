@@ -32,7 +32,7 @@ static uint8_t remote_mode_active = 0;
 #define CHASSIS_ACTION_RUNNING       0U
 #define CHASSIS_LINE_DONE_ERR_M      0.005f
 #define CHASSIS_LINE_DONE_TICKS      10U
-#define CHASSIS_TURN_DONE_ERR_DEG    1.5f
+#define CHASSIS_TURN_DONE_ERR_DEG    2.0f
 #define CHASSIS_TURN_DONE_TICKS      10U
 
 static pid_type_def chassis_line_yaw_pid;
@@ -233,6 +233,7 @@ void Chassis(void)
 				break;
 		case REMOTE_MODE:
 			Chassis_RemoteControl();
+			//Chassis_ImuModeAction();
 			break;
 		default:
 			break;
@@ -257,10 +258,24 @@ static void Chassis_ImuModeAction(void)
 	switch (chassis_imu_action_step)
 	{
 		case 0:
-			// 第一条边：使用 ICM42688 yaw 做方向保持，直行 0.2m。
-			if (Chassis_MoveStraight(0.2f, 0.035f) == CHASSIS_ACTION_DONE)
+			// 第一条边：使用 ICM42688 yaw 做方向保持，直行 1.0m。
+			if (Chassis_MoveStraight(0.97f, 0.035f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 1U;
+			}
+			else {
+				if (Chassis_GetForwardOdom()>0.7f)//大于0.7米时不再循迹
+				{
+					Trace_ResetLineError();
+					DCMotor_SetTraceCompensation(motor_l,0);
+					DCMotor_SetTraceCompensation(motor_r,0);
+				}
+				else {
+					Chassis_Trace_Cal();//小于0.7继续循迹
+					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
+						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
+					}
+				}
 			}
 			break;
 		case 1:
@@ -271,10 +286,23 @@ static void Chassis_ImuModeAction(void)
 			}
 			break;
 		case 2:
-			// 第二条边：直行 0.2m。
-			if (Chassis_MoveStraight(0.2f, 0.035f) == CHASSIS_ACTION_DONE)
+			// 第二条边：直行 1.0m。
+			if (Chassis_MoveStraight(0.97f, 0.035f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 3U;
+			}
+			else {
+				if (Chassis_GetForwardOdom()>0.7f) {
+					Trace_ResetLineError();
+					DCMotor_SetTraceCompensation(motor_l,0);
+					DCMotor_SetTraceCompensation(motor_r,0);
+				}
+				else {
+					Chassis_Trace_Cal();//小于0.7继续循迹
+					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
+						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
+					}
+				}
 			}
 			break;
 		case 3:
@@ -285,10 +313,23 @@ static void Chassis_ImuModeAction(void)
 			}
 			break;
 		case 4:
-			// 第三条边：直行 0.2m。
-			if (Chassis_MoveStraight(0.2f, 0.035f) == CHASSIS_ACTION_DONE)
+			// 第三条边：直行 1.0m。
+			if (Chassis_MoveStraight(0.97f, 0.035f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 5U;
+			}
+			else {
+				if (Chassis_GetForwardOdom()>0.7f) {
+					Trace_ResetLineError();
+					DCMotor_SetTraceCompensation(motor_l,0);
+					DCMotor_SetTraceCompensation(motor_r,0);
+				}
+				else {
+					Chassis_Trace_Cal();//小于0.7继续循迹
+					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
+						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
+					}
+				}
 			}
 			break;
 		case 5:
@@ -299,10 +340,23 @@ static void Chassis_ImuModeAction(void)
 			}
 			break;
 		case 6:
-			// 第四条边：直行 0.2m。
-			if (Chassis_MoveStraight(0.2f, 0.035f) == CHASSIS_ACTION_DONE)
+			// 第四条边：直行 1.0m。
+			if (Chassis_MoveStraight(0.97f, 0.035f) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 7U;
+			}
+			else {
+				if (Chassis_GetForwardOdom()>0.7f) {
+					Trace_ResetLineError();
+					DCMotor_SetTraceCompensation(motor_l,0);
+					DCMotor_SetTraceCompensation(motor_r,0);
+				}
+				else {
+					Chassis_Trace_Cal();//小于0.7继续循迹
+					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
+						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
+					}
+				}
 			}
 			break;
 		case 7:
@@ -468,8 +522,8 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 	yaw_error = Chassis_AngleNormalize(chassis_action_target_yaw - Chassis_GetYawDeg());
 	yaw_compensation = PID_calc(&chassis_line_yaw_pid, 0.0f, yaw_error);
 
-	DC_Motor_SetRef(motor_l, base_speed - yaw_compensation);
-	DC_Motor_SetRef(motor_r, base_speed + yaw_compensation);
+	DC_Motor_SetRef(motor_l, base_speed + yaw_compensation);
+	DC_Motor_SetRef(motor_r, base_speed - yaw_compensation);
 
 	return CHASSIS_ACTION_RUNNING;
 }
@@ -533,8 +587,8 @@ uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed)
 	chassis_turn_pid.max_out = abs_turn_speed;
 	turn_speed = PID_calc(&chassis_turn_pid, 0.0f, yaw_error);
 
-	DC_Motor_SetRef(motor_l, -turn_speed);
-	DC_Motor_SetRef(motor_r, turn_speed);
+	DC_Motor_SetRef(motor_l, turn_speed);
+	DC_Motor_SetRef(motor_r, -turn_speed);
 
 	return CHASSIS_ACTION_RUNNING;
 }
