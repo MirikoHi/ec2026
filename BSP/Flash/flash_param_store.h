@@ -109,6 +109,15 @@ FlashParam_Status_e FlashParam_Load(FlashParam_Data_s *params,
 FlashParam_Status_e FlashParam_Save(const FlashParam_Data_s *params);
 
 /**
+  * @brief 保存参数并立即应用到运行模块
+  * @param params 待保存和应用的参数结构体指针
+  * @return FLASH_PARAM_OK 表示保存成功且已触发应用，其他值表示保存失败
+  * @note 用法：屏幕端修改参数后调用本函数；函数会先写 Flash，成功后刷新底盘和循迹参数
+  * @note 注意：应在 Chassis_Init() 和 Trace_Init() 之后调用，避免模块尚未初始化
+  */
+FlashParam_Status_e FlashParam_SaveAndApply(const FlashParam_Data_s *params);
+
+/**
   * @brief 读取指定槽中的参数
   * @param slot 槽号，范围 0~1
   * @param params 输出该槽参数，可填 NULL

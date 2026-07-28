@@ -613,6 +613,26 @@ FlashParam_Status_e FlashParam_Save(const FlashParam_Data_s *params)
     return FLASH_PARAM_OK;
 }
 
+/**
+  * @brief 保存参数并立即应用到运行模块
+  * @param params 待保存和应用的参数结构体指针
+  * @return FLASH_PARAM_OK 表示保存成功且已触发应用，其他值表示保存失败
+  * @note 用法：屏幕端修改参数后调用本函数；函数会先写 Flash，成功后刷新底盘和循迹参数
+  */
+FlashParam_Status_e FlashParam_SaveAndApply(const FlashParam_Data_s *params)
+{
+    FlashParam_Status_e status = FlashParam_Save(params);
+
+    if (status != FLASH_PARAM_OK)
+    {
+        return status;
+    }
+
+    Chassis_ApplyParams(FlashParam_GetActive());
+    Trace_ApplyParams(FlashParam_GetActive());
+    return FLASH_PARAM_OK;
+}
+
 FlashParam_Status_e FlashParam_Format(void)
 {
     W25Q128JV_Status_e status0;

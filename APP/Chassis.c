@@ -115,6 +115,38 @@ void Chassis_FillDefaultParams(FlashParam_Data_s *params)
 }
 
 /**
+  * @brief 应用底盘运行参数
+  * @param params 待应用参数结构体指针
+  * @note 用法：上电初始化或屏幕端 FlashParam_Save() 成功后调用，使底盘 PID 和动作参数立即生效
+  */
+void Chassis_ApplyParams(const FlashParam_Data_s *params)
+{
+	if (params == NULL)
+	{
+		return;
+	}
+
+	chassis_param = *params;
+	PID_init(&chassis_line_yaw_pid, &chassis_param.line_yaw_pid);
+	PID_init(&chassis_turn_pid, &chassis_param.turn_pid);
+	Chassis_ResetAction();
+
+	LOGINFO("[param] chassis apply source=%d, rev=%u, seq=%u",
+	        FlashParam_GetSource(),
+	        FlashParam_GetDefaultRevision(),
+	        FlashParam_GetSequence());
+	LOGINFO("[param] line=%.3f %.3f %.3f %.3f, turn=%.1f %.1f %.1f %.1f",
+	        chassis_param.line_distance_m[0],
+	        chassis_param.line_distance_m[1],
+	        chassis_param.line_distance_m[2],
+	        chassis_param.line_distance_m[3],
+	        chassis_param.turn_angle_deg[0],
+	        chassis_param.turn_angle_deg[1],
+	        chassis_param.turn_angle_deg[2],
+	        chassis_param.turn_angle_deg[3]);
+}
+
+/**
  * @brief 初始化底盘左右电机和 IMU
  */
 void Chassis_Init(void)
@@ -208,22 +240,7 @@ void Chassis_Init(void)
 	// JY901s_IMU_Data = JY901s_IMU_Init();
 
 	// 上电参数已经由 FlashParam_Init() 读取，这里复制一份给底盘动作使用。
-	chassis_param = *FlashParam_GetActive();
-	LOGINFO("[param] chassis apply source=%d, rev=%u, seq=%u",
-	        FlashParam_GetSource(),
-	        FlashParam_GetDefaultRevision(),
-	        FlashParam_GetSequence());
-	LOGINFO("[param] line=%.3f %.3f %.3f %.3f, turn=%.1f %.1f %.1f %.1f",
-	        chassis_param.line_distance_m[0],
-	        chassis_param.line_distance_m[1],
-	        chassis_param.line_distance_m[2],
-	        chassis_param.line_distance_m[3],
-	        chassis_param.turn_angle_deg[0],
-	        chassis_param.turn_angle_deg[1],
-	        chassis_param.turn_angle_deg[2],
-	        chassis_param.turn_angle_deg[3]);
-	PID_init(&chassis_line_yaw_pid, &chassis_param.line_yaw_pid);
-	PID_init(&chassis_turn_pid, &chassis_param.turn_pid);
+	Chassis_ApplyParams(FlashParam_GetActive());
 	DWT_Delay(1);
 }
 

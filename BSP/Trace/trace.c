@@ -64,6 +64,23 @@ void Trace_FillDefaultParams(FlashParam_Data_s *params)
     };
 }
 
+/**
+  * @brief 应用循迹运行参数
+  * @param params 待应用参数结构体指针
+  * @note 用法：上电初始化或屏幕端 FlashParam_Save() 成功后调用，使循迹 PID 立即生效
+  */
+void Trace_ApplyParams(const FlashParam_Data_s *params)
+{
+    if (params == NULL)
+    {
+        return;
+    }
+
+    pid_init_config_s trace_config = params->trace_pid;
+    PID_init(&Trace_PID, &trace_config);
+    Trace_ResetLineError();
+}
+
 void Trace_Init(void)
 {
 #ifdef USE_GRAY_SERIAL
@@ -83,8 +100,7 @@ void Trace_Init(void)
     DWT_Delay(0.1);
 #endif
 	// 使用上电从 Flash 读取到的循迹 PID 参数。
-	pid_init_config_s trace_config = FlashParam_GetActive()->trace_pid;
-	PID_init(&Trace_PID,&trace_config);
+	Trace_ApplyParams(FlashParam_GetActive());
 }
 
 //旧版逻辑，暂时不用

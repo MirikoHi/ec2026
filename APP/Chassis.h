@@ -7,6 +7,7 @@
 void Chassis(void);
 void Chassis_Init(void);
 void Chassis_FillDefaultParams(FlashParam_Data_s *params);
+void Chassis_ApplyParams(const FlashParam_Data_s *params);
 
 void Motor_Cmd_CallBack(uint8_t i);
 
