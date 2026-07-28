@@ -32,8 +32,11 @@ pid_type_def gimbal_yaw_forwardfeed_PID = {0};
 float last_trace_imu_switch_s=0;
 float now_time=0;
 State robotcmd_control_state = DISABLE;
-/*  Lichee通信状态   */
+
+/*  Lichee通信  */
 LicheervnanoStatus_t Licheervnano_status = OFFLINE;;   //判断无线通讯状态
+static uint8_t LicheeRec_cmdid;
+static float LicheeRec_data;
 
 // void tjc_control(void);
 void draw_sin(void);
@@ -95,8 +98,9 @@ void RobotCmd_Init(void)
 void Robot_Cmd(void)
 {
 	xQueueReceive(trace_fetch_data_queue, &trace_fetch_data, 1);
-
-	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_GetCmdId(),LicheeRec_GetCmdId());
+	LicheeRec_cmdid = LicheeRec_GetCmdId();
+	LicheeRec_data = LicheeRec_GetData();
+	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_cmdid,LicheeRec_data);
 	switch (Licheervnano_status) {
 		case OFFLINE:
 			chassis_cmd_send.remote_lost = 1;
@@ -104,6 +108,16 @@ void Robot_Cmd(void)
 		case ONLINE:
 			chassis_cmd_send.remote_lost = 0;
 			robotcmd_control_state = ENABLE;
+			chassis_cmd_send.remote_forward = LicheeRec_GetData();
+	}
+	switch (LicheeRec_cmdid) {
+		case 6:  //遥控控制模式
+			chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
+			break;
+		case 7:  //IMU控制模式
+			chassis_cmd_send.Chassis_Mode = IMU_MODE;
+		default:
+			break;
 	}
 
 	if(gimbal_cmd_send.task_flag ==2)

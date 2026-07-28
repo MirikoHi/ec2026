@@ -16,7 +16,7 @@
 
 
 // licheervnano当前状态
-LicheervnanoStatus_t host_status = HOST_OFFLINE;
+LicheervnanoStatus_t host_status = OFFLINE;
 
 /* ── 静态变量 ──────────────────────────────────────────────── */
 static uint8_t       rx_buf[LICHEE_REC_DATA_SIZE];   /* CRC计算缓冲区     */
@@ -197,7 +197,7 @@ void LicheeRec_ClearFrameReceived(void)
  * @param  data : 数据
  * @return 当前上位机状态
  */
-LicheervnanoStatus_t Licheervnano_CheckOnline(uint8_t cmdid, uint8_t data)
+LicheervnanoStatus_t Licheervnano_CheckOnline(uint8_t cmdid, float data)
 {
     if(cmdid == 1 && data == 0)
     {
@@ -212,6 +212,7 @@ LicheervnanoStatus_t Licheervnano_CheckOnline(uint8_t cmdid, uint8_t data)
 
     return host_status;
 }
+
 
 /* ── UART2 中断服务函数 ────────────────────────────────────── */
 

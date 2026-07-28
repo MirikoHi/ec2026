@@ -56,6 +56,6 @@ uint8_t LicheeRec_GetCmdId(void);
 float   LicheeRec_GetData(void);
 uint8_t LicheeRec_IsFrameReceived(void);
 void    LicheeRec_ClearFrameReceived(void);
-LicheervnanoStatus_t Licheervnano_CheckOnline(uint8_t cmdid, uint8_t data)
+LicheervnanoStatus_t Licheervnano_CheckOnline(uint8_t cmdid, float data);
 
 #endif /* BSP_LICHEE_REC_H */
