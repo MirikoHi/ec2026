@@ -11,6 +11,7 @@
 #include "trace.h"
 #include "IMU_Mahony.h"
 #include "PID.h"
+#include "bsp_beep.h"
 
 static DCMotorInstance *motor_l,*motor_r;
 
@@ -63,6 +64,7 @@ static float Chassis_GetForwardOdom(void);
 static float Chassis_GetYawDeg(void);
 static float Chassis_AngleNormalize(float angle);
 static float Chassis_LimitAbs(float value, float limit);
+static void chassis_turn_test(void);
 /**
  * @brief 初始化底盘左右电机和 IMU
  */
@@ -168,16 +170,17 @@ void Chassis_Init(void)
 
 	pid_init_config_s turn_pid_config = {
 		.mode = PID_POSITION,
-		.Kp = 0.0008f,
-		.Ki = 0.000009f,
-		.Kd = 0.000003f,
+		.Kp = 0.005f,
+		.Ki = 0.0005f,
+		.Kd = 0.000012f,
 		.max_out = 0.08f,
-		.max_iout = 0.01f,
+		.max_iout = 0.02f,
 		.deadzone = 0.001f,
 	};
 	PID_init(&chassis_turn_pid, &turn_pid_config);
 	DWT_Delay(1);
 }
+
 
 
 /**
@@ -203,20 +206,23 @@ void Chassis(void)
 	}
 
 	if (chassis_cmd_receive.Chassis_Mode != chassis_last_mode)
-	{
-		if ((chassis_last_mode == IMU_MODE) || (chassis_cmd_receive.Chassis_Mode == IMU_MODE))
 		{
-			Chassis_ResetAction();
-			chassis_imu_action_step = 0U;
+			if ((chassis_last_mode == IMU_MODE) || (chassis_cmd_receive.Chassis_Mode == IMU_MODE))
+			{
+				Chassis_ResetAction();
+				chassis_imu_action_step = 0U;
+			}
+			if (chassis_cmd_receive.Chassis_Mode == TRACE_MODE)
+			{
+				state = 0;  // 重入巡线复位
+			}
+			chassis_last_mode = chassis_cmd_receive.Chassis_Mode;
 		}
-		chassis_last_mode = chassis_cmd_receive.Chassis_Mode;
-	}
-
 	switch(chassis_cmd_receive.Chassis_Mode)
 	{
 		case TRACE_MODE:
 			// 计算并设置巡线补偿量。
-			// Chassis_Trace_Cal();
+			Chassis_Trace_Cal();
 			// 按设定路径执行巡线动作。
 			Chassis_State_Turn();
 			// 检测直行/转弯是否完成，并更新完成标志。
@@ -226,8 +232,8 @@ void Chassis(void)
 			Chassis_ImuModeAction();
 			break;
 		case NORMAL_MODE:
-
-			Chassis_Set_Turn();
+			chassis_turn_test();
+			// Chassis_Set_Turn();
 
 			break;
 		case POSITION_MODE:
@@ -534,8 +540,8 @@ uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed)
 	chassis_turn_pid.max_out = abs_turn_speed;
 	turn_speed = PID_calc(&chassis_turn_pid, 0.0f, yaw_error);
 
-	DC_Motor_SetRef(motor_l, -turn_speed);
-	DC_Motor_SetRef(motor_r, turn_speed);
+	DC_Motor_SetRef(motor_l, turn_speed);
+	DC_Motor_SetRef(motor_r, -turn_speed);
 
 	return CHASSIS_ACTION_RUNNING;
 }
@@ -696,10 +702,10 @@ void Chassis_Set_Line(float position)
 	Spin_succeed_flag = 0;
 	motor_l->encoder->total_count = 0;
 	motor_r->encoder->total_count = 0;
-	motor_l->position_pid.max_out = 0.03;
-	motor_l->position_pid.max_iout = 0.0;
-	motor_r->position_pid.max_out = 0.03;
-	motor_r->position_pid.max_iout = 0.0;
+	motor_l->position_pid.max_out = 0.3;
+	motor_l->position_pid.max_iout = 0.1;
+	motor_r->position_pid.max_out = 0.3;
+	motor_r->position_pid.max_iout = 0.1;
 
 	DC_Motor_SetRef(motor_l, position);
 	DC_Motor_SetRef(motor_r, position);
@@ -707,89 +713,112 @@ void Chassis_Set_Line(float position)
 
 void Chassis_State_Turn(void)
 {
+    /* ---- 路口检测参数 ---- */
+    #define TURN_CORNER_BLACK_MIN   6    // >=N路传感器同时见黑线→路口
+    #define TURN_CORNER_CONFIRM_CNT 8    // 连续N帧确认(消抖, 5ms*8=40ms)
+    #define TURN_MAX_SPEED          0.2f // 转弯最大轮速(m/s), 给 Chassis_TurnAngle
+    #define TURN_ANGLE_DEG         -90.0f// 左转90°(逆时针)
+    #define TURN_TOTAL_SIDES        4    // 正方形4条边
 
-	static uint8_t quan=0;
-	switch(state)
-	{
-		case 0:
-			if(quan < chassis_cmd_receive.circle_set)
-			{
-				state ++;
-				Chassis_Set_Line(0.08);
-			}
-		break;
-		case 1:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 2:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.082);
-				state ++;
-			}
-		break;
-		case 3:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 4:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.082);
-				state ++;
-			}
-		break;
-			case 5:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-			case 6:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.082);
-				state ++;
-			}
-		break;
-			case 7:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 8:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.01);
-				state ++;
-			}
-		break;
-		case 9:
-			if(Stop_Flag)
-			{
-				quan ++;
-				state = 0;
-			}
-		break;
-		default:
-			break;
-	}
+    /* ---- 静态变量(函数内持久化) ---- */
+    static uint8_t turn_side_cnt  = 0;   // 已完成边数
+    static uint8_t corner_confirm = 0;   // 路口消抖计数器
+    static uint8_t turn_done_flag = 0;   // 1=走完正方形, 停车
 
+    uint8_t black_cnt;
+    uint8_t i;
 
+    /* -- 停车状态, 如果 mode 被重新切过, state 会变0, 这里也会复活 -- */
+    if (turn_done_flag) {
+        DCMotor_Cmd(motor_l, DISABLE);
+        DCMotor_Cmd(motor_r, DISABLE);
+        return;
+    }
 
+    /* -- state 是文件全局变量, 由 mode switch 处复位为 0 -- */
+    switch (state) {
 
+    /* ====== 第 0 步: 启动第一条边 ====== */
+    case 0:
+        turn_side_cnt  = 0;
+        corner_confirm = 0;
+        turn_done_flag = 0;
+
+        /* 强制使能电机(无需菜单预操作) */
+        DCMotor_Cmd(motor_l, ENABLE);
+        DCMotor_Cmd(motor_r, ENABLE);
+
+        /* 清位置 PID 历史, 避免上次积分残留 */
+        PID_clear(&motor_l->position_pid);
+        PID_clear(&motor_r->position_pid);
+
+        /* 起线: 1.5m 目标 > 实际边长, 靠路口检测提前中止 */
+        Chassis_Set_Line(1.5f);
+        state = 1;
+        break;
+
+    /* ====== 第 1 步: 巡线 + 路口检测 ====== */
+    case 1:
+        /* 统计当前 8 路灰度中有多少路看到黑线 */
+        black_cnt = 0;
+        for (i = 0; i < 8; i++) {
+            if (!(Digtal & (1 << i))) black_cnt++;
+        }
+
+        if (black_cnt >= TURN_CORNER_BLACK_MIN) {
+            corner_confirm++;
+            if (corner_confirm >= TURN_CORNER_CONFIRM_CNT) {
+                /* 路口确认 → 中止直线, 准备转弯 */
+                Line_flag      = 0;
+                Stop_Flag      = 0;
+                stop_count     = 0;
+                corner_confirm = 0;
+                state = 2;
+            }
+        } else {
+            corner_confirm = 0;
+        }
+
+        /* 安全兜底: 编码器位置到达也触发 (防路口漏检) */
+        if (Stop_Flag) {
+            Line_flag      = 0;
+            Stop_Flag      = 0;
+            stop_count     = 0;
+            corner_confirm = 0;
+            state = 2;
+        }
+        break;
+
+    /* ====== 第 2 步: 90° 左转 ====== */
+    case 2:
+        if (Chassis_TurnAngle(TURN_ANGLE_DEG, TURN_MAX_SPEED)
+            == CHASSIS_ACTION_DONE) {
+            turn_side_cnt++;
+
+            if (turn_side_cnt >= TURN_TOTAL_SIDES) {
+                /* 4 条边完成 → 停车 */
+                turn_done_flag = 1;
+                DCMotor_Cmd(motor_l, DISABLE);
+                DCMotor_Cmd(motor_r, DISABLE);
+                state = 3;  /* 进入空状态, 等下次重入复位 */
+            } else {
+                /* 清位置 PID 积分, 起下一条边 */
+                PID_clear(&motor_l->position_pid);
+                PID_clear(&motor_r->position_pid);
+                Chassis_Set_Line(1.5f);
+                state = 1;
+            }
+        }
+        break;
+
+    /* ====== 第 3 步: 空状态 (已完成, 等待切出模式) ====== */
+    case 3:
+    default:
+        DCMotor_Cmd(motor_l, DISABLE);
+        DCMotor_Cmd(motor_r, DISABLE);
+        break;
+    }
 }
-
 /* ========================================================================
  * 电机PID测试模块
  * ========================================================================
@@ -923,3 +952,99 @@ void chassis_motor_test(void)
     DC_Motor_SetRef(motor_l, ref_l);
     DC_Motor_SetRef(motor_r, ref_r);
 }
+
+/* ========================================================================
+ * IMU 转弯 PID 调试模块
+ * ========================================================================
+ *
+ * 【怎么用】
+ *   1. 把 Chassis() 里 case NORMAL_MODE: 改为 chassis_turn_test();
+ *   2. 菜单切到 NORMAL_MODE，机器人开始原地左右来回转
+ *   3. 修改下面 turn_test_config 的字段，编译烧录看效果
+ *   4. 每次转到位蜂鸣器会短鸣三声
+ *   5. 调好 PID 后，把 Kp/Ki/Kd 填回 Chassis_Init() 里的 chassis_turn_pid
+ *
+ * 【可调参数 — 修改 turn_test_config 即可，不用改函数】
+ *   turn_angle   = 转弯角度 (deg)，正=右转，负=左转。默认 90
+ *                 想只测一个方向：设 auto_reverse=0，改这个值
+ *   max_speed    = 最大转弯轮速 (m/s)，越大转得越快。默认 0.06
+ *   enable       = 1=使能 / 0=停转并关蜂鸣器
+ *   auto_reverse = 1=到位后自动反向（左右来回转）
+ *                  0=只转一次就停，适合抓波形看单次响应
+ *
+ * 【蜂鸣器时序】非阻塞，不干扰主循环
+ *   转弯到位 → 嘀(100ms)→停(100ms)→嘀(100ms)→停(100ms)→嘀(100ms)→停
+ *   全部走完约 600ms，期间转弯已开始下一次动作，互不影响
+ */
+
+typedef struct {
+    float turn_angle;     // 转弯角度 (deg)，正=右转，负=左转
+    float max_speed;      // 最大转弯轮速 (m/s)，传给 Chassis_TurnAngle
+    uint8_t enable;       // 1=使能转弯，0=停转 + 关蜂鸣器
+    uint8_t auto_reverse; // 1=到位后自动反向，0=转一次就停
+} TurnTest_Config_s;
+
+/* ---------- 调试时改这里的值就行 ---------- */
+static TurnTest_Config_s turn_test_config = {
+    .turn_angle   = 90.0f,   // 转弯角度 deg
+    .max_speed    = 0.06f,   // 最大轮速 m/s
+    .enable       = 1,       // 使能
+    .auto_reverse = 1,       // 自动往返
+};
+
+static void chassis_turn_test(void)
+{
+    // turn_test_init : 首次进入 / enable 切回 1 时重新初始化
+    // current_angle  : 本轮目标角度，auto_reverse 会在到位后取反
+    // beep_step      : 蜂鸣器状态机步骤 (0=空闲, 1/3/5=鸣, 2/4/6=停)
+    // beep_cnt       : 蜂鸣器当前步骤计数 (200Hz, 20 次 = 100ms)
+    static uint8_t  turn_test_init = 1;
+    static float    current_angle;
+    static uint8_t  beep_step;
+    static uint16_t beep_cnt;
+
+    /* ---- 停转：关电机 + 关蜂鸣 + 复位 ---- */
+    if (turn_test_config.enable == 0) {
+        DCMotor_Cmd(motor_l, DISABLE);
+        DCMotor_Cmd(motor_r, DISABLE);
+        turn_test_init = 1;
+        beep_step = 0;
+        beep_off();
+        return;
+    }
+
+    /* ---- 首次使能：清 PID 历史 + 开电机 + 锁定初始角度 ---- */
+    if (turn_test_init) {
+        Chassis_ResetAction();                     // 清 chassis_turn_pid 积分/微分
+        DCMotor_Cmd(motor_l, ENABLE);
+        DCMotor_Cmd(motor_r, ENABLE);
+        motor_l->loop_mode = SPEED_MODE;           // 转弯用速度环
+        motor_r->loop_mode = SPEED_MODE;
+        current_angle = turn_test_config.turn_angle;  // 记录初始方向
+        beep_step = 0;
+        turn_test_init = 0;
+    }
+
+    /* ---- 蜂鸣器：非阻塞 3 短声 (200Hz * 20tick = 100ms/段) ---- */
+    switch (beep_step) {
+    case 0:                                                         break;  // 空闲
+    case 1: beep_on();  if (++beep_cnt >= 100) { beep_step = 2; beep_cnt = 0; } break;
+    case 2: beep_off(); if (++beep_cnt >= 100) { beep_step = 3; beep_cnt = 0; } break;
+    case 3: beep_on();  if (++beep_cnt >= 100) { beep_step = 4; beep_cnt = 0; } break;
+    case 4: beep_off(); if (++beep_cnt >= 100) { beep_step = 5; beep_cnt = 0; } break;
+    case 5: beep_on();  if (++beep_cnt >= 100) { beep_step = 6; beep_cnt = 0; } break;
+    case 6: beep_off(); if (++beep_cnt >= 100) { beep_step = 0; beep_cnt = 0; } break;
+    default: beep_step = 0;                                        break;
+    }
+
+    /* ---- 核心：调 Chassis_TurnAngle，到位后反向 + 触发蜂鸣 ---- */
+    if (Chassis_TurnAngle(current_angle, turn_test_config.max_speed) == CHASSIS_ACTION_DONE) {
+        if (turn_test_config.auto_reverse) {
+            current_angle = -current_angle;         // 右转完接左转，左转完接右转
+        }
+        beep_step = 1;                              // 触发蜂鸣序列
+        beep_cnt  = 0;
+    }
+}
+
+// End of file
