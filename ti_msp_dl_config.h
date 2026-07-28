@@ -221,9 +221,9 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_UART_0_IOMUX_TX                                     (IOMUX_PINCM29)
 #define GPIO_UART_0_IOMUX_RX_FUNC                      IOMUX_PINCM30_PF_UART3_RX
 #define GPIO_UART_0_IOMUX_TX_FUNC                      IOMUX_PINCM29_PF_UART3_TX
-#define UART_0_BAUD_RATE                                                (420000)
-#define UART_0_IBRD_80_MHZ_420000_BAUD                                      (11)
-#define UART_0_FBRD_80_MHZ_420000_BAUD                                      (58)
+#define UART_0_BAUD_RATE                                                (115200)
+#define UART_0_IBRD_80_MHZ_115200_BAUD                                      (43)
+#define UART_0_FBRD_80_MHZ_115200_BAUD                                      (26)
 /* Defines for K230 */
 #define K230_INST                                                          UART2
 #define K230_INST_FREQUENCY                                             40000000
@@ -347,6 +347,12 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for User_led: GPIOB.22 with pinCMx 50 on package pin 21 */
 #define User_LED_User_led_PIN                                   (DL_GPIO_PIN_22)
 #define User_LED_User_led_IOMUX                                  (IOMUX_PINCM50)
+/* Port definition for Pin Group BMI088_CS2 */
+#define BMI088_CS2_PORT                                                  (GPIOB)
+
+/* Defines for CS2: GPIOB.23 with pinCMx 51 on package pin 22 */
+#define BMI088_CS2_CS2_PIN                                      (DL_GPIO_PIN_23)
+#define BMI088_CS2_CS2_IOMUX                                     (IOMUX_PINCM51)
 /* Defines for key1: GPIOA.30 with pinCMx 5 on package pin 37 */
 #define KEY_key1_PORT                                                    (GPIOA)
 #define KEY_key1_PIN                                            (DL_GPIO_PIN_30)
@@ -431,12 +437,6 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for CE: GPIOB.20 with pinCMx 48 on package pin 19 */
 #define NRF24L_CE_PIN                                           (DL_GPIO_PIN_20)
 #define NRF24L_CE_IOMUX                                          (IOMUX_PINCM48)
-/* Port definition for Pin Group BMI088_CS2 */
-#define BMI088_CS2_PORT                                                  (GPIOB)
-
-/* Defines for CS2: GPIOB.23 with pinCMx 51 on package pin 22 */
-#define BMI088_CS2_CS2_PIN                                      (DL_GPIO_PIN_23)
-#define BMI088_CS2_CS2_IOMUX                                     (IOMUX_PINCM51)
 
 
 /* Defines for MCAN0 */

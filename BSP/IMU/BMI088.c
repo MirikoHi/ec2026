@@ -133,13 +133,14 @@ int8_t bsp_Bmi088GetRawData(bmi088RealData_t* accData, bmi088RealData_t* GyroDat
     rawGyroZ = (int16_t)(gyroBuf[4] | (gyroBuf[5] << 8));
 
     /* 单位换算 */
-    accData->x = (float)(rawAccX * BMI088_ACCEL_SENSITIVITY_G);
-    accData->y = (float)(rawAccY * BMI088_ACCEL_SENSITIVITY_G);
-    accData->z = (float)(rawAccZ * BMI088_ACCEL_SENSITIVITY_G);
+    accData->x = (float)rawAccX * BMI088_ACCEL_SENSITIVITY_G;
+    accData->y = ((float)rawAccY * BMI088_ACCEL_SENSITIVITY_G);
+    accData->z = ((float)rawAccZ * BMI088_ACCEL_SENSITIVITY_G);
 
-    GyroData->x = (float)(rawGyroX * BMI088_GYRO_SENSITIVITY_DPS);
-    GyroData->y = (float)(rawGyroY * BMI088_GYRO_SENSITIVITY_DPS);
-    GyroData->z = (float)(rawGyroZ * BMI088_GYRO_SENSITIVITY_DPS);
+    /* 陀螺仪: LSB → deg/s → rad/s (Mahony 滤波器要求 rad/s) */
+    GyroData->x = ((float)rawGyroX * BMI088_GYRO_SENSITIVITY_DPS * 0.017453293f);
+    GyroData->y = ((float)rawGyroY * BMI088_GYRO_SENSITIVITY_DPS * 0.017453293f);
+    GyroData->z = ((float)rawGyroZ * BMI088_GYRO_SENSITIVITY_DPS * 0.017453293f);
 
     return 0;
 }

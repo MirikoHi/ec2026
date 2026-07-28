@@ -293,6 +293,7 @@ PWM1.peripheral.ccp1Pin.$assign         = "PB11";
 PWM1.PWM_CHANNEL_0.$name                = "ti_driverlib_pwm_PWMTimerCC2";
 PWM1.PWM_CHANNEL_0.invert               = true;
 PWM1.PWM_CHANNEL_1.$name                = "ti_driverlib_pwm_PWMTimerCC1";
+PWM1.PWM_CHANNEL_1.invert               = true;
 PWM1.ccp0PinConfig.direction            = scripting.forceWrite("OUTPUT");
 PWM1.ccp0PinConfig.hideOutputInversion  = scripting.forceWrite(false);
 PWM1.ccp0PinConfig.onlyInternalResistor = scripting.forceWrite(false);
@@ -408,7 +409,7 @@ TIMER3.peripheral.$assign = "TIMG6";
 
 UART1.enabledInterrupts                = ["RX"];
 UART1.$name                            = "UART_1";
-UART1.targetBaudRate                   = 420000;
+UART1.targetBaudRate                   = 115200;
 UART1.peripheral.$assign               = "UART1";
 UART1.peripheral.rxPin.$assign         = "PB7";
 UART1.peripheral.txPin.$assign         = "PB6";

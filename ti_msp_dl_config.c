@@ -248,6 +248,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 
     DL_GPIO_initDigitalOutput(User_LED_User_led_IOMUX);
 
+    DL_GPIO_initDigitalOutput(BMI088_CS2_CS2_IOMUX);
+
     DL_GPIO_initDigitalInputFeatures(KEY_key1_IOMUX,
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
 		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
@@ -304,8 +306,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 
     DL_GPIO_initDigitalOutput(NRF24L_CE_IOMUX);
 
-    DL_GPIO_initDigitalOutput(BMI088_CS2_CS2_IOMUX);
-
     DL_GPIO_clearPins(GPIOA, BEEP_PIN_14_PIN |
 		ICM42688_CS_CS_PIN |
 		Motor_dir_EN1_A_PIN |
@@ -320,22 +320,22 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		Gray_Address_PIN_0_PIN);
     DL_GPIO_clearPins(GPIOB, RELAY_Control_PIN |
 		User_LED_User_led_PIN |
+		BMI088_CS2_CS2_PIN |
 		Motor_dir_EN2_B_PIN |
 		Gray_Address_PIN_1_PIN |
 		Gray_Address_PIN_2_PIN |
 		Gray_Serial_CLK_PIN |
-		NRF24L_CE_PIN |
-		BMI088_CS2_CS2_PIN);
+		NRF24L_CE_PIN);
     DL_GPIO_setPins(GPIOB, NRF24L_CSN_PIN);
     DL_GPIO_enableOutput(GPIOB, RELAY_Control_PIN |
 		User_LED_User_led_PIN |
+		BMI088_CS2_CS2_PIN |
 		Motor_dir_EN2_B_PIN |
 		Gray_Address_PIN_1_PIN |
 		Gray_Address_PIN_2_PIN |
 		Gray_Serial_CLK_PIN |
 		NRF24L_CSN_PIN |
-		NRF24L_CE_PIN |
-		BMI088_CS2_CS2_PIN);
+		NRF24L_CE_PIN);
     DL_GPIO_setLowerPinsPolarity(GPIOB, DL_GPIO_PIN_2_EDGE_RISE |
 		DL_GPIO_PIN_3_EDGE_RISE);
     DL_GPIO_setUpperPinsPolarity(GPIOB, DL_GPIO_PIN_18_EDGE_RISE |
@@ -505,7 +505,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_Motor_init(void) {
     DL_TimerG_setCaptureCompareValue(Motor_INST, 2500, DL_TIMER_CC_0_INDEX);
 
     DL_TimerG_setCaptureCompareOutCtl(Motor_INST, DL_TIMER_CC_OCTL_INIT_VAL_LOW,
-		DL_TIMER_CC_OCTL_INV_OUT_DISABLED, DL_TIMER_CC_OCTL_SRC_FUNCVAL,
+		DL_TIMER_CC_OCTL_INV_OUT_ENABLED, DL_TIMER_CC_OCTL_SRC_FUNCVAL,
 		DL_TIMERG_CAPTURE_COMPARE_1_INDEX);
 
     DL_TimerG_setCaptCompUpdateMethod(Motor_INST, DL_TIMER_CC_UPDATE_METHOD_IMMEDIATE, DL_TIMERG_CAPTURE_COMPARE_1_INDEX);
@@ -804,11 +804,11 @@ SYSCONFIG_WEAK void SYSCFG_DL_UART_1_init(void)
     DL_UART_Main_init(UART_1_INST, (DL_UART_Main_Config *) &gUART_1Config);
     /*
      * Configure baud rate by setting oversampling and baud rate divisors.
-     *  Target baud rate: 420000
-     *  Actual baud rate: 419947.51
+     *  Target baud rate: 115200
+     *  Actual baud rate: 115190.78
      */
     DL_UART_Main_setOversampling(UART_1_INST, DL_UART_OVERSAMPLING_RATE_16X);
-    DL_UART_Main_setBaudRateDivisor(UART_1_INST, UART_1_IBRD_40_MHZ_420000_BAUD, UART_1_FBRD_40_MHZ_420000_BAUD);
+    DL_UART_Main_setBaudRateDivisor(UART_1_INST, UART_1_IBRD_40_MHZ_115200_BAUD, UART_1_FBRD_40_MHZ_115200_BAUD);
 
 
     /* Configure Interrupts */

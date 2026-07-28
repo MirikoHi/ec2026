@@ -26,4 +26,20 @@ typedef enum {
  */
 void Chassis_GetMotorSpeed(float *left_speed,
 						   float *right_speed);
+void Stop_Detect(void);
+void Chassis_State_Turn(void);
+void Chassis_Set_Turn(void);
+static void Chassis_RemoteControl(void);
+static void Chassis_ClearRemoteSpeed(void);
+static void Chassis_RemoteLostDisable(void);
+static void Chassis_Trace_Cal(void);
+static void Chassis_ImuModeAction(void);
+static void Motor_FeedForward_Update(void);
+static void Chassis_ResetEncoderOdom(void);
+static float Chassis_GetForwardOdom(void);
+static float Chassis_GetYawDeg(void);
+static float Chassis_AngleNormalize(float angle);
+static float Chassis_LimitAbs(float value, float limit);
+void Chassis_Set_Line(float position);
+static void Chassis_Test_Line(void);
 #endif
