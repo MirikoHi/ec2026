@@ -32,8 +32,13 @@ static uint8_t remote_mode_active = 0;
 #define CHASSIS_ACTION_RUNNING       0U
 #define CHASSIS_LINE_DONE_ERR_M      0.005f
 #define CHASSIS_LINE_DONE_TICKS      10U
-#define CHASSIS_TURN_DONE_ERR_DEG    2.0f
+#define CHASSIS_LINE_ACCEL_M         0.20f
+#define CHASSIS_LINE_SLOWDOWN_M      0.25f
+#define CHASSIS_LINE_MIN_SPEED       0.025f
+#define CHASSIS_TURN_DONE_ERR_DEG    3.0f
 #define CHASSIS_TURN_DONE_TICKS      10U
+#define CHASSIS_ACTION_SPEED		 0.2f
+#define CHASSIS_ACTION_TURN_SPEED	 0.05f
 
 static pid_type_def chassis_line_yaw_pid;
 static pid_type_def chassis_turn_pid;
@@ -56,12 +61,10 @@ static void Chassis_ClearRemoteSpeed(void);
 static void Chassis_RemoteLostDisable(void);
 static void Chassis_Trace_Cal(void);
 static void Chassis_ImuModeAction(void);
-static void Motor_FeedForward_Update(void);
 static void Chassis_ResetEncoderOdom(void);
 static float Chassis_GetForwardOdom(void);
 static float Chassis_GetYawDeg(void);
 static float Chassis_AngleNormalize(float angle);
-static float Chassis_LimitAbs(float value, float limit);
 /**
  * @brief 初始化底盘左右电机和 IMU
  */
@@ -168,7 +171,7 @@ void Chassis_Init(void)
 	pid_init_config_s turn_pid_config = {
 		.mode = PID_POSITION,
 		.Kp = 0.0008f,
-		.Ki = 0.000009f,
+		.Ki = 0.000012f,
 		.Kd = 0.000003f,
 		.max_out = 0.08f,
 		.max_iout = 0.01f,
@@ -259,7 +262,7 @@ static void Chassis_ImuModeAction(void)
 	{
 		case 0:
 			// 第一条边：使用 ICM42688 yaw 做方向保持，直行 1.0m。
-			if (Chassis_MoveStraight(0.97f, 0.035f) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveStraight(0.96f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 1U;
 			}
@@ -280,14 +283,14 @@ static void Chassis_ImuModeAction(void)
 			break;
 		case 1:
 			// 第一次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(90.0f, 0.02f) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(92.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 2U;
 			}
 			break;
 		case 2:
 			// 第二条边：直行 1.0m。
-			if (Chassis_MoveStraight(0.97f, 0.035f) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveStraight(0.96f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 3U;
 			}
@@ -307,14 +310,14 @@ static void Chassis_ImuModeAction(void)
 			break;
 		case 3:
 			// 第二次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(90.0f, 0.02f) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(92.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 4U;
 			}
 			break;
 		case 4:
 			// 第三条边：直行 1.0m。
-			if (Chassis_MoveStraight(0.97f, 0.035f) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveStraight(0.96f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 5U;
 			}
@@ -334,14 +337,14 @@ static void Chassis_ImuModeAction(void)
 			break;
 		case 5:
 			// 第三次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(90.0f, 0.02f) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(92.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 6U;
 			}
 			break;
 		case 6:
 			// 第四条边：直行 1.0m。
-			if (Chassis_MoveStraight(0.97f, 0.035f) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveStraight(0.96f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 7U;
 			}
@@ -361,7 +364,7 @@ static void Chassis_ImuModeAction(void)
 			break;
 		case 7:
 			// 第四次转角完成后回到第一条边，形成正方形循环。
-			if (Chassis_TurnAngle(90.0f, 0.02f) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(92.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 0U;
 			}
@@ -377,17 +380,12 @@ static void Chassis_ImuModeAction(void)
 
 static void Chassis_RemoteControl(void)
 {
-	static float left_out;
-	static float right_out;
 	// 遥控模式使用速度环，直接给左右轮差速速度。
 	motor_l->loop_mode = SPEED_MODE;
 	motor_r->loop_mode = SPEED_MODE;
 	// 计算差速轮输出。
 	float left_speed = chassis_cmd_receive.remote_forward - chassis_cmd_receive.remote_turn;
 	float right_speed = chassis_cmd_receive.remote_forward + chassis_cmd_receive.remote_turn;
-
-	// left_out += left_speed;
-	// right_out += right_speed;
 
 	motor_l->State = ENABLE;
 	motor_r->State = ENABLE;
@@ -463,6 +461,7 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 	const float abs_distance = fabsf(distance_m);
 	float abs_speed = fabsf(speed_mps);
 	float remain;
+	float progress;
 	float base_speed;
 	float yaw_error;
 	float yaw_compensation;
@@ -513,10 +512,44 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 	}
 
 	chassis_action_done_count = 0U;
-	base_speed = (remain > 0.0f) ? abs_speed : -abs_speed;
-	if (fabsf(remain) < (abs_speed * 0.20f))
+	progress = fabsf(chassis_action_target_distance) - fabsf(remain);
+	if (progress < 0.0f)
 	{
-		base_speed = Chassis_LimitAbs(remain * 5.0f, abs_speed);
+		progress = 0.0f;
+	}
+
+	base_speed = (remain > 0.0f) ? abs_speed : -abs_speed;
+	if (progress < CHASSIS_LINE_ACCEL_M)
+	{
+		float accel_speed = CHASSIS_LINE_MIN_SPEED +
+		                    (abs_speed - CHASSIS_LINE_MIN_SPEED) * progress / CHASSIS_LINE_ACCEL_M;
+
+		/*
+		 * 起步前 0.1m 线性加速，避免一进入直线动作就给满速度。
+		 */
+		base_speed = (remain > 0.0f) ? accel_speed : -accel_speed;
+	}
+	if (fabsf(remain) < CHASSIS_LINE_SLOWDOWN_M)
+	{
+		float slowdown_speed = abs_speed * fabsf(remain) / CHASSIS_LINE_SLOWDOWN_M;
+
+		/*
+		 * 直线末段提前按剩余距离线性降速。
+		 * 原逻辑只剩约 2.4cm 才减速，实际表现接近急停。
+		 */
+		if (slowdown_speed < CHASSIS_LINE_MIN_SPEED)
+		{
+			slowdown_speed = CHASSIS_LINE_MIN_SPEED;
+		}
+		if (slowdown_speed > abs_speed)
+		{
+			slowdown_speed = abs_speed;
+		}
+
+		if (fabsf(slowdown_speed) < fabsf(base_speed))
+		{
+			base_speed = (remain > 0.0f) ? slowdown_speed : -slowdown_speed;
+		}
 	}
 
 	yaw_error = Chassis_AngleNormalize(chassis_action_target_yaw - Chassis_GetYawDeg());
@@ -641,26 +674,6 @@ static float Chassis_AngleNormalize(float angle)
 		angle += 360.0f;
 	}
 	return angle;
-}
-
-/**
- * @brief 对数值做正负对称限幅
- * @param value 输入值
- * @param limit 最大绝对值
- * @return 限幅后的值
- */
-static float Chassis_LimitAbs(float value, float limit)
-{
-	// 对称限幅，保持输入值符号不变。
-	if (value > limit)
-	{
-		return limit;
-	}
-	if (value < -limit)
-	{
-		return -limit;
-	}
-	return value;
 }
 
 void Motor_Cmd_CallBack(uint8_t i)
