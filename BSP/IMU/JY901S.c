@@ -13,7 +13,7 @@ float YawAngleLast=0;
 volatile JY901s_IMU_Data_s *JY901s_IMU_Init(void)
 {
 	return &IMU_Data;
-	NVIC_EnableIRQ(JY901s_INST_INT_IRQN);
+	//NVIC_EnableIRQ(JY901s_INST_INT_IRQN);
 }
 
 /**
@@ -80,6 +80,6 @@ void JY901s_ReceiveData(uint8_t RxData)
 
 void JY901s_INST_IRQHandler(void)
 {
-	uint8_t RxData = DL_UART_receiveData(JY901s_INST);
-	JY901s_ReceiveData(RxData);
+	//uint8_t RxData = DL_UART_receiveData(JY901s_INST);
+	//JY901s_ReceiveData(RxData);
 }

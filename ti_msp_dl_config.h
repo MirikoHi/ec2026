@@ -192,22 +192,6 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_I2C_1_IOMUX_SCL_FUNC                       IOMUX_PINCM9_PF_I2C1_SCL
 
 
-/* Defines for JY901s */
-#define JY901s_INST                                                        UART1
-#define JY901s_INST_FREQUENCY                                           40000000
-#define JY901s_INST_IRQHandler                                  UART1_IRQHandler
-#define JY901s_INST_INT_IRQN                                      UART1_INT_IRQn
-#define GPIO_JY901s_RX_PORT                                                GPIOB
-#define GPIO_JY901s_TX_PORT                                                GPIOB
-#define GPIO_JY901s_RX_PIN                                         DL_GPIO_PIN_7
-#define GPIO_JY901s_TX_PIN                                         DL_GPIO_PIN_6
-#define GPIO_JY901s_IOMUX_RX                                     (IOMUX_PINCM24)
-#define GPIO_JY901s_IOMUX_TX                                     (IOMUX_PINCM23)
-#define GPIO_JY901s_IOMUX_RX_FUNC                      IOMUX_PINCM24_PF_UART1_RX
-#define GPIO_JY901s_IOMUX_TX_FUNC                      IOMUX_PINCM23_PF_UART1_TX
-#define JY901s_BAUD_RATE                                                (115200)
-#define JY901s_IBRD_40_MHZ_115200_BAUD                                      (21)
-#define JY901s_FBRD_40_MHZ_115200_BAUD                                      (45)
 /* Defines for ELRS */
 #define ELRS_INST                                                          UART3
 #define ELRS_INST_FREQUENCY                                             80000000
@@ -277,23 +261,23 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_ICM42688_SCLK_PIN                                   DL_GPIO_PIN_11
 #define GPIO_ICM42688_IOMUX_SCLK                                (IOMUX_PINCM22)
 #define GPIO_ICM42688_IOMUX_SCLK_FUNC                IOMUX_PINCM22_PF_SPI0_SCLK
-/* Defines for NRF24L01 */
-#define NRF24L01_INST                                                      SPI1
-#define NRF24L01_INST_IRQHandler                                SPI1_IRQHandler
-#define NRF24L01_INST_INT_IRQN                                    SPI1_INT_IRQn
-#define GPIO_NRF24L01_PICO_PORT                                           GPIOB
-#define GPIO_NRF24L01_PICO_PIN                                    DL_GPIO_PIN_8
-#define GPIO_NRF24L01_IOMUX_PICO                                (IOMUX_PINCM25)
-#define GPIO_NRF24L01_IOMUX_PICO_FUNC                IOMUX_PINCM25_PF_SPI1_PICO
-#define GPIO_NRF24L01_POCI_PORT                                           GPIOB
-#define GPIO_NRF24L01_POCI_PIN                                   DL_GPIO_PIN_21
-#define GPIO_NRF24L01_IOMUX_POCI                                (IOMUX_PINCM49)
-#define GPIO_NRF24L01_IOMUX_POCI_FUNC                IOMUX_PINCM49_PF_SPI1_POCI
-/* GPIO configuration for NRF24L01 */
-#define GPIO_NRF24L01_SCLK_PORT                                           GPIOB
-#define GPIO_NRF24L01_SCLK_PIN                                    DL_GPIO_PIN_9
-#define GPIO_NRF24L01_IOMUX_SCLK                                (IOMUX_PINCM26)
-#define GPIO_NRF24L01_IOMUX_SCLK_FUNC                IOMUX_PINCM26_PF_SPI1_SCLK
+/* Defines for SPI_FLASH */
+#define SPI_FLASH_INST                                                     SPI1
+#define SPI_FLASH_INST_IRQHandler                               SPI1_IRQHandler
+#define SPI_FLASH_INST_INT_IRQN                                   SPI1_INT_IRQn
+#define GPIO_SPI_FLASH_PICO_PORT                                          GPIOB
+#define GPIO_SPI_FLASH_PICO_PIN                                   DL_GPIO_PIN_8
+#define GPIO_SPI_FLASH_IOMUX_PICO                               (IOMUX_PINCM25)
+#define GPIO_SPI_FLASH_IOMUX_PICO_FUNC               IOMUX_PINCM25_PF_SPI1_PICO
+#define GPIO_SPI_FLASH_POCI_PORT                                          GPIOB
+#define GPIO_SPI_FLASH_POCI_PIN                                   DL_GPIO_PIN_7
+#define GPIO_SPI_FLASH_IOMUX_POCI                               (IOMUX_PINCM24)
+#define GPIO_SPI_FLASH_IOMUX_POCI_FUNC               IOMUX_PINCM24_PF_SPI1_POCI
+/* GPIO configuration for SPI_FLASH */
+#define GPIO_SPI_FLASH_SCLK_PORT                                          GPIOB
+#define GPIO_SPI_FLASH_SCLK_PIN                                   DL_GPIO_PIN_9
+#define GPIO_SPI_FLASH_IOMUX_SCLK                               (IOMUX_PINCM26)
+#define GPIO_SPI_FLASH_IOMUX_SCLK_FUNC               IOMUX_PINCM26_PF_SPI1_SCLK
 
 
 
@@ -420,15 +404,12 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for CLK: GPIOB.27 with pinCMx 58 on package pin 29 */
 #define Gray_Serial_CLK_PIN                                     (DL_GPIO_PIN_27)
 #define Gray_Serial_CLK_IOMUX                                    (IOMUX_PINCM58)
-/* Port definition for Pin Group NRF24L */
-#define NRF24L_PORT                                                      (GPIOB)
+/* Port definition for Pin Group SPI_FLASH_CS */
+#define SPI_FLASH_CS_PORT                                                (GPIOB)
 
-/* Defines for CSN: GPIOB.5 with pinCMx 18 on package pin 53 */
-#define NRF24L_CSN_PIN                                           (DL_GPIO_PIN_5)
-#define NRF24L_CSN_IOMUX                                         (IOMUX_PINCM18)
-/* Defines for CE: GPIOB.20 with pinCMx 48 on package pin 19 */
-#define NRF24L_CE_PIN                                           (DL_GPIO_PIN_20)
-#define NRF24L_CE_IOMUX                                          (IOMUX_PINCM48)
+/* Defines for CSN: GPIOB.6 with pinCMx 23 on package pin 58 */
+#define SPI_FLASH_CS_CSN_PIN                                     (DL_GPIO_PIN_6)
+#define SPI_FLASH_CS_CSN_IOMUX                                   (IOMUX_PINCM23)
 
 
 /* Defines for MCAN0 */
@@ -482,12 +463,11 @@ void SYSCFG_DL_dwt_init(void);
 void SYSCFG_DL_ZDT_MOTOR_TICK_init(void);
 void SYSCFG_DL_I2C_0_init(void);
 void SYSCFG_DL_I2C_1_init(void);
-void SYSCFG_DL_JY901s_init(void);
 void SYSCFG_DL_ELRS_init(void);
 void SYSCFG_DL_K230_init(void);
 void SYSCFG_DL_UART_2_init(void);
 void SYSCFG_DL_ICM42688_init(void);
-void SYSCFG_DL_NRF24L01_init(void);
+void SYSCFG_DL_SPI_FLASH_init(void);
 void SYSCFG_DL_ADC1_init(void);
 void SYSCFG_DL_ADC0_init(void);
 
