@@ -18,7 +18,6 @@
  */
 
 #include "IMU.h"
-#include "icm42688.h"
 #include "dwt.h"
 #include <math.h>
 

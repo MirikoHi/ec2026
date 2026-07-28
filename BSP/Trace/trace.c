@@ -1,10 +1,12 @@
 #include "trace.h"
+
+#include "Chassis.h"
 #include "Robot_Cmd.h"
 #include "No_Mcu_Ganv_Grayscale_Sensor_Config.h"
 #include "dwt.h"
 #include "gray_serial.h"
-#include "flash_param_store.h"
-#define SENSOR_WEIGHTS { -4.0f, -3.0f, -2.0f, -1.0f, 1.0f, 2.0f, 3.0f, 4.0f }
+
+#define SENSOR_WEIGHTS { -8.0f, -6.0f, -4.0f, -2.0f, 2.0f, 4.0f, 6.0f, 8.0f }
 
 /* ---- filter_raw 可调参数 ---- */
 #define FILTER_JUMP_THRESHOLD   3   /* 跳变确认所需连续帧数，可调 2~8 */
@@ -100,7 +102,7 @@ void Trace_Init(void)
     DWT_Delay(0.1);
 #endif
 	// 使用上电从 Flash 读取到的循迹 PID 参数。
-	Trace_ApplyParams(FlashParam_GetActive());
+	// Trace_ApplyParams(FlashParam_GetActive());
 }
 
 //旧版逻辑，暂时不用

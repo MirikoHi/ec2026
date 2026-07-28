@@ -10,27 +10,13 @@
 #include "ti_msp_dl_config.h"
 #include "crc8.h"
 #include <string.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-/* ── UART 实例映射 ─────────────────────────────────────────── */
-#define LICHEE_REC_UART      Licheervnano_INST           /* UART0 peripheral */
-#define LICHEE_REC_UART_IRQN Licheervnano_INST_INT_IRQN   /* UART0_INT_IRQn  */
 
-/* ── float / uint8_t 联合体 ────────────────────────────────── */
-typedef union {
-    float   f;
-    uint8_t bytes[4];
-} FloatBytes_u;
 
-/* ── 接收状态机状态 ────────────────────────────────────────── */
-typedef enum {
-    STATE_HEADER = 0,
-    STATE_CMD_ID,
-    STATE_DATA0,
-    STATE_DATA1,
-    STATE_DATA2,
-    STATE_DATA3,
-    STATE_CRC
-} RxState_e;
+// licheervnano当前状态
+LicheervnanoStatus_t host_status = HOST_OFFLINE;
 
 /* ── 静态变量 ──────────────────────────────────────────────── */
 static uint8_t       rx_buf[LICHEE_REC_DATA_SIZE];   /* CRC计算缓冲区     */
@@ -40,10 +26,12 @@ static uint8_t       rx_cmd_id;                      /* 当前帧的cmd_id    */
 static FloatBytes_u  rx_float_data;                   /* 当前帧的float数据  */
 
 static volatile uint8_t frame_received;               /* 帧接收标志        */
-static volatile uint8_t last_cmd_id;                  /* 最新有效cmd_id    */
-static volatile float   last_data;                    /* 最新有效float数据  */
+// static volatile uint8_t last_cmd_id;                  /* 最新有效cmd_id    */
+// static volatile float   last_data;                    /* 最新有效float数据  */
+static volatile Licheervnano_Frame LicheeRec_Frame;
 
 /* ── 公开接口 ──────────────────────────────────────────────── */
+
 
 /**
  * @brief 初始化 LiChee 通信模块
@@ -54,8 +42,8 @@ void LicheeRec_Init(void)
     rx_state      = STATE_HEADER;
     rx_data_index = 0;
     frame_received = 0;
-    last_cmd_id   = 0;
-    last_data     = 0.0f;
+    LicheeRec_Frame.cmdid = 0;
+    LicheeRec_Frame.data = 0.0f;
 
     /* 清空 RX FIFO */
     while (!DL_UART_isRXFIFOEmpty(LICHEE_REC_UART))
@@ -156,8 +144,8 @@ void LicheeRec_ReceiveByte(uint8_t data)
             uint8_t calc_crc = crc_8(rx_buf, LICHEE_REC_DATA_SIZE);
             if (calc_crc == data)
             {
-                last_cmd_id    = rx_cmd_id;
-                last_data      = rx_float_data.f;
+                LicheeRec_Frame.cmdid    = rx_cmd_id;
+                LicheeRec_Frame.data     = rx_float_data.f;
                 frame_received = 1;
             }
             rx_state = STATE_HEADER;
@@ -175,7 +163,7 @@ void LicheeRec_ReceiveByte(uint8_t data)
  */
 uint8_t LicheeRec_GetCmdId(void)
 {
-    return last_cmd_id;
+    return LicheeRec_Frame.cmdid;
 }
 
 /**
@@ -183,7 +171,7 @@ uint8_t LicheeRec_GetCmdId(void)
  */
 float LicheeRec_GetData(void)
 {
-    return last_data;
+    return LicheeRec_Frame.data;
 }
 
 /**
@@ -201,6 +189,28 @@ uint8_t LicheeRec_IsFrameReceived(void)
 void LicheeRec_ClearFrameReceived(void)
 {
     frame_received = 0;
+}
+
+/**
+ * @brief  接收上位机命令，判断在线状态
+ * @param  cmdid: 命令ID
+ * @param  data : 数据
+ * @return 当前上位机状态
+ */
+LicheervnanoStatus_t Licheervnano_CheckOnline(uint8_t cmdid, uint8_t data)
+{
+    if(cmdid == 1 && data == 0)
+    {
+        // 上位机上线
+        host_status = ONLINE;
+    }
+    else if(cmdid == 0 && data == 0)
+    {
+        // 上位机下线
+        host_status = OFFLINE;
+    }
+
+    return host_status;
 }
 
 /* ── UART2 中断服务函数 ────────────────────────────────────── */

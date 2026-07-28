@@ -1,8 +1,10 @@
 #include "IMU_Mahony.h"
-#include "icm42688_improved.h"
+// #include "icm42688_improved.h"
 #include "dwt.h"
 #include <math.h>
 #include <stdint.h>
+
+#include "BMI088.h"
 
 imu_mahony_xyz_t imu_mahony_north = {0.0f, 0.0f, 0.0f};
 imu_mahony_xyz_t imu_mahony_west = {0.0f, 0.0f, 0.0f};
@@ -162,7 +164,7 @@ static void mahony_get_rotation_matrix(float r[3][3])
 
 void IMU_Mahony_Init(void)
 {
-    if (ICM42688_Improved_Init() == 0) {
+    if (bsp_Bmi088Init() == 0) {
         mahony_init();
         last_update_ms = DWT_GetTimeline_ms();
         imu_initialized = 1U;
@@ -171,8 +173,8 @@ void IMU_Mahony_Init(void)
 
 void IMU_Mahony_GetYawPitchRoll(float *ypr)
 {
-    icm42688_imp_data_t acc;
-    icm42688_imp_data_t gyro;
+    bmi088RealData_t acc;
+    bmi088RealData_t gyro;
     float now_ms;
     float dt;
     float roll;
@@ -187,7 +189,7 @@ void IMU_Mahony_GetYawPitchRoll(float *ypr)
         return;
     }
 
-    (void)ICM42688_Improved_GetRawData(&acc, &gyro);
+    (void)bsp_Bmi088GetRawData(&acc, &gyro);
 
     imu_mahony_motion6[0] = acc.x;
     imu_mahony_motion6[1] = acc.y;

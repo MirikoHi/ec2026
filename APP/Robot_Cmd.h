@@ -4,8 +4,8 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
-#include "elrs.h"
-#include "BlueTooth_uart.h"
+// #include "elrs.h"
+// #include "BlueTooth_uart.h"
 
 
 
@@ -16,9 +16,9 @@ extern QueueHandle_t chassis_cmd_queue;
 extern QueueHandle_t chassis_fetch_data_queue;
 extern QueueHandle_t trace_fetch_data_queue;
 extern QueueHandle_t gimbal_cmd_queue;
-extern const volatile ELRS_Data_s *robotcmd_elrs;
-extern BlueTooth_Tx_t g_bt_tx;
-extern volatile BlueTooth_Rx_t g_bt_rx;
+// extern const volatile ELRS_Data_s *robotcmd_elrs;
+// extern BlueTooth_Tx_t g_bt_tx;
+// extern volatile BlueTooth_Rx_t g_bt_rx;
 
 typedef enum {
 	NORMAL_MODE=0,
@@ -31,7 +31,7 @@ typedef enum {
 typedef struct {
 		Chassis_Mode_e Chassis_Mode;
 		uint8_t circle_set;
-		uint8_t remote_disable;
+		uint8_t remote_lost;
 		float remote_forward;
 		float remote_turn;
 }chassis_cmd_q;
