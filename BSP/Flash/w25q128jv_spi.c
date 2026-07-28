@@ -8,6 +8,12 @@
 #define W25Q128JV_SPI_CS_PORT       SPI_FLASH_CS_PORT
 #define W25Q128JV_SPI_CS_PIN        SPI_FLASH_CS_CSN_PIN
 
+/**
+  * @brief SPI 交换一个字节
+  * @param tx 要发送的一个字节数据，范围 0x00~0xFF
+  * @return 同时接收到的一个字节数据，范围 0x00~0xFF
+  * @note 用法：W25Q128JV 是全双工 SPI，发送指令、地址、dummy 或数据时都通过本函数完成
+  */
 static uint8_t w25q128jv_spi_xfer(uint8_t tx)
 {
     DL_SPI_transmitData8(W25Q128JV_SPI_INST, tx);
@@ -17,16 +23,32 @@ static uint8_t w25q128jv_spi_xfer(uint8_t tx)
     return DL_SPI_receiveData8(W25Q128JV_SPI_INST);
 }
 
+/**
+  * @brief 拉低 Flash 片选
+  * @return 无
+  * @note 用法：每条 SPI 指令开始前调用，使 W25Q128JV 进入本次命令接收状态
+  */
 static void w25q128jv_cs_low(void)
 {
     DL_GPIO_clearPins(W25Q128JV_SPI_CS_PORT, W25Q128JV_SPI_CS_PIN);
 }
 
+/**
+  * @brief 拉高 Flash 片选
+  * @return 无
+  * @note 用法：每条 SPI 指令发送完成后调用，通知 W25Q128JV 结束本次命令
+  */
 static void w25q128jv_cs_high(void)
 {
     DL_GPIO_setPins(W25Q128JV_SPI_CS_PORT, W25Q128JV_SPI_CS_PIN);
 }
 
+/**
+  * @brief 发送 24 位 Flash 地址
+  * @param address Flash 地址，低 24 位有效
+  * @return 无
+  * @note 用法：读、页编程、扇区擦除等带地址命令发送指令后调用
+  */
 static void w25q128jv_send_addr24(uint32_t address)
 {
     w25q128jv_spi_xfer((uint8_t)(address >> 16));
@@ -34,6 +56,11 @@ static void w25q128jv_send_addr24(uint32_t address)
     w25q128jv_spi_xfer((uint8_t)address);
 }
 
+/**
+  * @brief 发送写使能命令
+  * @return W25Q128JV_OK 表示命令已发送
+  * @note 用法：页编程、扇区擦除、块擦除、整片擦除前必须先调用
+  */
 static W25Q128JV_Status_e w25q128jv_write_enable(void)
 {
     w25q128jv_cs_low();
@@ -42,6 +69,13 @@ static W25Q128JV_Status_e w25q128jv_write_enable(void)
     return W25Q128JV_OK;
 }
 
+/**
+  * @brief 读取指定状态寄存器
+  * @param cmd 状态寄存器读取命令，例如 0x05、0x35、0x15
+  * @param value 输出状态寄存器值
+  * @return W25Q128JV_OK 表示读取成功，W25Q128JV_ERR_NULL 表示输出指针为空
+  * @note 用法：对外的 ReadStatus1/2/3 都调用本函数实现
+  */
 static W25Q128JV_Status_e w25q128jv_read_status(uint8_t cmd, uint8_t *value)
 {
     if (value == NULL)
@@ -56,6 +90,12 @@ static W25Q128JV_Status_e w25q128jv_read_status(uint8_t cmd, uint8_t *value)
     return W25Q128JV_OK;
 }
 
+/**
+  * @brief 等待状态寄存器 1 的 WIP 位清零
+  * @param timeout_ms 超时时间，单位 ms
+  * @return W25Q128JV_OK 表示 Flash 空闲，W25Q128JV_ERR_TIMEOUT 表示等待超时
+  * @note 用法：写入或擦除后等待芯片内部操作完成，避免下一条命令过早发送
+  */
 static W25Q128JV_Status_e w25q128jv_wait_wip_clear(uint32_t timeout_ms)
 {
     const float start_ms = DWT_GetTimeline_ms();
@@ -76,11 +116,22 @@ static W25Q128JV_Status_e w25q128jv_wait_wip_clear(uint32_t timeout_ms)
     return W25Q128JV_ERR_TIMEOUT;
 }
 
+/**
+  * @brief 初始化 W25Q128JV SPI 片选状态
+  * @return 无
+  * @note 用法：系统初始化后调用一次，保证 CS 处于高电平空闲状态
+  */
 void W25Q128JV_SpiInit(void)
 {
     w25q128jv_cs_high();
 }
 
+/**
+  * @brief 读取并校验 JEDEC ID
+  * @param id 输出 JEDEC ID
+  * @return W25Q128JV_OK 表示 ID 正确，其他值表示空指针或型号不匹配
+  * @note 25Q128JVSQ 期望读到 manufacturer_id=0xEF，device_id=0x4018
+  */
 W25Q128JV_Status_e W25Q128JV_ReadJedecId(W25Q128JV_JedecId_s *id)
 {
     uint8_t raw[3] = {0};
@@ -110,26 +161,57 @@ W25Q128JV_Status_e W25Q128JV_ReadJedecId(W25Q128JV_JedecId_s *id)
     return W25Q128JV_OK;
 }
 
+/**
+  * @brief 读取状态寄存器 1
+  * @param value 输出状态寄存器 1 的值
+  * @return W25Q128JV_OK 表示读取成功
+  * @note 状态寄存器 1 的 bit0 为 WIP，bit1 为 WEL
+  */
 W25Q128JV_Status_e W25Q128JV_ReadStatus1(uint8_t *value)
 {
     return w25q128jv_read_status(W25Q128JV_CMD_READ_STATUS1, value);
 }
 
+/**
+  * @brief 读取状态寄存器 2
+  * @param value 输出状态寄存器 2 的值
+  * @return W25Q128JV_OK 表示读取成功
+  * @note 可用于检查 QE 等配置位
+  */
 W25Q128JV_Status_e W25Q128JV_ReadStatus2(uint8_t *value)
 {
     return w25q128jv_read_status(W25Q128JV_CMD_READ_STATUS2, value);
 }
 
+/**
+  * @brief 读取状态寄存器 3
+  * @param value 输出状态寄存器 3 的值
+  * @return W25Q128JV_OK 表示读取成功
+  */
 W25Q128JV_Status_e W25Q128JV_ReadStatus3(uint8_t *value)
 {
     return w25q128jv_read_status(W25Q128JV_CMD_READ_STATUS3, value);
 }
 
+/**
+  * @brief 等待 Flash 空闲
+  * @param timeout_ms 超时时间，单位 ms
+  * @return W25Q128JV_OK 表示 Flash 已空闲，W25Q128JV_ERR_TIMEOUT 表示超时
+  * @note 对外封装 WIP 轮询，供上层在必要时主动等待
+  */
 W25Q128JV_Status_e W25Q128JV_WaitReady(uint32_t timeout_ms)
 {
     return w25q128jv_wait_wip_clear(timeout_ms);
 }
 
+/**
+  * @brief 从 Flash 读取任意长度数据
+  * @param address 起始地址，范围 0 ~ W25Q128JV_TOTAL_SIZE-1
+  * @param buf 读取数据输出缓冲区
+  * @param len 读取长度，单位字节
+  * @return W25Q128JV_OK 表示读取成功，其他值表示参数错误或等待超时
+  * @note 本函数发送 0x03 普通读命令，不需要写使能，不会修改 Flash 内容
+  */
 W25Q128JV_Status_e W25Q128JV_ReadData(uint32_t address, uint8_t *buf, uint32_t len)
 {
     uint32_t i;
@@ -160,6 +242,14 @@ W25Q128JV_Status_e W25Q128JV_ReadData(uint32_t address, uint8_t *buf, uint32_t l
     return W25Q128JV_OK;
 }
 
+/**
+  * @brief 单页编程
+  * @param address 写入起始地址
+  * @param buf 待写入数据缓冲区
+  * @param len 写入长度，不能跨越 256 字节页边界
+  * @return W25Q128JV_OK 表示写入成功，其他值表示参数错误或写入超时
+  * @note 写入前需要对应区域已经擦除；Flash 编程只能把 1 写成 0
+  */
 W25Q128JV_Status_e W25Q128JV_PageProgram(uint32_t address, const uint8_t *buf, uint32_t len)
 {
     uint32_t i;
@@ -208,6 +298,14 @@ W25Q128JV_Status_e W25Q128JV_PageProgram(uint32_t address, const uint8_t *buf, u
     return w25q128jv_wait_wip_clear(15U);
 }
 
+/**
+  * @brief 跨页连续写入数据
+  * @param address 写入起始地址
+  * @param buf 待写入数据缓冲区
+  * @param len 写入长度，单位字节
+  * @return W25Q128JV_OK 表示写入成功，其他值表示参数错误或写入失败
+  * @note 内部按页边界拆分，多次调用 W25Q128JV_PageProgram()
+  */
 W25Q128JV_Status_e W25Q128JV_WriteBuffer(uint32_t address, const uint8_t *buf, uint32_t len)
 {
     W25Q128JV_Status_e ret;
@@ -245,6 +343,15 @@ W25Q128JV_Status_e W25Q128JV_WriteBuffer(uint32_t address, const uint8_t *buf, u
     return W25Q128JV_OK;
 }
 
+/**
+  * @brief 擦除公共实现
+  * @param cmd 擦除命令
+  * @param address 擦除起始地址，整片擦除时该参数无效
+  * @param timeout_ms 等待擦除完成的超时时间，单位 ms
+  * @param mask 地址对齐掩码
+  * @return W25Q128JV_OK 表示擦除成功，其他值表示地址未对齐或擦除超时
+  * @note 4K、32K、64K 和整片擦除都通过本函数或相同流程实现
+  */
 static W25Q128JV_Status_e w25q128jv_erase_common(uint8_t cmd, uint32_t address, uint32_t timeout_ms, uint32_t mask)
 {
     if ((address & mask) != 0U)
@@ -273,6 +380,12 @@ static W25Q128JV_Status_e w25q128jv_erase_common(uint8_t cmd, uint32_t address, 
     return w25q128jv_wait_wip_clear(timeout_ms);
 }
 
+/**
+  * @brief 擦除 4KB 扇区
+  * @param address 扇区起始地址，必须 4KB 对齐
+  * @return W25Q128JV_OK 表示擦除成功
+  * @note 参数双槽机制使用 4KB 扇区作为一个槽
+  */
 W25Q128JV_Status_e W25Q128JV_Erase4K(uint32_t address)
 {
     return w25q128jv_erase_common(W25Q128JV_CMD_SECTOR_ERASE_4K,
@@ -281,6 +394,12 @@ W25Q128JV_Status_e W25Q128JV_Erase4K(uint32_t address)
                                   W25Q128JV_SECTOR_SIZE - 1U);
 }
 
+/**
+  * @brief 擦除 32KB 块
+  * @param address 块起始地址，必须 32KB 对齐
+  * @return W25Q128JV_OK 表示擦除成功
+  * @note 适合清理较大连续区域，比逐个 4KB 扇区擦除更快
+  */
 W25Q128JV_Status_e W25Q128JV_Erase32K(uint32_t address)
 {
     return w25q128jv_erase_common(W25Q128JV_CMD_BLOCK_ERASE_32K,
@@ -289,6 +408,12 @@ W25Q128JV_Status_e W25Q128JV_Erase32K(uint32_t address)
                                   W25Q128JV_BLOCK32_SIZE - 1U);
 }
 
+/**
+  * @brief 擦除 64KB 块
+  * @param address 块起始地址，必须 64KB 对齐
+  * @return W25Q128JV_OK 表示擦除成功
+  * @note 适合清理较大连续区域，比 32KB 或 4KB 擦除更快
+  */
 W25Q128JV_Status_e W25Q128JV_Erase64K(uint32_t address)
 {
     return w25q128jv_erase_common(W25Q128JV_CMD_BLOCK_ERASE_64K,
@@ -297,6 +422,11 @@ W25Q128JV_Status_e W25Q128JV_Erase64K(uint32_t address)
                                   W25Q128JV_BLOCK64_SIZE - 1U);
 }
 
+/**
+  * @brief 整片擦除
+  * @return W25Q128JV_OK 表示整片擦除成功
+  * @note 会清空整颗 Flash，包含参数槽，正常调参和比赛运行禁止调用
+  */
 W25Q128JV_Status_e W25Q128JV_ChipErase(void)
 {
     if (w25q128jv_wait_wip_clear(200U) != W25Q128JV_OK)
@@ -316,6 +446,11 @@ W25Q128JV_Status_e W25Q128JV_ChipErase(void)
     return w25q128jv_wait_wip_clear(200000U);
 }
 
+/**
+  * @brief 软件复位 Flash
+  * @return W25Q128JV_OK 表示复位命令已发送
+  * @note 依次发送 0x66 和 0x99，复位后延时等待芯片恢复
+  */
 W25Q128JV_Status_e W25Q128JV_Reset(void)
 {
     w25q128jv_cs_low();
@@ -330,6 +465,11 @@ W25Q128JV_Status_e W25Q128JV_Reset(void)
     return W25Q128JV_OK;
 }
 
+/**
+  * @brief 运行 Flash 芯片基础自测
+  * @return W25Q128JV_OK 表示 JEDEC、擦除、写入、读取校验全部通过
+  * @note 会擦除最后一个 4KB 扇区 0xFFF000，该扇区已作为参数 slot1，正常启动禁止调用
+  */
 W25Q128JV_Status_e W25Q128JV_RunSelfTest(void)
 {
     static uint8_t write_buf[W25Q128JV_PAGE_SIZE];
