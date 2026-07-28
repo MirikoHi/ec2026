@@ -21,5 +21,6 @@
 
 void Gray_Serial_Init(void);
 uint8_t Gray_Serial_Read(void);
+bool Gray_Is_Line(uint8_t trace);
 
 #endif /* _GRAY_SERIAL_H_ */

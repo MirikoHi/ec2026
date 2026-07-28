@@ -24,7 +24,7 @@ void Robot_Init(void)
 	Chassis_Init();
 	free_heap = xPortGetFreeHeapSize();
 	LOGWARNING("heap after Chassis_Init: %u", (uint32_t)free_heap);
-//	Trace_Init();
+	Trace_Init();
 	RobotCmd_Init();
 	free_heap = xPortGetFreeHeapSize();
 	LOGWARNING("heap after RobotCmd_Init: %u", (uint32_t)free_heap);

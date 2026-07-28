@@ -46,3 +46,22 @@ uint8_t Gray_Serial_Read(void)
 
     return ret;
 }
+
+bool Gray_Is_Line(uint8_t trace)
+{
+    uint8_t black = ~trace;
+
+    uint8_t count = 0;
+
+
+    for(int i=0;i<8;i++)
+    {
+        if(black&(1<<i))
+        {
+            count++;
+        }
+    }
+
+
+    return count>=6;
+}
