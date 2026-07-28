@@ -3,6 +3,7 @@
 #include "No_Mcu_Ganv_Grayscale_Sensor_Config.h"
 #include "dwt.h"
 #include "gray_serial.h"
+#include "flash_param_store.h"
 #define SENSOR_WEIGHTS { -4.0f, -3.0f, -2.0f, -1.0f, 1.0f, 2.0f, 3.0f, 4.0f }
 
 /* ---- filter_raw 可调参数 ---- */
@@ -39,6 +40,30 @@ static int     calcline_single_pos  = -1;
 static uint8_t calcline_single_cnt  = 0;
 static uint8_t calcline_ff_gap_cnt  = 0;
 
+/**
+  * @brief 填充循迹相关默认参数
+  * @param params 待填充参数结构体指针
+  * @note 默认值保留在循迹使用处，Flash 参数无效时由存储库调用本函数恢复默认循迹参数
+  */
+void Trace_FillDefaultParams(FlashParam_Data_s *params)
+{
+    if (params == NULL)
+    {
+        return;
+    }
+
+    params->trace_pid = (pid_init_config_s) {
+        .mode = PID_POSITION,
+        .Kp = 0.006f,
+        .Ki = 0.0f,
+        .Kd = 0.0f,
+        .max_out = 500.0f,
+        .max_iout = 200.0f,
+        .deadzone = 0.0f,
+        .ff_type = FF_None,
+    };
+}
+
 void Trace_Init(void)
 {
 #ifdef USE_GRAY_SERIAL
@@ -57,15 +82,8 @@ void Trace_Init(void)
     No_MCU_Ganv_Sensor_Init(&sensor,white,black);
     DWT_Delay(0.1);
 #endif
-	pid_init_config_s trace_config={
-		.mode = PID_POSITION,
-		.Kp = 0.006f,
-		.Kd = 0.0f,
-		.Ki = 0.0f,
-		.max_out = 500.0f,
-		.max_iout = 200.0f,
-		//.feedforward = 0.0f,
-	};
+	// 使用上电从 Flash 读取到的循迹 PID 参数。
+	pid_init_config_s trace_config = FlashParam_GetActive()->trace_pid;
 	PID_init(&Trace_PID,&trace_config);
 }
 

@@ -2,6 +2,8 @@
 
 #include <string.h>
 #include "bsp_log.h"
+#include "Chassis.h"
+#include "trace.h"
 
 #define FLASH_PARAM_MAGIC               0x4350524DU
 #define FLASH_PARAM_VERSION             1U
@@ -27,49 +29,22 @@ typedef struct
 
 static FlashParam_State_s flash_param_state = {0};
 
-static const FlashParam_Data_s flash_param_default = {
-    .trace_pid = {
-        .mode = PID_POSITION,
-        .Kp = 0.006f,
-        .Ki = 0.0f,
-        .Kd = 0.0f,
-        .max_out = 500.0f,
-        .max_iout = 200.0f,
-        .deadzone = 0.0f,
-        .ff_type = FF_None,
-    },
-    .line_yaw_pid = {
-        .mode = PID_POSITION,
-        .Kp = 0.0008f,
-        .Ki = 0.0f,
-        .Kd = 0.000003f,
-        .max_out = 0.08f,
-        .max_iout = 0.0f,
-        .deadzone = 0.5f,
-        .ff_type = FF_None,
-    },
-    .turn_pid = {
-        .mode = PID_POSITION,
-        .Kp = 0.0008f,
-        .Ki = 0.000012f,
-        .Kd = 0.000003f,
-        .max_out = 0.08f,
-        .max_iout = 0.01f,
-        .deadzone = 0.001f,
-        .ff_type = FF_None,
-    },
-    .line_distance_m = {0.96f, 0.96f, 0.96f, 0.96f},
-    .turn_angle_deg = {92.0f, 92.0f, 92.0f, 92.0f},
-    .line_accel_m = 0.20f,
-    .line_slowdown_m = 0.25f,
-    .line_min_speed_mps = 0.025f,
-    .line_done_err_m = 0.005f,
-    .line_done_ticks = 10U,
-    .turn_done_err_deg = 3.0f,
-    .turn_done_ticks = 10U,
-    .action_speed_mps = 0.2f,
-    .turn_speed_mps = 0.05f,
-};
+/**
+  * @brief 组装默认参数
+  * @param params 输出默认参数结构体指针
+  * @note Flash 库不保存业务默认值，默认值由各个使用模块填充
+  */
+static void FlashParam_BuildDefault(FlashParam_Data_s *params)
+{
+    if (params == NULL)
+    {
+        return;
+    }
+
+    memset(params, 0, sizeof(*params));
+    Chassis_FillDefaultParams(params);
+    Trace_FillDefaultParams(params);
+}
 
 /**
   * @brief 根据槽号换算 Flash 物理地址
@@ -172,7 +147,7 @@ static FlashParam_Status_e FlashParam_ValidateRecord(const FlashParam_Record_s *
   */
 static void FlashParam_SetDefaultState(void)
 {
-    flash_param_state.params = flash_param_default;
+    FlashParam_BuildDefault(&flash_param_state.params);
     flash_param_state.source = FLASH_PARAM_SOURCE_DEFAULT;
     flash_param_state.sequence = 0U;
 }
@@ -318,7 +293,7 @@ void FlashParam_GetDefault(FlashParam_Data_s *params)
 {
     if (params != NULL)
     {
-        *params = flash_param_default;
+        FlashParam_BuildDefault(params);
     }
 }
 

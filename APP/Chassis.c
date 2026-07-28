@@ -11,6 +11,8 @@
 #include "trace.h"
 #include "IMU_Mahony.h"
 #include "PID.h"
+#include "flash_param_store.h"
+#include "bsp_log.h"
 
 static DCMotorInstance *motor_l,*motor_r;
 
@@ -30,18 +32,9 @@ static uint8_t remote_mode_active = 0;
 
 #define CHASSIS_ACTION_DONE          1U
 #define CHASSIS_ACTION_RUNNING       0U
-#define CHASSIS_LINE_DONE_ERR_M      0.005f
-#define CHASSIS_LINE_DONE_TICKS      10U
-#define CHASSIS_LINE_ACCEL_M         0.20f
-#define CHASSIS_LINE_SLOWDOWN_M      0.25f
-#define CHASSIS_LINE_MIN_SPEED       0.025f
-#define CHASSIS_TURN_DONE_ERR_DEG    3.0f
-#define CHASSIS_TURN_DONE_TICKS      10U
-#define CHASSIS_ACTION_SPEED		 0.2f
-#define CHASSIS_ACTION_TURN_SPEED	 0.05f
-
 static pid_type_def chassis_line_yaw_pid;
 static pid_type_def chassis_turn_pid;
+static FlashParam_Data_s chassis_param;
 static Chassis_Mode_e chassis_last_mode = NORMAL_MODE;
 static uint8_t chassis_action_active = 0U;
 static uint8_t chassis_action_type = 0U;
@@ -65,6 +58,62 @@ static void Chassis_ResetEncoderOdom(void);
 static float Chassis_GetForwardOdom(void);
 static float Chassis_GetYawDeg(void);
 static float Chassis_AngleNormalize(float angle);
+
+/**
+  * @brief 填充底盘相关默认参数
+  * @param params 待填充参数结构体指针
+  * @note 默认值保留在底盘使用处，Flash 参数无效时由存储库调用本函数恢复默认底盘参数
+  */
+void Chassis_FillDefaultParams(FlashParam_Data_s *params)
+{
+	if (params == NULL)
+	{
+		return;
+	}
+
+	params->line_yaw_pid = (pid_init_config_s) {
+		.mode = PID_POSITION,
+		.Kp = 0.0008f,
+		.Ki = 0.0f,
+		.Kd = 0.000003f,
+		.max_out = 0.08f,
+		.max_iout = 0.0f,
+		.deadzone = 0.5f,
+		.ff_type = FF_None,
+	};
+
+	params->turn_pid = (pid_init_config_s) {
+		.mode = PID_POSITION,
+		.Kp = 0.0008f,
+		.Ki = 0.000012f,
+		.Kd = 0.000003f,
+		.max_out = 0.08f,
+		.max_iout = 0.01f,
+		.deadzone = 0.001f,
+		.ff_type = FF_None,
+	};
+
+	params->line_distance_m[0] = 0.96f;
+	params->line_distance_m[1] = 0.96f;
+	params->line_distance_m[2] = 0.96f;
+	params->line_distance_m[3] = 0.96f;
+
+	params->turn_angle_deg[0] = 92.0f;
+	params->turn_angle_deg[1] = 92.0f;
+	params->turn_angle_deg[2] = 92.0f;
+	params->turn_angle_deg[3] = 92.0f;
+
+	params->line_accel_m = 0.20f;
+	params->line_slowdown_m = 0.25f;
+	params->line_min_speed_mps = 0.025f;
+	params->line_done_err_m = 0.005f;
+	params->line_done_ticks = 10U;
+	params->turn_done_err_deg = 3.0f;
+	params->turn_done_ticks = 10U;
+	params->action_speed_mps = 0.2f;
+	params->turn_speed_mps = 0.05f;
+}
+
 /**
  * @brief 初始化底盘左右电机和 IMU
  */
@@ -157,27 +206,23 @@ void Chassis_Init(void)
 	// ICM42688 陀螺仪初始化，ICM 需要主动轮询读取并解算。
 	IMU_Mahony_Init();
 	// JY901s_IMU_Data = JY901s_IMU_Init();
-	pid_init_config_s line_yaw_pid_config = {
-		.mode = PID_POSITION,
-		.Kp = 0.0008f,
-		.Ki = 0.0f,
-		.Kd = 0.000003f,
-		.max_out = 0.08f,
-		.max_iout = 0.0f,
-		.deadzone = 0.5f,
-	};
-	PID_init(&chassis_line_yaw_pid, &line_yaw_pid_config);
 
-	pid_init_config_s turn_pid_config = {
-		.mode = PID_POSITION,
-		.Kp = 0.0008f,
-		.Ki = 0.000012f,
-		.Kd = 0.000003f,
-		.max_out = 0.08f,
-		.max_iout = 0.01f,
-		.deadzone = 0.001f,
-	};
-	PID_init(&chassis_turn_pid, &turn_pid_config);
+	// 上电参数已经由 FlashParam_Init() 读取，这里复制一份给底盘动作使用。
+	chassis_param = *FlashParam_GetActive();
+	LOGINFO("[param] chassis apply source=%d, seq=%u",
+	        FlashParam_GetSource(),
+	        FlashParam_GetSequence());
+	LOGINFO("[param] line=%.3f %.3f %.3f %.3f, turn=%.1f %.1f %.1f %.1f",
+	        chassis_param.line_distance_m[0],
+	        chassis_param.line_distance_m[1],
+	        chassis_param.line_distance_m[2],
+	        chassis_param.line_distance_m[3],
+	        chassis_param.turn_angle_deg[0],
+	        chassis_param.turn_angle_deg[1],
+	        chassis_param.turn_angle_deg[2],
+	        chassis_param.turn_angle_deg[3]);
+	PID_init(&chassis_line_yaw_pid, &chassis_param.line_yaw_pid);
+	PID_init(&chassis_turn_pid, &chassis_param.turn_pid);
 	DWT_Delay(1);
 }
 
@@ -262,7 +307,7 @@ static void Chassis_ImuModeAction(void)
 	{
 		case 0:
 			// 第一条边：使用 ICM42688 yaw 做方向保持，直行 1.0m。
-			if (Chassis_MoveStraight(0.96f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveStraight(chassis_param.line_distance_m[0], chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 1U;
 			}
@@ -283,14 +328,14 @@ static void Chassis_ImuModeAction(void)
 			break;
 		case 1:
 			// 第一次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(92.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(chassis_param.turn_angle_deg[0], chassis_param.turn_speed_mps) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 2U;
 			}
 			break;
 		case 2:
 			// 第二条边：直行 1.0m。
-			if (Chassis_MoveStraight(0.96f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveStraight(chassis_param.line_distance_m[1], chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 3U;
 			}
@@ -310,14 +355,14 @@ static void Chassis_ImuModeAction(void)
 			break;
 		case 3:
 			// 第二次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(92.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(chassis_param.turn_angle_deg[1], chassis_param.turn_speed_mps) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 4U;
 			}
 			break;
 		case 4:
 			// 第三条边：直行 1.0m。
-			if (Chassis_MoveStraight(0.96f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveStraight(chassis_param.line_distance_m[2], chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 5U;
 			}
@@ -337,14 +382,14 @@ static void Chassis_ImuModeAction(void)
 			break;
 		case 5:
 			// 第三次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(92.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(chassis_param.turn_angle_deg[2], chassis_param.turn_speed_mps) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 6U;
 			}
 			break;
 		case 6:
 			// 第四条边：直行 1.0m。
-			if (Chassis_MoveStraight(0.96f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveStraight(chassis_param.line_distance_m[3], chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 7U;
 			}
@@ -364,7 +409,7 @@ static void Chassis_ImuModeAction(void)
 			break;
 		case 7:
 			// 第四次转角完成后回到第一条边，形成正方形循环。
-			if (Chassis_TurnAngle(92.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_TurnAngle(chassis_param.turn_angle_deg[3], chassis_param.turn_speed_mps) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 0U;
 			}
@@ -466,7 +511,7 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 	float yaw_error;
 	float yaw_compensation;
 
-	if (abs_distance <= CHASSIS_LINE_DONE_ERR_M)
+	if (abs_distance <= chassis_param.line_done_err_m)
 	{
 		Chassis_ResetAction();
 		return CHASSIS_ACTION_DONE;
@@ -498,12 +543,12 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 	motor_r->State = ENABLE;
 
 	remain = chassis_action_target_distance - Chassis_GetForwardOdom();
-	if (fabsf(remain) <= CHASSIS_LINE_DONE_ERR_M)
+	if (fabsf(remain) <= chassis_param.line_done_err_m)
 	{
 		chassis_action_done_count++;
 		DC_Motor_SetRef(motor_l, 0.0f);
 		DC_Motor_SetRef(motor_r, 0.0f);
-		if (chassis_action_done_count >= CHASSIS_LINE_DONE_TICKS)
+		if (chassis_action_done_count >= chassis_param.line_done_ticks)
 		{
 			Chassis_ResetAction();
 			return CHASSIS_ACTION_DONE;
@@ -519,27 +564,27 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 	}
 
 	base_speed = (remain > 0.0f) ? abs_speed : -abs_speed;
-	if (progress < CHASSIS_LINE_ACCEL_M)
+	if ((chassis_param.line_accel_m > 0.001f) && (progress < chassis_param.line_accel_m))
 	{
-		float accel_speed = CHASSIS_LINE_MIN_SPEED +
-		                    (abs_speed - CHASSIS_LINE_MIN_SPEED) * progress / CHASSIS_LINE_ACCEL_M;
+		float accel_speed = chassis_param.line_min_speed_mps +
+		                    (abs_speed - chassis_param.line_min_speed_mps) * progress / chassis_param.line_accel_m;
 
 		/*
 		 * 起步前 0.1m 线性加速，避免一进入直线动作就给满速度。
 		 */
 		base_speed = (remain > 0.0f) ? accel_speed : -accel_speed;
 	}
-	if (fabsf(remain) < CHASSIS_LINE_SLOWDOWN_M)
+	if ((chassis_param.line_slowdown_m > 0.001f) && (fabsf(remain) < chassis_param.line_slowdown_m))
 	{
-		float slowdown_speed = abs_speed * fabsf(remain) / CHASSIS_LINE_SLOWDOWN_M;
+		float slowdown_speed = abs_speed * fabsf(remain) / chassis_param.line_slowdown_m;
 
 		/*
 		 * 直线末段提前按剩余距离线性降速。
 		 * 原逻辑只剩约 2.4cm 才减速，实际表现接近急停。
 		 */
-		if (slowdown_speed < CHASSIS_LINE_MIN_SPEED)
+		if (slowdown_speed < chassis_param.line_min_speed_mps)
 		{
-			slowdown_speed = CHASSIS_LINE_MIN_SPEED;
+			slowdown_speed = chassis_param.line_min_speed_mps;
 		}
 		if (slowdown_speed > abs_speed)
 		{
@@ -573,7 +618,7 @@ uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed)
 	float yaw_error;
 	float turn_speed;
 
-	if (fabsf(angle_deg) <= CHASSIS_TURN_DONE_ERR_DEG)
+	if (fabsf(angle_deg) <= chassis_param.turn_done_err_deg)
 	{
 		Chassis_ResetAction();
 		return CHASSIS_ACTION_DONE;
@@ -603,12 +648,12 @@ uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed)
 
 	// 直接读取当前归一化 yaw，和启动时锁定的目标 yaw 做最短角误差。
 	yaw_error = Chassis_AngleNormalize(chassis_action_target_yaw - Chassis_GetYawDeg());
-	if (fabsf(yaw_error) <= CHASSIS_TURN_DONE_ERR_DEG)
+	if (fabsf(yaw_error) <= chassis_param.turn_done_err_deg)
 	{
 		chassis_action_done_count++;
 		DC_Motor_SetRef(motor_l, 0.0f);
 		DC_Motor_SetRef(motor_r, 0.0f);
-		if (chassis_action_done_count >= CHASSIS_TURN_DONE_TICKS)
+		if (chassis_action_done_count >= chassis_param.turn_done_ticks)
 		{
 			Chassis_ResetAction();
 			return CHASSIS_ACTION_DONE;
