@@ -231,10 +231,10 @@ void app_tasks_init(void)
             STACK_HANDLE(Chassis));
 			configASSERT(xResult == pdPASS);
    //
-			// xResult=xTaskCreate(GimbalTask, "Gimbal", GIMBAL_TASK_STACK_DEPTH,
-   //           (void *) Gimbal_PARAMETER, tskIDLE_PRIORITY+2,
-   //           STACK_HANDLE(Gimbal));
-			// configASSERT(xResult == pdPASS);
+			xResult=xTaskCreate(GimbalTask, "Gimbal", GIMBAL_TASK_STACK_DEPTH,
+             (void *) Gimbal_PARAMETER, tskIDLE_PRIORITY+2,
+             STACK_HANDLE(Gimbal));
+			configASSERT(xResult == pdPASS);
 
 			// xResult=xTaskCreate(MotorTask, "Motor", MOTOR_TASK_STACK_DEPTH,
    //          (void *) MotorTask_PARAMETER, tskIDLE_PRIORITY+2,
@@ -444,24 +444,24 @@ static void ChassisTask(void *pvParameters)
 		}
 }
 
-// static void GimbalTask(void *pvParameters)
-// {
-// 	configASSERT(
-//         ((unsigned long) pvParameters) == Gimbal_PARAMETER);
-// 	Gimbal_Init();
-// 	vTaskDelay(2000);
-// 	static float Gimbal_dt;
-//   static float Gimbal_start;
-// 	for (;;){
-// 			Gimbal_start = DWT_GetTimeline_ms();
-// 			Gimbal();
-// 			Gimbal_dt = DWT_GetTimeline_ms() - Gimbal_start;
-// 			if (Gimbal_dt > 5)
-//           LOGERROR("[freeRTOS] Gimbal Task is being DELAY! dt = [%f]", Gimbal_dt);
-// 			vTaskDelay(pdMS_TO_TICKS(5));
-// //
-// 		}
-// }
+static void GimbalTask(void *pvParameters)
+{
+	configASSERT(
+        ((unsigned long) pvParameters) == Gimbal_PARAMETER);
+	Gimbal_Init();
+	vTaskDelay(2000);
+	static float Gimbal_dt;
+  static float Gimbal_start;
+	for (;;){
+			Gimbal_start = DWT_GetTimeline_ms();
+			Gimbal();
+			Gimbal_dt = DWT_GetTimeline_ms() - Gimbal_start;
+			if (Gimbal_dt > 5)
+          LOGERROR("[freeRTOS] Gimbal Task is being DELAY! dt = [%f]", Gimbal_dt);
+			vTaskDelay(pdMS_TO_TICKS(5));
+//
+		}
+}
 static void DaemonTask(void *pvParameters)
 {
 	configASSERT(

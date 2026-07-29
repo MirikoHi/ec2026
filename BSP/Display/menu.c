@@ -110,7 +110,7 @@ static void menu_flush_all_pending(void);
  */
 void MenuInit(void)
 {
-MenuInitConfig_s third_menu_config[1] = {
+MenuInitConfig_s third_menu_config[1] = {    //三级菜单
 			[0] = {
 			.string={
 				[0] = "普通",
@@ -126,12 +126,11 @@ MenuInitConfig_s third_menu_config[1] = {
 				[3] = Chassis_Mode_Switch_Callback,
 			},
 			.next_menu_config={
-
 			},
 			.pre_idx=1,
 		},
 };
-MenuInitConfig_s second_menu_config[3]	={
+MenuInitConfig_s second_menu_config[3]	={      //二级菜单
 		[0] = {
 			.string={
 				[0] = "使能",
@@ -158,8 +157,8 @@ MenuInitConfig_s second_menu_config[3]	={
 				[4]	= NULL,
 			},
 			.callback={
-				[0] = Control_Switch_Callback,
-				[1] = Control_Switch_Callback,
+				// [0] = Control_Switch_Callback,
+				// [1] = Control_Switch_Callback,
 			},
 			.next_menu_config={
 				[1] = &third_menu_config[0],
@@ -216,7 +215,7 @@ MenuInitConfig_s second_menu_config[3]	={
 //			.pre_idx=4,
 //		},
 	};
-MenuInitConfig_s first_menu_config={
+MenuInitConfig_s first_menu_config={     //一级菜单
 		.string={
 				[0] = "电机控制",
 				[1] = "控制方式",
@@ -778,9 +777,6 @@ void menu_task(void)
 			menu_set_selection(previous_idx);
 			menu_redraw();
 		}
-		
-		
-		
 	}
 	else if(Key_Check(2,KEY_SINGLE|KEY_REPEAT))//向上
 	{

@@ -41,10 +41,10 @@ typedef enum
 typedef struct
 {
     /*起止角度模式设置值*/
-    int16_t Init_angle;
-    int16_t Final_angle;
+    uint16_t Init_angle;
+    uint16_t Final_angle;
     /*任意角度模式设置值*/
-    int16_t free_angle;
+    uint16_t free_angle;
     /*下述值仅仅适用于360°舵机
      *设定值为0-100 为速度值百分比
      *0-50为正转 速度由快到慢
@@ -82,7 +82,7 @@ typedef struct
 } ServoInstance;
 
 ServoInstance *ServoInit(Servo_Init_Config_s *Servo_Init_Config);
-void Servo_Motor_FreeAngle_Set(ServoInstance *Servo_Motor, int16_t S_angle);
+void Servo_Motor_FreeAngle_Set(ServoInstance *Servo_Motor, uint16_t S_angle);
 void Servo_Motor_StartSTOP_Angle_Set(ServoInstance *Servo_Motor, int16_t Start_angle, int16_t Final_angle);
 void Servo_Motor_Type_Select(ServoInstance *Servo_Motor,int16_t mode);
 void ServeoMotorControl();

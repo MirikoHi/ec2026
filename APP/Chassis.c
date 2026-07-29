@@ -48,7 +48,6 @@ volatile JY901s_IMU_Data_s* JY901s_IMU_Data;
 
 extern State robotcmd_control_state;
 
-steel_ball_movement_typedef steel_ball_movement_data;
 
 /**
  * @brief 初始化底盘左右电机和 IMU
@@ -161,12 +160,12 @@ void Chassis(void)
 
 	// 更新 BMI088 姿态数据，耗时约 1ms。
 	IMU_Mahony_GetYawPitchRoll((float *)IMU_data);
-	K230_Read(&steel_ball_movement_data);
 
-	if (chassis_cmd_receive.remote_lost)
+
+	if (!chassis_cmd_receive.remote_lost)
 	{
-		Chassis_RemoteLostDisable();
-		return;
+		DCMotor_Cmd(motor_l,ENABLE);
+		DCMotor_Cmd(motor_r,ENABLE);
 	}
 	if (chassis_cmd_receive.Chassis_Mode != chassis_last_mode)
 	{
@@ -348,8 +347,8 @@ static void Chassis_RemoteControl(void)
 	float left_speed = chassis_cmd_receive.remote_forward - chassis_cmd_receive.remote_turn;
 	float right_speed = chassis_cmd_receive.remote_forward + chassis_cmd_receive.remote_turn;
 
-	// motor_l->State = ENABLE;
-	// motor_r->State = ENABLE;
+	motor_l->State = ENABLE;
+	motor_r->State = ENABLE;
 	Line_flag = 0;
 	Stop_Flag = 0;
 	Spin_start_flag = 0;
@@ -524,7 +523,7 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 }
 
 /**
- * @brief 使用 ICM42688 yaw 归一化角度，原地转向指定相对角度
+ * @brief 使用 IMU yaw 归一化角度，原地转向指定相对角度
  * @param angle_deg 目标相对角度，单位 deg，正负决定转向方向
  * @param max_turn_speed 转向外环 PID 最大速度输出幅值
  * @return CHASSIS_ACTION_DONE 表示完成，否则返回 CHASSIS_ACTION_RUNNING
@@ -610,7 +609,7 @@ static float Chassis_GetForwardOdom(void)
 }
 
 /**
- * @brief 获取 ICM42688 解算出的 yaw 角
+ * @brief 获取 IMU解算出的 yaw 角
  * @return yaw 角度，单位 deg
  */
 static float Chassis_GetYawDeg(void)

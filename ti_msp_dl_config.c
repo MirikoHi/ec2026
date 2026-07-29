@@ -214,13 +214,10 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
         GPIO_UART_0_IOMUX_TX, GPIO_UART_0_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
         GPIO_UART_0_IOMUX_RX, GPIO_UART_0_IOMUX_RX_FUNC);
-    
-	DL_GPIO_initPeripheralOutputFunction(
-		 GPIO_K230_IOMUX_TX, GPIO_K230_IOMUX_TX_FUNC);
-	DL_GPIO_initPeripheralInputFunctionFeatures(
-		 GPIO_K230_IOMUX_RX, GPIO_K230_IOMUX_RX_FUNC,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_NONE,
-		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_K230_IOMUX_TX, GPIO_K230_IOMUX_TX_FUNC);
+    DL_GPIO_initPeripheralInputFunction(
+        GPIO_K230_IOMUX_RX, GPIO_K230_IOMUX_RX_FUNC);
     DL_GPIO_initPeripheralOutputFunction(
         GPIO_Licheervnano_IOMUX_TX, GPIO_Licheervnano_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(

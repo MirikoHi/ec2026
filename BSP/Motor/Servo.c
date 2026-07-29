@@ -28,7 +28,7 @@ ServoInstance *ServoInit(Servo_Init_Config_s *Servo_Init_Config)
  * @param Servo_Motor 注册的舵机实例
  * @param S_angle  改变自由模式设定的角度
  */
-void Servo_Motor_FreeAngle_Set(ServoInstance *Servo_Motor, int16_t S_angle)
+void Servo_Motor_FreeAngle_Set(ServoInstance *Servo_Motor, uint16_t S_angle)
 {
     switch (Servo_Motor->Servo_type)
     {

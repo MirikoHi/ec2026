@@ -69,36 +69,44 @@ void Robot_Cmd(void)
 	LicheeRec_Frame = LicheeRec_GetFrame();
 	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_Frame.cmdid,LicheeRec_Frame.data);
 
-	switch (LicheeRec_Frame.cmdid) {
-		case 0:  // 上位机下线
-			chassis_cmd_send.remote_lost = 1;
-			last_chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
-			chassis_cmd_send.remote_forward = 0.0f;
-			robotcmd_control_state = MENU_CTL;
-			break;
-		case 1:  // 上位机上线
-			chassis_cmd_send.remote_lost = 0;
-			robotcmd_control_state = REMOTE_CTL;
-			break;
-		case 2:
-			chassis_cmd_send.remote_forward = LicheeRec_Frame.data;
-			break;
-		case 3:
-			chassis_cmd_send.remote_forward = -LicheeRec_Frame.data;
-			break;
-		case 5:  // 心跳时，延续底盘模式
-			chassis_cmd_send.Chassis_Mode = last_chassis_cmd_send.Chassis_Mode;
-			break;
-		case 6:  // 遥控控制模式
-			chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
-			last_chassis_cmd_send.Chassis_Mode = chassis_cmd_send.Chassis_Mode;
-			break;
-		case 7:  // IMU控制模式
-			chassis_cmd_send.Chassis_Mode = IMU_MODE;
-			break;
-		default:
-			break;
+	if (Licheervnano_status == ONLINE) {
+		switch (LicheeRec_Frame.cmdid) {
+			case 0:  // 上位机下线
+				chassis_cmd_send.remote_lost = 1;
+				last_chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
+				chassis_cmd_send.remote_forward = 0.0f;
+				robotcmd_control_state = MENU_CTL;
+				break;
+			case 1:  // 上位机上线
+				chassis_cmd_send.remote_lost = 0;
+				robotcmd_control_state = REMOTE_CTL;
+				chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
+				last_chassis_cmd_send.Chassis_Mode = chassis_cmd_send.Chassis_Mode;
+				break;
+			case 2:
+				chassis_cmd_send.remote_forward = LicheeRec_Frame.data;
+				break;
+			case 3:
+				chassis_cmd_send.remote_forward = -LicheeRec_Frame.data;
+				break;
+			case 5:  // 心跳时，延续底盘模式
+				chassis_cmd_send.Chassis_Mode = last_chassis_cmd_send.Chassis_Mode;
+				break;
+			case 6:  // 遥控控制模式
+				chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
+				last_chassis_cmd_send.Chassis_Mode = chassis_cmd_send.Chassis_Mode;
+				break;
+			case 7:  // IMU控制模式
+				chassis_cmd_send.Chassis_Mode = IMU_MODE;
+				break;
+			default:
+				break;
+		}
 	}
+	else {
+
+	}
+
 	// draw_sin();
 
 	//通过队列向云台和底盘发送命令
@@ -147,16 +155,7 @@ void Chassis_Mode_Switch_Callback(uint8_t i)  //选择底盘控制模式
 		chassis_cmd_send.Chassis_Mode = POSITION_MODE;
 	}
 }
-// void Control_Switch_Callback(uint8_t i)     //选择电机是否使能
-// {
-// 	if(i == 0)
-// 	{
-// 	}
-// 	else if(i ==1)
-// 	{
-// 		robotcmd_control_state = DISABLE;
-// 	}
-// }
+
 void Task_Callback(uint8_t i)    //选择执行任务
 {
 	if(i==0)

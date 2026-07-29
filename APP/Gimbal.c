@@ -21,7 +21,7 @@ pid_type_def gimbal_pitch_PID={0};
 pid_type_def gimbal_yaw_forwardfeed_PID = {0};
 gimbal_cmd_q gimbal_cmd_send ={0};
 
-
+steel_ball_movement_typedef steel_ball_movement_data;
 ServoInstance*  servo_yaw;
 
 void Gimbal_task_2(void);
@@ -93,20 +93,25 @@ void Gimbal(void)
 {
 	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
 
-	switch(gimbal_cmd_receive.task_flag)
-	{
-		case 1:
-			Gimbal_Task();
-			break;
-		default:
-			break;
+	if (K230_Read(&steel_ball_movement_data)) {
+		Servo_Motor_FreeAngle_Set(servo_yaw, (uint8_t)steel_ball_movement_data.x_position*180/640);
+		ServeoMotorControl();
 	}
+	Gimbal_Task();
+	// switch(gimbal_cmd_receive.task_flag)
+	// {
+	// 	case 0:
+	//
+	// 		break;
+	// 	default:
+	// 		break;
+	// }
 }
 
 void Gimbal_Pid_Cal(void)
 {
 	// PID_calc(&gimbal_yaw_PID,0,K230_err[0]);
-	PID_calc(&gimbal_pitch_PID,0,K230_err[1]);
+	// PID_calc(&gimbal_pitch_PID,0,K230_err[1]);
 	// gimbal_cmd_send.yaw += gimbal_yaw_PID.out;
 	gimbal_cmd_send.pitch +=gimbal_pitch_PID.out;
 }
@@ -118,9 +123,6 @@ void Gimbal_Attitude_Solving(void)
 	gimbal_cmd_receive.pitch = atan2f(aim_y,sqrtf(GIMBAL_LENGTH_TO_CENTER*GIMBAL_LENGTH_TO_CENTER+aim_x*aim_x))*180.0f/PI;
 }
 void Gimbal_Task() {
-	//舵机控制，需要时取消注释
-	int16_t angle = 0;
-	Servo_Motor_FreeAngle_Set(servo_yaw, ++angle);
-	ServeoMotorControl();
+
 }
 
