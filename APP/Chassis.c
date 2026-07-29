@@ -295,13 +295,14 @@ void Chassis(void)
 	{
 		case TRACE_MODE:
 			// 计算并设置巡线补偿量。
-			// Chassis_Trace_Cal();
+			Chassis_Trace_Cal();
 			// 按设定路径执行巡线动作。
 			Chassis_State_Turn();
 			// 检测直行/转弯是否完成，并更新完成标志。
 			Stop_Detect();
 			break;
 		case IMU_MODE:
+			Chassis_Trace_Cal();
 			Chassis_ImuModeAction();
 			break;
 		case NORMAL_MODE:
@@ -1013,44 +1014,67 @@ static float motor_test_gen_ref(float t)
  * 引脚: PA17 (TIMA1 CCP0), PA16 (TIMA1 CCP1)
  * 在 NORMAL_MODE 下调用，舵机在 0°~180° 之间来回摆动。
  */
+/* 舵机测试：阶段0快速扫0→180，阶段1扫180→0，阶段2/3/4 分别保持MAX/MIN/MID */
 static void chassis_servo_test(void)
 {
-	static ServoInstance *servo0 = NULL;
-	static ServoInstance *servo1 = NULL;
-	static uint8_t  init_done = 0;
-	static float    angle = 0.0f;
-	static int8_t   direction = 1;
+    static ServoInstance *servo0 = NULL;
+    static ServoInstance *servo1 = NULL;
+    static uint8_t  init_done = 0;
+    static uint8_t  phase = 0;
+    static uint16_t tick = 0;
+    static float    angle = 0.0f;
 
-	if (!init_done) {
-		Servo_Init_Config_s cfg0 = {
-			.Servo_type = Servo180,
-			.Servo_Angle_Type = Free_Angle_mode,
-			.inst = Servo_INST,
-			.idx = GPIO_Servo_C0_IDX,   /* PA17 */
-		};
-		servo0 = ServoInit(&cfg0);
-		Servo_Motor_Type_Select(servo0, Free_Angle_mode);
+    enum { SWEEP_UP, SWEEP_DOWN, HOLD_MAX, HOLD_MIN, HOLD_MID, PHASE_COUNT };
+    /* 每阶段持续 tick 数（5ms/tick） */
+    const uint16_t phase_ticks[PHASE_COUNT] = {
+        [SWEEP_UP]   = 400,  /* 2s: 0→180, 每tick +0.45° */
+        [SWEEP_DOWN] = 400,  /* 2s: 180→0, 每tick -0.45° */
+        [HOLD_MAX]   = 600,  /* 3s: 保持 180° */
+        [HOLD_MIN]   = 600,  /* 3s: 保持 0°   */
+        [HOLD_MID]   = 600,  /* 3s: 保持 90°  */
+    };
 
-		Servo_Init_Config_s cfg1 = {
-			.Servo_type = Servo180,
-			.Servo_Angle_Type = Free_Angle_mode,
-			.inst = Servo_INST,
-			.idx = GPIO_Servo_C1_IDX,   /* PA16 */
-		};
-		servo1 = ServoInit(&cfg1);
-		Servo_Motor_Type_Select(servo1, Free_Angle_mode);
+    if (!init_done) {
+        Servo_Init_Config_s cfg0 = {
+            .Servo_type = Servo180,
+            .Servo_Angle_Type = Free_Angle_mode,
+            .inst = Servo_INST, .idx = GPIO_Servo_C0_IDX, /* PA17 */
+        };
+        servo0 = ServoInit(&cfg0);
+        Servo_Motor_Type_Select(servo0, Free_Angle_mode);
 
-		init_done = 1;
-	}
+        Servo_Init_Config_s cfg1 = {
+            .Servo_type = Servo180,
+            .Servo_Angle_Type = Free_Angle_mode,
+            .inst = Servo_INST, .idx = GPIO_Servo_C1_IDX, /* PA16 */
+        };
+        servo1 = ServoInit(&cfg1);
+        Servo_Motor_Type_Select(servo1, Free_Angle_mode);
 
-	/* 每 5ms 加 0.9°，约 180°/s，2 秒扫完 0↔180 */
-	angle += direction * 0.3f;
-	if (angle >= 180.0f) { angle = 180.0f; direction = -1; }
-	if (angle <= 0.0f)   { angle = 0.0f;   direction = 1;  }
+        init_done = 1;
+        phase = 0;
+        tick = 0;
+        angle = 0.0f;
+    }
 
-	Servo_Motor_FreeAngle_Set(servo0, (int16_t)angle);
-	Servo_Motor_FreeAngle_Set(servo1, 180 - (int16_t)angle);
-	ServeoMotorControl();
+    switch (phase) {
+    case SWEEP_UP:   angle += 0.45f; if (angle >= 180.0f) angle = 180.0f; break;
+    case SWEEP_DOWN: angle -= 0.45f; if (angle <= 0.0f)   angle = 0.0f;   break;
+    case HOLD_MAX:   angle = 180.0f; break;
+    case HOLD_MIN:   angle = 0.0f;   break;
+    case HOLD_MID:   angle = 90.0f;  break;
+    default: break;
+    }
+
+    /* 当前阶段时间到，切换到下一阶段 */
+    if (++tick >= phase_ticks[phase]) {
+        tick = 0;
+        phase = (phase + 1) % PHASE_COUNT;
+    }
+
+    Servo_Motor_FreeAngle_Set(servo0, (int16_t)angle);
+    Servo_Motor_FreeAngle_Set(servo1, 180 - (int16_t)angle);
+    ServeoMotorControl();
 }
 
 void chassis_motor_test(void)
