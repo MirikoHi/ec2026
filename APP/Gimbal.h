@@ -7,9 +7,8 @@
 
 
 
-
-
-#include "ti_msp_dl_config.h"
+void Gimbal_Attitude_Solving(void);
 void Gimbal(void);
+void Gimbal_Task();
 void Gimbal_Init(void);
 #endif

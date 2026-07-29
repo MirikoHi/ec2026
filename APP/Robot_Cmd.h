@@ -28,24 +28,29 @@ typedef enum {
 	REMOTE_MODE,
 }Chassis_Mode_e;
 
+typedef enum {
+	REMOTE_CTL=0,
+	MENU_CTL,
+}Control_mode;
 typedef struct {
-		Chassis_Mode_e Chassis_Mode;
-		uint8_t circle_set;
-		uint8_t remote_lost;
-		float remote_forward;
-		float remote_turn;
+	Chassis_Mode_e Chassis_Mode;
+	uint8_t circle_set;
+	uint8_t remote_lost;
+	float remote_forward;
+	float remote_turn;
+	uint8_t task_flag;
 }chassis_cmd_q;
 
 typedef struct {
 		
 }chassis_fetch_data_q;
 typedef struct {
-		float yaw;
-		float pitch;
-		float aim_x;
-		float aim_y;
-		uint8_t relay_on_flag;
-		uint8_t task_flag;
+	float yaw;
+	float pitch;
+	float aim_x;
+	float aim_y;
+	uint8_t relay_on_flag;
+	uint8_t task_flag;
 }gimbal_cmd_q;
 
 //这里一定要pack取消对齐字节，会出现双板字节位数对不上，回调函数中直接return

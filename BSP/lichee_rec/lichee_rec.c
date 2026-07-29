@@ -48,9 +48,11 @@ void LicheeRec_Init(void)
     LicheeRec_Frame.cmdid = 0;
     LicheeRec_Frame.data = 0.0f;
 
-    /* 清空 RX FIFO */
-    while (!DL_UART_isRXFIFOEmpty(LICHEE_REC_UART))
+    /* 清空 RX FIFO（限定最多清 16 次，防止死循环） */
+    for (int _i = 0; _i < 16; _i++)
     {
+        if (DL_UART_isRXFIFOEmpty(LICHEE_REC_UART))
+            break;
         (void)DL_UART_receiveData(LICHEE_REC_UART);
     }
     // DL_GPIO_setInternalResistor(GPIOA, DL_GPIO_PIN_1, DL_GPIO_RESISTOR_PULL_UP);

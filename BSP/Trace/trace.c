@@ -23,7 +23,7 @@ unsigned short Normal[8];
 unsigned char rx_buff[256]={0};
 //巡线状态机
 trace_state_e trace_state;
-trace_mode_e trace_mode;
+trace_mode_e trace_mode = TRACE_LOST_DETECT;
 //原始数据
 unsigned char Digtal;
 // //滤除多余数据后的8位数据

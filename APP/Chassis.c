@@ -137,6 +137,12 @@ void Chassis_Init(void)
 	};
 	motor_r = DCMotor_Init(&motor_r_config);
 
+	chassis_param.line_distance_m[0] = 0.5f;
+	chassis_param.line_distance_m[1] = 0.5f;
+	chassis_param.turn_angle_deg[0] = 90.0f;
+	chassis_param.turn_speed_mps = 0.5f;
+	chassis_param.action_speed_mps = 0.5f;
+
 	// BMI088 陀螺仪初始化
 	IMU_Mahony_Init();
 
@@ -159,11 +165,6 @@ void Chassis(void)
 		Chassis_RemoteLostDisable();
 		return;
 	}
-	//
-	// if (chassis_cmd_receive.Chassis_Mode != REMOTE_MODE)
-	// {
-	// 	Chassis_ClearRemoteSpeed();
-	// }
 	if (chassis_cmd_receive.Chassis_Mode != chassis_last_mode)
 	{
 		if ((chassis_last_mode == IMU_MODE) || (chassis_cmd_receive.Chassis_Mode == IMU_MODE))
@@ -188,7 +189,7 @@ void Chassis(void)
 				Chassis_ImuModeAction();
 				break;
 			case NORMAL_MODE:
-				Chassis_Set_Turn();
+				// Chassis_Set_Turn();
 				break;
 			case POSITION_MODE:
 				break;
@@ -218,7 +219,7 @@ static void Chassis_ImuModeAction(void)
 	switch (chassis_imu_action_step)
 	{
 		case 0:
-			// 第一条边：使用 ICM42688 yaw 做方向保持，直行 1.0m。
+			// 第一条边：使用 IMU yaw 做方向保持，直行 1.0m。
 			if (Chassis_MoveStraight(chassis_param.line_distance_m[0], chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 1U;
@@ -634,20 +635,6 @@ static float Chassis_AngleNormalize(float angle)
 	return angle;
 }
 
-void Motor_Cmd_CallBack(uint8_t i)
-{
-	if(i ==0)
-	{
-		DCMotor_Cmd(motor_l,ENABLE);
-		DCMotor_Cmd(motor_r,ENABLE);
-	}
-	else if(i == 1)
-	{
-		DCMotor_Cmd(motor_l,DISABLE);
-		DCMotor_Cmd(motor_r,DISABLE);
-	}
-	
-}
 
 void Stop_Detect(void)
 {
@@ -808,8 +795,20 @@ void Chassis_State_Turn(void)
 		default:
 			break;
 	}
+}
+static uint8_t testtt;
+void Motor_Cmd_CallBack(uint8_t i)
+{
+	if(i ==0)
+	{
+		testtt++;
+		DCMotor_Cmd(motor_l,ENABLE);
+		DCMotor_Cmd(motor_r,ENABLE);
+	}
+	else if(i == 1)
+	{
+		DCMotor_Cmd(motor_l,DISABLE);
+		DCMotor_Cmd(motor_r,DISABLE);
+	}
 
-	
-	
-	
 }

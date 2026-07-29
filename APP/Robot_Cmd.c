@@ -9,6 +9,7 @@
 #include "dwt.h"
 //#include "tjc.h"
 #include "Chassis.h"
+#include "dcmotor.h"
 #include "math.h"
 #include "K230.h"
 #include "lichee_rec.h"
@@ -23,16 +24,12 @@ QueueHandle_t chassis_fetch_data_queue = NULL;
 QueueHandle_t trace_fetch_data_queue = NULL;
 chassis_cmd_q chassis_cmd_send={0};
 chassis_cmd_q last_chassis_cmd_send;         // 上一帧发送底盘的控制命令
-gimbal_cmd_q gimbal_cmd_send ={0};
 trace_fetch_data_q trace_fetch_data={0};
 
-pid_type_def gimbal_yaw_PID={0};
-pid_type_def gimbal_pitch_PID={0};
-pid_type_def gimbal_yaw_forwardfeed_PID = {0};
 
 float last_trace_imu_switch_s=0;
 float now_time=0;
-State robotcmd_control_state = DISABLE;
+Control_mode robotcmd_control_state = MENU_CTL;
 
 /*  Lichee通信  */
 LicheervnanoStatus_t Licheervnano_status = OFFLINE;;   //判断无线通讯状态
@@ -49,36 +46,7 @@ void RobotCmd_Init(void)
 	gimbal_cmd_queue = xQueueCreate(4,sizeof(gimbal_cmd_q));
 	BSPLogInit();
 
-	chassis_cmd_send.Chassis_Mode = TRACE_MODE;  //todo:这里记得改回默认值，调试用
-	pid_init_config_s gimbal_yaw_pid_config={
-		.mode = PID_POSITION,
-		.Kp = 0.003f,
-		.Kd = 0.0001f,
-		.Ki = 0.0f,
-		.max_out = 4.0f,
-		.max_iout = 1.0f,
-	};
-	PID_init(&gimbal_yaw_PID,&gimbal_yaw_pid_config);
-
-	pid_init_config_s gimbal_pitch_pid_config={
-		.mode = PID_POSITION,
-		.Kp = -0.003f,
-		.Kd = -0.0001f,
-		.Ki = 0.0f,
-		.max_out = 4.0f,
-		.max_iout = 1.0f,
-	};
-	PID_init(&gimbal_pitch_PID,&gimbal_pitch_pid_config);
-	
-	pid_init_config_s gimbal_yaw_forwardfeed_pid_config={
-		.mode = PID_POSITION,
-		.Kp = 0.000f,
-		.Kd = -0.0001f,
-		.Ki = 0.0f,
-		.max_out = 4.0f,
-		.max_iout = 1.0f,
-	};
-	PID_init(&gimbal_yaw_forwardfeed_PID,&gimbal_yaw_forwardfeed_pid_config);
+	chassis_cmd_send.Chassis_Mode = NORMAL_MODE;  //todo:这里记得改回默认值，调试用
 
 	chassis_feedback_data.real_vy = 100;
 	//双板通信can初始化
@@ -96,7 +64,7 @@ void RobotCmd_Init(void)
  * @brief 核心cmd任务，向云台和底盘发送命令，在RTOS中以200Hz运行
  */
 void Robot_Cmd(void)
-{	LicheeRec_Send(0x42, 3.14f);
+{
 	xQueueReceive(trace_fetch_data_queue, &trace_fetch_data, 1);
 	LicheeRec_Frame = LicheeRec_GetFrame();
 	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_Frame.cmdid,LicheeRec_Frame.data);
@@ -106,19 +74,24 @@ void Robot_Cmd(void)
 			chassis_cmd_send.remote_lost = 1;
 			last_chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
 			chassis_cmd_send.remote_forward = 0.0f;
-			robotcmd_control_state = DISABLE;
+			robotcmd_control_state = MENU_CTL;
 			break;
 		case 1:  // 上位机上线
 			chassis_cmd_send.remote_lost = 0;
-			robotcmd_control_state = ENABLE;
+			robotcmd_control_state = REMOTE_CTL;
 			break;
-		case 5:  // 恢复上一种底盘模式
+		case 2:
+			chassis_cmd_send.remote_forward = LicheeRec_Frame.data;
+			break;
+		case 3:
+			chassis_cmd_send.remote_forward = -LicheeRec_Frame.data;
+			break;
+		case 5:  // 心跳时，延续底盘模式
 			chassis_cmd_send.Chassis_Mode = last_chassis_cmd_send.Chassis_Mode;
 			break;
 		case 6:  // 遥控控制模式
 			chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
 			last_chassis_cmd_send.Chassis_Mode = chassis_cmd_send.Chassis_Mode;
-			chassis_cmd_send.remote_forward = 0.05f;
 			break;
 		case 7:  // IMU控制模式
 			chassis_cmd_send.Chassis_Mode = IMU_MODE;
@@ -126,20 +99,11 @@ void Robot_Cmd(void)
 		default:
 			break;
 	}
-
-	if(gimbal_cmd_send.task_flag ==2)
-	{
-		Gimbal_Pid_Cal();
-		if(!DaemonIsOnline(K230_Lost_Target_daemon))
-		{
-			gimbal_cmd_send.yaw+=0.6f;
-		}
-	}
 	// draw_sin();
 
 	//通过队列向云台和底盘发送命令
 	xQueueSend(chassis_cmd_queue, &chassis_cmd_send, 0U);
-	xQueueSend(gimbal_cmd_queue,&gimbal_cmd_send,0U);
+	// xQueueSend(gimbal_cmd_queue,&gimbal_cmd_send,0U);
 
 	//CANCommSend(chasiss_can_comm, (void *)&chassis_feedback_data);
 }
@@ -155,17 +119,10 @@ void draw_sin(void)
 		start_time = DWT_GetTimeline_s();
 		aim_x = (DWT_GetTimeline_s()-start_time)*0.01f-0.15f;
 	}
-	gimbal_cmd_send.aim_x=aim_x;
-	gimbal_cmd_send.aim_y=0.1f*sinf(aim_x/T_x*PI);
-	
+	// gimbal_cmd_send.aim_x=aim_x;
+	// gimbal_cmd_send.aim_y=0.1f*sinf(aim_x/T_x*PI);
 }
-void Gimbal_Pid_Cal(void)
-{
-	PID_calc(&gimbal_yaw_PID,0,K230_err[0]);
-	PID_calc(&gimbal_pitch_PID,0,K230_err[1]);
-	gimbal_cmd_send.yaw += gimbal_yaw_PID.out;
-	gimbal_cmd_send.pitch +=gimbal_pitch_PID.out;
-}
+
 
 /**
 	各种底盘模式的回调函数
@@ -190,25 +147,20 @@ void Chassis_Mode_Switch_Callback(uint8_t i)  //选择底盘控制模式
 		chassis_cmd_send.Chassis_Mode = POSITION_MODE;
 	}
 }
-void Control_Switch_Callback(uint8_t i)     //选择电机是否使能
-{
-	if(i == 0)
-	{
-		robotcmd_control_state = ENABLE;
-	}
-	else if(i ==1)
-	{
-		robotcmd_control_state = DISABLE;
-	}
-}
+// void Control_Switch_Callback(uint8_t i)     //选择电机是否使能
+// {
+// 	if(i == 0)
+// 	{
+// 	}
+// 	else if(i ==1)
+// 	{
+// 		robotcmd_control_state = DISABLE;
+// 	}
+// }
 void Task_Callback(uint8_t i)    //选择执行任务
 {
 	if(i==0)
 	{
-		gimbal_cmd_send.task_flag = 1;
-	}
-	else if(i==1)
-	{
-		gimbal_cmd_send.task_flag = 2;
+		chassis_cmd_send.task_flag = 1;
 	}
 }
