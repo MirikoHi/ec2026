@@ -116,7 +116,7 @@ int main(void)
     LOGINFO("Hardware init");
     SEGGER_SYSVIEW_Conf();     // 使用daplink时请注释掉该行，否则会导致程序无法运行
     LOGINFO("systemview start");
-		Robot_Init();
+    Robot_Init();
     LOGERROR("unknow error");
     return 0;
 }

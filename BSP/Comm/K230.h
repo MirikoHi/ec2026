@@ -9,7 +9,7 @@ typedef struct {
     float    dt;
 } steel_ball_movement_typedef;
 
-volatile uint8_t k230_data_valid = 0;
+extern volatile uint8_t k230_data_valid;
 
 void K230_Init(void);
 uint8_t K230_Read(steel_ball_movement_typedef *steel_ball_movement);

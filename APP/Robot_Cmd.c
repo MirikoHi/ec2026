@@ -127,14 +127,6 @@ void Robot_Cmd(void)
 			break;
 	}
 
-	if(gimbal_cmd_send.task_flag ==2)
-	{
-		Gimbal_Pid_Cal();
-		if(!DaemonIsOnline(K230_Lost_Target_daemon))
-		{
-			gimbal_cmd_send.yaw+=0.6f;
-		}
-	}
 	// draw_sin();
 
 	//通过队列向云台和底盘发送命令
@@ -161,8 +153,6 @@ void draw_sin(void)
 }
 void Gimbal_Pid_Cal(void)
 {
-	PID_calc(&gimbal_yaw_PID,0,K230_err[0]);
-	PID_calc(&gimbal_pitch_PID,0,K230_err[1]);
 	gimbal_cmd_send.yaw += gimbal_yaw_PID.out;
 	gimbal_cmd_send.pitch +=gimbal_pitch_PID.out;
 }

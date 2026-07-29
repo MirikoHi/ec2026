@@ -5,7 +5,7 @@
 #define DATA_PACKET_LENGTH 8
 
 static volatile uint8_t RxBuffer[DATA_PACKET_LENGTH];
-extern volatile uint8_t k230_data_valid;
+volatile uint8_t k230_data_valid;
 
 typedef union {
     uint16_t word;
@@ -30,6 +30,7 @@ void K230_Init(void) {
     Clear_UART_FIFO(); // ???????????????FIFO
     NVIC_ClearPendingIRQ(K230_INST_INT_IRQN);
     NVIC_EnableIRQ(K230_INST_INT_IRQN);
+    DL_UART_enableInterrupt(K230_INST, DL_UART_INTERRUPT_RX);
     DL_UART_clearInterruptStatus(K230_INST, DL_UART_INTERRUPT_RX); // ????ж???λ
 }
 
@@ -117,6 +118,7 @@ void K230_ReceiveData(const uint8_t RxData) {
             } else {
                 k230_data_valid = 0;
             }
+            DL_UART_clearInterruptStatus(K230_INST, DL_UART_INTERRUPT_RX);
         }
     }
 }
