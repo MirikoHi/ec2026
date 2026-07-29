@@ -9,15 +9,13 @@
 #include "dwt.h"
 #include "../BSP/Display/menu.h"
 #include "../BSP/IMU/JY901S.h"
-#include "../BSP/Flash/flash_param_store.h"
-#include "../BSP/Comm/TJC.h"
+//#include "tjc.h"
 #include "K230.h"
 void Robot_Init(void)
 {
 	size_t free_heap = 0;
 	__disable_irq();
 	DWT_Init(80);
-	FlashParam_Init();
 	MenuInit();
 	free_heap = xPortGetFreeHeapSize();
 	LOGWARNING("heap after MenuInit: %u", (uint32_t)free_heap);
@@ -34,9 +32,6 @@ void Robot_Init(void)
 	K230_Init();
 	free_heap = xPortGetFreeHeapSize();
 	LOGWARNING("heap after K230_Init: %u", (uint32_t)free_heap);
-	TJC_Init();
-	free_heap = xPortGetFreeHeapSize();
-	LOGWARNING("heap after TJC_Init: %u", (uint32_t)free_heap);
 	__enable_irq();
 	vTaskStartScheduler();
 }

@@ -3,7 +3,6 @@
 //
 
 #include "BlueTooth_uart.h"
-#include "TJC.h"
 #include "ti_msp_dl_config.h"
 #include "daemon.h"
 #include "../Algorithm/crc8.h"
@@ -259,7 +258,6 @@ void UART_2_INST_IRQHandler(void)
         {
             uint8_t byte = DL_UART_receiveData(UART_2_INST);
             BlueToothUart_FeedByte(byte);
-            TJC_FeedByte(byte);
         }
     }
 }

@@ -4,7 +4,7 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
-#include "elrs.h"
+/* ELRS 已弃用 */
 #include "BlueTooth_uart.h"
 
 
@@ -16,7 +16,6 @@ extern QueueHandle_t chassis_cmd_queue;
 extern QueueHandle_t chassis_fetch_data_queue;
 extern QueueHandle_t trace_fetch_data_queue;
 extern QueueHandle_t gimbal_cmd_queue;
-extern const volatile ELRS_Data_s *robotcmd_elrs;
 extern BlueTooth_Tx_t g_bt_tx;
 extern volatile BlueTooth_Rx_t g_bt_rx;
 

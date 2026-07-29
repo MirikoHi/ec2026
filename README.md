@@ -11,7 +11,6 @@ CLion + CMake
 Keil MDK
 
 ## 硬件平台
-
 MCU: TI MSPM0G3507 (ARM Cortex-M0+, 80MHz, 128KB Flash, 32KB SRAM)
 开发板: 嘉立创天猛星MSPM0G3507
 调试器: J-Link / DAPLink (4MHz SWD)

@@ -8,10 +8,8 @@ project(electric-competition-robot C ASM)
 #   2. 或在命令行传参：cmake -DUSE_MSPM0G3519=OFF ..
 # ============================================================
 option(USE_MSPM0G3519 "Build for MSPM0G3519 (OFF = MSPM0G3507)" OFF)
-
 # 蓝牙串口板号：板1烧录时用 BLUETOOTH_BOARD_1，板2烧录时改为 BLUETOOTH_BOARD_2
 add_compile_definitions(BLUETOOTH_BOARD_1)
-
 # ============================================================
 # MCU and compiler flags
 # (CPU architecture flags are set in the toolchain file)

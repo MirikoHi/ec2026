@@ -34,7 +34,7 @@
  *  ============ ti_msp_dl_config.c =============
  *  Configured MSPM0 DriverLib module definitions
  *
- *  DO NOT EDIT - This file is generated for the MSPM0G351X
+ *  DO NOT EDIT - This file is generated for the MSPM0G350X
  *  by the SysConfig tool.
  */
 
@@ -69,6 +69,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_ELRS_init();
     SYSCFG_DL_K230_init();
     SYSCFG_DL_UART_2_init();
+    SYSCFG_DL_g_code_uart_init();
     SYSCFG_DL_ICM42688_init();
     SYSCFG_DL_SPI_FLASH_init();
     SYSCFG_DL_ADC1_init();
@@ -135,6 +136,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_reset(ELRS_INST);
     DL_UART_Main_reset(K230_INST);
     DL_UART_Main_reset(UART_2_INST);
+    DL_UART_Main_reset(g_code_uart_INST);
     DL_SPI_reset(ICM42688_INST);
     DL_SPI_reset(SPI_FLASH_INST);
     DL_ADC12_reset(ADC1_INST);
@@ -154,6 +156,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_enablePower(ELRS_INST);
     DL_UART_Main_enablePower(K230_INST);
     DL_UART_Main_enablePower(UART_2_INST);
+    DL_UART_Main_enablePower(g_code_uart_INST);
     DL_SPI_enablePower(ICM42688_INST);
     DL_SPI_enablePower(SPI_FLASH_INST);
     DL_ADC12_enablePower(ADC1_INST);
@@ -215,6 +218,10 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
         GPIO_UART_2_IOMUX_TX, GPIO_UART_2_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
         GPIO_UART_2_IOMUX_RX, GPIO_UART_2_IOMUX_RX_FUNC);
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_g_code_uart_IOMUX_TX, GPIO_g_code_uart_IOMUX_TX_FUNC);
+    DL_GPIO_initPeripheralInputFunction(
+        GPIO_g_code_uart_IOMUX_RX, GPIO_g_code_uart_IOMUX_RX_FUNC);
 
     DL_GPIO_initPeripheralOutputFunction(
         GPIO_ICM42688_IOMUX_SCLK, GPIO_ICM42688_IOMUX_SCLK_FUNC);
@@ -240,6 +247,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 		 DL_GPIO_DRIVE_STRENGTH_LOW, DL_GPIO_HIZ_DISABLE);
 
     DL_GPIO_initDigitalOutput(User_LED_User_led_IOMUX);
+
+    DL_GPIO_initDigitalOutput(SPI_FLASH_CS_CSN_IOMUX);
 
     DL_GPIO_initDigitalInputFeatures(KEY_key1_IOMUX,
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
@@ -293,8 +302,6 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 
     DL_GPIO_initDigitalOutput(Gray_Serial_CLK_IOMUX);
 
-    DL_GPIO_initDigitalOutput(SPI_FLASH_CS_CSN_IOMUX);
-
     DL_GPIO_clearPins(GPIOA, BEEP_PIN_14_PIN |
 		ICM42688_CS_CS_PIN |
 		Motor_dir_EN1_A_PIN |
@@ -316,11 +323,11 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_setPins(GPIOB, SPI_FLASH_CS_CSN_PIN);
     DL_GPIO_enableOutput(GPIOB, RELAY_Control_PIN |
 		User_LED_User_led_PIN |
+		SPI_FLASH_CS_CSN_PIN |
 		Motor_dir_EN2_B_PIN |
 		Gray_Address_PIN_1_PIN |
 		Gray_Address_PIN_2_PIN |
-		Gray_Serial_CLK_PIN |
-		SPI_FLASH_CS_CSN_PIN);
+		Gray_Serial_CLK_PIN);
     DL_GPIO_setLowerPinsPolarity(GPIOB, DL_GPIO_PIN_2_EDGE_RISE |
 		DL_GPIO_PIN_3_EDGE_RISE);
     DL_GPIO_setUpperPinsPolarity(GPIOB, DL_GPIO_PIN_18_EDGE_RISE |
@@ -872,6 +879,37 @@ SYSCONFIG_WEAK void SYSCFG_DL_UART_2_init(void)
 
 
     DL_UART_Main_enable(UART_2_INST);
+}
+static const DL_UART_Main_ClockConfig gg_code_uartClockConfig = {
+    .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,
+    .divideRatio = DL_UART_MAIN_CLOCK_DIVIDE_RATIO_1
+};
+
+static const DL_UART_Main_Config gg_code_uartConfig = {
+    .mode        = DL_UART_MAIN_MODE_NORMAL,
+    .direction   = DL_UART_MAIN_DIRECTION_TX_RX,
+    .flowControl = DL_UART_MAIN_FLOW_CONTROL_NONE,
+    .parity      = DL_UART_MAIN_PARITY_NONE,
+    .wordLength  = DL_UART_MAIN_WORD_LENGTH_8_BITS,
+    .stopBits    = DL_UART_MAIN_STOP_BITS_ONE
+};
+
+SYSCONFIG_WEAK void SYSCFG_DL_g_code_uart_init(void)
+{
+    DL_UART_Main_setClockConfig(g_code_uart_INST, (DL_UART_Main_ClockConfig *) &gg_code_uartClockConfig);
+
+    DL_UART_Main_init(g_code_uart_INST, (DL_UART_Main_Config *) &gg_code_uartConfig);
+    /*
+     * Configure baud rate by setting oversampling and baud rate divisors.
+     *  Target baud rate: 115200
+     *  Actual baud rate: 115190.78
+     */
+    DL_UART_Main_setOversampling(g_code_uart_INST, DL_UART_OVERSAMPLING_RATE_16X);
+    DL_UART_Main_setBaudRateDivisor(g_code_uart_INST, g_code_uart_IBRD_40_MHZ_115200_BAUD, g_code_uart_FBRD_40_MHZ_115200_BAUD);
+
+
+
+    DL_UART_Main_enable(g_code_uart_INST);
 }
 
 static const DL_SPI_Config gICM42688_config = {

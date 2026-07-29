@@ -34,7 +34,7 @@
  *  ============ ti_msp_dl_config.h =============
  *  Configured MSPM0 DriverLib module declarations
  *
- *  DO NOT EDIT - This file is generated for the MSPM0G351X
+ *  DO NOT EDIT - This file is generated for the MSPM0G350X
  *  by the SysConfig tool.
  */
 #ifndef ti_msp_dl_config_h
@@ -240,6 +240,22 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define UART_2_BAUD_RATE                                                (115200)
 #define UART_2_IBRD_40_MHZ_115200_BAUD                                      (21)
 #define UART_2_FBRD_40_MHZ_115200_BAUD                                      (45)
+/* Defines for g_code_uart */
+#define g_code_uart_INST                                                   UART1
+#define g_code_uart_INST_FREQUENCY                                      40000000
+#define g_code_uart_INST_IRQHandler                             UART1_IRQHandler
+#define g_code_uart_INST_INT_IRQN                                 UART1_INT_IRQn
+#define GPIO_g_code_uart_RX_PORT                                           GPIOB
+#define GPIO_g_code_uart_TX_PORT                                           GPIOA
+#define GPIO_g_code_uart_RX_PIN                                    DL_GPIO_PIN_5
+#define GPIO_g_code_uart_TX_PIN                                    DL_GPIO_PIN_8
+#define GPIO_g_code_uart_IOMUX_RX                                (IOMUX_PINCM18)
+#define GPIO_g_code_uart_IOMUX_TX                                (IOMUX_PINCM19)
+#define GPIO_g_code_uart_IOMUX_RX_FUNC                 IOMUX_PINCM18_PF_UART1_RX
+#define GPIO_g_code_uart_IOMUX_TX_FUNC                 IOMUX_PINCM19_PF_UART1_TX
+#define g_code_uart_BAUD_RATE                                           (115200)
+#define g_code_uart_IBRD_40_MHZ_115200_BAUD                                 (21)
+#define g_code_uart_FBRD_40_MHZ_115200_BAUD                                 (45)
 
 
 
@@ -286,7 +302,8 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define ADC1_INST_IRQHandler                                     ADC1_IRQHandler
 #define ADC1_INST_INT_IRQN                                       (ADC1_INT_IRQn)
 #define ADC1_ADCMEM_0                                         DL_ADC12_MEM_IDX_0
-#define ADC1_ADCMEM_0_REF                   DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA
+#define ADC1_ADCMEM_0_REF                        DL_ADC12_REFERENCE_VOLTAGE_VDDA
+#define ADC1_ADCMEM_0_REF_VOLTAGE_V                                          3.3
 #define GPIO_ADC1_C0_PORT                                                  GPIOA
 #define GPIO_ADC1_C0_PIN                                          DL_GPIO_PIN_15
 #define GPIO_ADC1_IOMUX_C0                                       (IOMUX_PINCM37)
@@ -297,7 +314,8 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define ADC0_INST_IRQHandler                                     ADC0_IRQHandler
 #define ADC0_INST_INT_IRQN                                       (ADC0_INT_IRQn)
 #define ADC0_ADCMEM_0                                         DL_ADC12_MEM_IDX_0
-#define ADC0_ADCMEM_0_REF                   DL_ADC12_REFERENCE_VOLTAGE_VDDA_VSSA
+#define ADC0_ADCMEM_0_REF                        DL_ADC12_REFERENCE_VOLTAGE_VDDA
+#define ADC0_ADCMEM_0_REF_VOLTAGE_V                                          3.3
 #define GPIO_ADC0_C0_PORT                                                  GPIOA
 #define GPIO_ADC0_C0_PIN                                          DL_GPIO_PIN_27
 #define GPIO_ADC0_IOMUX_C0                                       (IOMUX_PINCM60)
@@ -329,6 +347,12 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for User_led: GPIOB.22 with pinCMx 50 on package pin 21 */
 #define User_LED_User_led_PIN                                   (DL_GPIO_PIN_22)
 #define User_LED_User_led_IOMUX                                  (IOMUX_PINCM50)
+/* Port definition for Pin Group SPI_FLASH_CS */
+#define SPI_FLASH_CS_PORT                                                (GPIOB)
+
+/* Defines for CSN: GPIOB.6 with pinCMx 23 on package pin 58 */
+#define SPI_FLASH_CS_CSN_PIN                                     (DL_GPIO_PIN_6)
+#define SPI_FLASH_CS_CSN_IOMUX                                   (IOMUX_PINCM23)
 /* Defines for key1: GPIOA.30 with pinCMx 5 on package pin 37 */
 #define KEY_key1_PORT                                                    (GPIOA)
 #define KEY_key1_PIN                                            (DL_GPIO_PIN_30)
@@ -404,12 +428,6 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 /* Defines for CLK: GPIOB.27 with pinCMx 58 on package pin 29 */
 #define Gray_Serial_CLK_PIN                                     (DL_GPIO_PIN_27)
 #define Gray_Serial_CLK_IOMUX                                    (IOMUX_PINCM58)
-/* Port definition for Pin Group SPI_FLASH_CS */
-#define SPI_FLASH_CS_PORT                                                (GPIOB)
-
-/* Defines for CSN: GPIOB.6 with pinCMx 23 on package pin 58 */
-#define SPI_FLASH_CS_CSN_PIN                                     (DL_GPIO_PIN_6)
-#define SPI_FLASH_CS_CSN_IOMUX                                   (IOMUX_PINCM23)
 
 
 /* Defines for MCAN0 */
@@ -466,6 +484,7 @@ void SYSCFG_DL_I2C_1_init(void);
 void SYSCFG_DL_ELRS_init(void);
 void SYSCFG_DL_K230_init(void);
 void SYSCFG_DL_UART_2_init(void);
+void SYSCFG_DL_g_code_uart_init(void);
 void SYSCFG_DL_ICM42688_init(void);
 void SYSCFG_DL_SPI_FLASH_init(void);
 void SYSCFG_DL_ADC1_init(void);

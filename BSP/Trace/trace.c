@@ -3,7 +3,6 @@
 #include "No_Mcu_Ganv_Grayscale_Sensor_Config.h"
 #include "dwt.h"
 #include "gray_serial.h"
-#include "flash_param_store.h"
 #define SENSOR_WEIGHTS { -4.0f, -3.0f, -2.0f, -1.0f, 1.0f, 2.0f, 3.0f, 4.0f }
 
 /* ---- filter_raw 可调参数 ---- */
@@ -40,47 +39,6 @@ static int     calcline_single_pos  = -1;
 static uint8_t calcline_single_cnt  = 0;
 static uint8_t calcline_ff_gap_cnt  = 0;
 
-/**
-  * @brief 填充循迹相关默认参数
-  * @param params 待填充参数结构体指针
-  * @note 默认值保留在循迹使用处，Flash 参数无效时由存储库调用本函数恢复默认循迹参数
-  */
-void Trace_FillDefaultParams(FlashParam_Data_s *params)
-{
-    if (params == NULL)
-    {
-        return;
-    }
-
-    params->trace_pid = (pid_init_config_s) {
-        .mode = PID_POSITION,
-        .Kp = 0.006f,
-        .Ki = 0.0f,
-        .Kd = 0.0f,
-        .max_out = 500.0f,
-        .max_iout = 200.0f,
-        .deadzone = 0.0f,
-        .ff_type = FF_None,
-    };
-}
-
-/**
-  * @brief 应用循迹运行参数
-  * @param params 待应用参数结构体指针
-  * @note 用法：上电初始化或屏幕端 FlashParam_Save() 成功后调用，使循迹 PID 立即生效
-  */
-void Trace_ApplyParams(const FlashParam_Data_s *params)
-{
-    if (params == NULL)
-    {
-        return;
-    }
-
-    pid_init_config_s trace_config = params->trace_pid;
-    PID_init(&Trace_PID, &trace_config);
-    Trace_ResetLineError();
-}
-
 void Trace_Init(void)
 {
 #ifdef USE_GRAY_SERIAL
@@ -99,8 +57,18 @@ void Trace_Init(void)
     No_MCU_Ganv_Sensor_Init(&sensor,white,black);
     DWT_Delay(0.1);
 #endif
-	// 使用上电从 Flash 读取到的循迹 PID 参数。
-	Trace_ApplyParams(FlashParam_GetActive());
+	pid_init_config_s trace_config={
+		.mode = PID_POSITION,
+		.Kp = 0.008f,//0.008
+		.Kd = 0.0f,
+		.Ki = 0.0f,
+	    .kf_p = 20000,//20000
+	    .kf_v = 20000,
+		.max_out = 500.0f,
+		.max_iout = 200.0f,
+		//.feedforward = 0.0f,
+	};
+	PID_init(&Trace_PID,&trace_config);
 }
 
 //旧版逻辑，暂时不用
@@ -529,6 +497,22 @@ float Trace_task(void)
     // 获取数字量传感器数据（只有当黑白值填进去之后才会有数字量输出）
     Digtal = Get_Digtal_For_User(&sensor);
 #endif
+
+    uint8_t left_black = 0, right_black = 0;
+    for (int i = 0; i < 4; i++) {
+        if (!(Digtal & (1 << i))) left_black++;   // 统计 bit 0~3 (一侧)
+    }
+    for (int i = 4; i < 8; i++) {
+        if (!(Digtal & (1 << i))) right_black++;  // 统计 bit 4~7 (另一侧)
+    }
+
+    // 只要有一侧有 3 个或以上传感器吃到黑线，判定为直角弯
+    if (left_black >= 3 || right_black >= 3) {
+        PID_clear(&Trace_PID); // 清空 PID
+        return 0.0f;           // 不进行补偿计算，直接返回 0.0f
+    }
+
+
     switch (trace_mode) {
         case TRACE_NORMAL:
             track_err =  raw_transform_easy(Digtal);  //仅把八位数据映射成-7到7的数字，无残留
