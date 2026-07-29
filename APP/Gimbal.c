@@ -23,8 +23,94 @@ gimbal_cmd_q gimbal_cmd_send ={0};
 
 steel_ball_movement_typedef steel_ball_movement_data;
 ServoInstance*  servo_yaw;
+/* ═══════════════════════════════════════════════════════════════════════
+ * Slide Ball Control — 滑槽小球位置闭环
+ *
+ *   - 滑槽一端合页固定，另一端连杆连接舵机
+ *   - 舵机角度控制滑槽倾角，从而控制小球位置
+ *   - 视觉回传 steel_ball_movement_data.x_position (0~640)
+ *   - 视觉回传 steel_ball_movement_data.dt (帧间隔, 秒)
+ *
+ *   控制策略:
+ *     PID(目标位置 - 当前位置) → 基础角度
+ *     + 速度前馈(dt 用于精确速度估计) → 预测性角度补偿
+ *     → 最终舵机角度
+ * ═══════════════════════════════════════════════════════════════════════ */
 
-void Gimbal_task_2(void);
+#define SLIDE_TARGET_X         320     /* 目标位置: 画面中心 (640/2) */
+#define SLIDE_SERVO_CENTER     90      /* 滑槽水平时舵机角度 */
+#define SLIDE_SERVO_RANGE      30      /* 最大倾角范围 (±50°) */
+#define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
+#define SLIDE_VEL_FF_GAIN      0.08f   /* 速度前馈增益 */
+
+static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
+static float        slide_prev_x = 320;   /* 上一帧 X 位置 */
+static float        slide_velocity = 0;   /* 滤波后的小球速度 (px/s) */
+
+static void Slide_Control_Init(void)
+{
+    pid_init_config_s cfg = {
+        .mode    = PID_POSITION,
+        .Kp      = 0.15f,     /* 比例: 每像素误差产生多少度倾角 */
+        .Kd      = 0.06f,     /* 微分: 抑制震荡 */
+        .Ki      = 0.015f,    /* 积分: 消除静差 */
+        .max_out = SLIDE_SERVO_RANGE,
+        .max_iout = 10.0f,
+    };
+    PID_init(&slide_ball_pid, &cfg);
+}
+
+/**
+ * @brief 滑槽小球闭环控制 (在 Gimbal 200Hz 循环中调用)
+ *
+ * 算法:
+ *   1. 从 K230 数据中取 x_position (0~640) 和 dt (帧间隔)
+ *   2. 速度估计: v = Δx / dt, 低通滤波
+ *   3. 位置误差 → PID → 基础舵机角度
+ *   4. 速度前馈: 球速越大 → 倾角补偿越大
+ *   5. 合成最终角度, 限幅后输出到舵机
+ */
+static void Slide_Control_Run(void)
+{
+    if (!k230_data_valid) return;
+
+    float x  = (float)steel_ball_movement_data.x_position;
+    float dt = steel_ball_movement_data.dt;
+
+    /* 保护: dt 异常时使用默认值 */
+    if (dt <= 0.0f || dt > 0.5f) {
+        dt = 0.05f;  /* 默认 50ms (20fps) */
+    }
+
+    /* ── 1. 速度估计 (利用 dt 精确计算) ── */
+    float raw_v = (x - slide_prev_x) / dt;
+    slide_prev_x = x;
+
+    /* 一阶低通滤波, 滤除视觉抖动 */
+    slide_velocity = slide_velocity * (1.0f - SLIDE_VEL_LPF_ALPHA)
+                   + raw_v * SLIDE_VEL_LPF_ALPHA;
+
+    /* ── 2. 位置 PID ── */
+    float error = SLIDE_TARGET_X - x;
+    PID_calc(&slide_ball_pid, 0.0f, error);
+
+    /* ── 3. 速度前馈 ──
+     * 球向右运动 (v>0) → 需要左倾 (减小角度) 来"接住"球
+     * 球速越大 → 前馈幅度越大 → 舵机提前动作 */
+    float velocity_ff = -slide_velocity * SLIDE_VEL_FF_GAIN;
+
+    /* ── 4. 合成角度 = 中心角度 + PID输出 + 速度前馈 ── */
+    float angle = SLIDE_SERVO_CENTER + slide_ball_pid.out + velocity_ff;
+
+    /* 限幅到舵机有效范围 */
+    if (angle > 180.0f) angle = 180.0f;
+    if (angle < 0.0f)   angle = 0.0f;
+
+    Servo_Motor_FreeAngle_Set(servo_yaw, (int16_t)angle);
+    ServeoMotorControl();
+}
+
+
 void Gimbal_Init(void)
 {
 	// ZDT_Motor_Config_s yaw_config = {
@@ -87,6 +173,9 @@ void Gimbal_Init(void)
 	};
 	servo_yaw = ServoInit(&servo_yaw_config);
 	Servo_Motor_Type_Select(servo_yaw, Free_Angle_mode);
+
+	/* 初始化滑槽小球位置闭环 */
+	Slide_Control_Init();
 }
 
 void Gimbal(void)
@@ -94,8 +183,8 @@ void Gimbal(void)
 	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
 
 	if (K230_Read(&steel_ball_movement_data)) {
-		Servo_Motor_FreeAngle_Set(servo_yaw, (uint8_t)steel_ball_movement_data.x_position*180/640);
-		ServeoMotorControl();
+		/* 滑槽小球位置闭环: PID + 速度前馈 */
+		Slide_Control_Run();
 	}
 	Gimbal_Task();
 	// switch(gimbal_cmd_receive.task_flag)
