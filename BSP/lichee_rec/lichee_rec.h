@@ -2,7 +2,7 @@
  * @file lichee_rec.h
  * @brief LiChee 识别模块通信接口 (UART2)
  * @note  帧格式: 帧头(0xA5) + cmd_id(uint8_t) + data(float) + crc8
- *        使用 UART_2 (UART0外设, PA0/PA1, 9600bps)
+ *        使用 UART_2 (UART0外设, PA0/PA1, 115200bps)
  */
 
 #ifndef BSP_LICHEE_REC_H
@@ -57,5 +57,6 @@ float   LicheeRec_GetData(void);
 uint8_t LicheeRec_IsFrameReceived(void);
 void    LicheeRec_ClearFrameReceived(void);
 LicheervnanoStatus_t Licheervnano_CheckOnline(uint8_t cmdid, float data);
+Licheervnano_Frame LicheeRec_GetFrame(void);
 
 #endif /* BSP_LICHEE_REC_H */

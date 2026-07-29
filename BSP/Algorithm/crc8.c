@@ -67,3 +67,25 @@ uint8_t update_crc_8(uint8_t crc, uint8_t val)
 {
     return sht75_crc_table[val ^ crc];
 }
+
+/**
+ * @brief CRC-8/MAXIM (Dallas 1-Wire), 与 LicheeRec 发送端一致
+ * @note  右移实现, 反射多项式 0x8C (x^8 + x^5 + x^4 + 1), 初值 0x00
+ */
+uint8_t crc8_maxim(const uint8_t *data, size_t len)
+{
+    uint8_t crc = 0;
+    size_t i;
+
+    for (i = 0; i < len; ++i) {
+        crc ^= data[i];
+        for (int bit = 0; bit < 8; ++bit) {
+            if (crc & 0x01u) {
+                crc = (uint8_t)((crc >> 1) ^ 0x8Cu);
+            } else {
+                crc = (uint8_t)(crc >> 1);
+            }
+        }
+    }
+    return crc;
+}
