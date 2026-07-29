@@ -22,6 +22,7 @@ QueueHandle_t chassis_cmd_queue = NULL,gimbal_cmd_queue =NULL;
 QueueHandle_t chassis_fetch_data_queue = NULL;
 QueueHandle_t trace_fetch_data_queue = NULL;
 chassis_cmd_q chassis_cmd_send={0};
+chassis_cmd_q last_chassis_cmd_send;         // 上一帧发送底盘的控制命令
 gimbal_cmd_q gimbal_cmd_send ={0};
 trace_fetch_data_q trace_fetch_data={0};
 
@@ -35,8 +36,7 @@ State robotcmd_control_state = DISABLE;
 
 /*  Lichee通信  */
 LicheervnanoStatus_t Licheervnano_status = OFFLINE;;   //判断无线通讯状态
-static uint8_t LicheeRec_cmdid;
-static float LicheeRec_data;
+static volatile Licheervnano_Frame LicheeRec_Frame;
 
 // void tjc_control(void);
 void draw_sin(void);
@@ -96,26 +96,33 @@ void RobotCmd_Init(void)
  * @brief 核心cmd任务，向云台和底盘发送命令，在RTOS中以200Hz运行
  */
 void Robot_Cmd(void)
-{
+{	LicheeRec_Send(0x42, 3.14f);
 	xQueueReceive(trace_fetch_data_queue, &trace_fetch_data, 1);
-	LicheeRec_cmdid = LicheeRec_GetCmdId();
-	LicheeRec_data = LicheeRec_GetData();
-	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_cmdid,LicheeRec_data);
-	switch (Licheervnano_status) {
-		case OFFLINE:
+	LicheeRec_Frame = LicheeRec_GetFrame();
+	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_Frame.cmdid,LicheeRec_Frame.data);
+
+	switch (LicheeRec_Frame.cmdid) {
+		case 0:  // 上位机下线
 			chassis_cmd_send.remote_lost = 1;
+			last_chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
+			chassis_cmd_send.remote_forward = 0.0f;
 			robotcmd_control_state = DISABLE;
-		case ONLINE:
+			break;
+		case 1:  // 上位机上线
 			chassis_cmd_send.remote_lost = 0;
 			robotcmd_control_state = ENABLE;
-			chassis_cmd_send.remote_forward = LicheeRec_GetData();
-	}
-	switch (LicheeRec_cmdid) {
-		case 6:  //遥控控制模式
-			chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
 			break;
-		case 7:  //IMU控制模式
+		case 5:  // 恢复上一种底盘模式
+			chassis_cmd_send.Chassis_Mode = last_chassis_cmd_send.Chassis_Mode;
+			break;
+		case 6:  // 遥控控制模式
+			chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
+			last_chassis_cmd_send.Chassis_Mode = chassis_cmd_send.Chassis_Mode;
+			chassis_cmd_send.remote_forward = 0.05f;
+			break;
+		case 7:  // IMU控制模式
 			chassis_cmd_send.Chassis_Mode = IMU_MODE;
+			break;
 		default:
 			break;
 	}

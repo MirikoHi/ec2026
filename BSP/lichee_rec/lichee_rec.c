@@ -23,12 +23,15 @@ static uint8_t       rx_buf[LICHEE_REC_DATA_SIZE];   /* CRC计算缓冲区     *
 static uint8_t       rx_state;                        /* 状态机当前状态     */
 static uint8_t       rx_data_index;                   /* CRC缓冲写入索引   */
 static uint8_t       rx_cmd_id;                      /* 当前帧的cmd_id    */
-static FloatBytes_u  rx_float_data;                   /* 当前帧的float数据  */
+static volatile FloatBytes_u  rx_float_data;                   /* 当前帧的float数据  */
 
 static volatile uint8_t frame_received;               /* 帧接收标志        */
-// static volatile uint8_t last_cmd_id;                  /* 最新有效cmd_id    */
-// static volatile float   last_data;                    /* 最新有效float数据  */
-static volatile Licheervnano_Frame LicheeRec_Frame;
+static volatile Licheervnano_Frame LicheeRec_Frame;    /* CRC 校验通过的有效帧 */
+static volatile uint32_t crc_pass_cnt;                  /* 调试：CRC通过计数  */
+static volatile uint32_t crc_fail_cnt;                  /* 调试：CRC失败计数  */
+static volatile uint8_t  dbg_calc_crc;                  /* 调试：接收端计算的CRC */
+static volatile uint8_t  dbg_recv_crc;                  /* 调试：发送端传来的CRC */
+static volatile uint8_t  dbg_rx_buf[LICHEE_REC_DATA_SIZE]; /* 调试：CRC计算的5字节 */
 
 /* ── 公开接口 ──────────────────────────────────────────────── */
 
@@ -50,7 +53,7 @@ void LicheeRec_Init(void)
     {
         (void)DL_UART_receiveData(LICHEE_REC_UART);
     }
-
+    // DL_GPIO_setInternalResistor(GPIOA, DL_GPIO_PIN_1, DL_GPIO_RESISTOR_PULL_UP);
     /* 使能 UART RX 中断 (syscfg 默认为 UART_2 关闭了中断) */
     DL_UART_Main_enableInterrupt(LICHEE_REC_UART, DL_UART_MAIN_INTERRUPT_RX);
 
@@ -83,7 +86,7 @@ void LicheeRec_Send(uint8_t cmd_id, float data)
     buf[5]  = fb.bytes[3];
 
     /* CRC8 校验: 计算 cmd_id + float 数据 (5字节) */
-    crc     = crc_8(&buf[1], LICHEE_REC_DATA_SIZE);
+    crc     = crc8_maxim(&buf[1], LICHEE_REC_DATA_SIZE);
     buf[6]  = crc;
 
     /* 阻塞发送 */
@@ -141,12 +144,27 @@ void LicheeRec_ReceiveByte(uint8_t data)
 
         case STATE_CRC:
         {
-            uint8_t calc_crc = crc_8(rx_buf, LICHEE_REC_DATA_SIZE);
+            uint8_t calc_crc = crc8_maxim(rx_buf, LICHEE_REC_DATA_SIZE);
+
+            /* 调试：保存最近一次 CRC 校验的详细信息 */
+            dbg_calc_crc = calc_crc;
+            dbg_recv_crc = data;
+            dbg_rx_buf[0] = rx_buf[0];
+            dbg_rx_buf[1] = rx_buf[1];
+            dbg_rx_buf[2] = rx_buf[2];
+            dbg_rx_buf[3] = rx_buf[3];
+            dbg_rx_buf[4] = rx_buf[4];
+
             if (calc_crc == data)
             {
-                LicheeRec_Frame.cmdid    = rx_cmd_id;
-                LicheeRec_Frame.data     = rx_float_data.f;
                 frame_received = 1;
+                LicheeRec_Frame.cmdid = rx_cmd_id ;
+                LicheeRec_Frame.data = rx_float_data.f;
+                crc_pass_cnt++;
+            }
+            else
+            {
+                crc_fail_cnt++;
             }
             rx_state = STATE_HEADER;
             break;
@@ -158,22 +176,11 @@ void LicheeRec_ReceiveByte(uint8_t data)
     }
 }
 
-/**
- * @brief 获取最近一次成功接收的 cmd_id
- */
-uint8_t LicheeRec_GetCmdId(void)
-{
-    return LicheeRec_Frame.cmdid;
-}
 
-/**
- * @brief 获取最近一次成功接收的 float 数据
- */
-float LicheeRec_GetData(void)
-{
-    return LicheeRec_Frame.data;
+Licheervnano_Frame LicheeRec_GetFrame(void) {
+    /* 返回 CRC 校验通过后存储的有效帧，而非状态机中间值 */
+    return LicheeRec_Frame;
 }
-
 /**
  * @brief 查询是否有新帧接收
  * @return 1 = 有新帧, 0 = 无
@@ -222,10 +229,8 @@ LicheervnanoStatus_t Licheervnano_CheckOnline(uint8_t cmdid, float data)
  */
 void UART0_IRQHandler(void)
 {
-    while (!DL_UART_isRXFIFOEmpty(LICHEE_REC_UART))
-    {
-        LicheeRec_ReceiveByte(DL_UART_receiveData(LICHEE_REC_UART));
-    }
+    uint8_t recByte = DL_UART_receiveData(LICHEE_REC_UART);
+    LicheeRec_ReceiveByte(recByte);
 
     DL_UART_clearInterruptStatus(LICHEE_REC_UART, DL_UART_INTERRUPT_RX);
 }

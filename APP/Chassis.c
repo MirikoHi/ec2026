@@ -45,19 +45,7 @@ static uint8_t chassis_imu_action_step = 0U;
 float IMU_data[3] = {0};
 volatile JY901s_IMU_Data_s* JY901s_IMU_Data;
 
-void Stop_Detect(void);
-void Chassis_State_Turn(void);
-void Chassis_Set_Turn(void);
-static void Chassis_RemoteControl(void);
-static void Chassis_ClearRemoteSpeed(void);
-static void Chassis_RemoteLostDisable(void);
-static void Chassis_Trace_Cal(void);
-static void Chassis_ImuModeAction(void);
-static void Chassis_ResetEncoderOdom(void);
-static float Chassis_GetForwardOdom(void);
-static float Chassis_GetYawDeg(void);
-static float Chassis_AngleNormalize(float angle);
-
+extern State robotcmd_control_state;
 
 
 /**
@@ -171,11 +159,11 @@ void Chassis(void)
 		Chassis_RemoteLostDisable();
 		return;
 	}
-
-	if (chassis_cmd_receive.Chassis_Mode != REMOTE_MODE)
-	{
-		Chassis_ClearRemoteSpeed();
-	}
+	//
+	// if (chassis_cmd_receive.Chassis_Mode != REMOTE_MODE)
+	// {
+	// 	Chassis_ClearRemoteSpeed();
+	// }
 	if (chassis_cmd_receive.Chassis_Mode != chassis_last_mode)
 	{
 		if ((chassis_last_mode == IMU_MODE) || (chassis_cmd_receive.Chassis_Mode == IMU_MODE))
@@ -185,31 +173,32 @@ void Chassis(void)
 		}
 		chassis_last_mode = chassis_cmd_receive.Chassis_Mode;
 	}
-
-	switch(chassis_cmd_receive.Chassis_Mode)
-	{
-		case TRACE_MODE:
-			// 计算并设置巡线补偿量。
-			Chassis_Trace_Cal();
-			// 按设定路径执行巡线动作。
-			Chassis_State_Turn();
-			// 检测直行/转弯是否完成，并更新完成标志。
-			Stop_Detect();
-			break;
-		case IMU_MODE:
-			Chassis_ImuModeAction();
-			break;
-		case NORMAL_MODE:
-			Chassis_Set_Turn();
-			break;
-		case POSITION_MODE:
+	if (robotcmd_control_state) {
+		switch(chassis_cmd_receive.Chassis_Mode)
+		{
+			case TRACE_MODE:
+				// 计算并设置巡线补偿量。
+				Chassis_Trace_Cal();
+				// 按设定路径执行巡线动作。
+				Chassis_State_Turn();
+				// 检测直行/转弯是否完成，并更新完成标志。
+				Stop_Detect();
 				break;
-		case REMOTE_MODE:
-			Chassis_RemoteControl();
-			//Chassis_ImuModeAction();
-			break;
-		default:
-			break;
+			case IMU_MODE:
+				Chassis_ImuModeAction();
+				break;
+			case NORMAL_MODE:
+				Chassis_Set_Turn();
+				break;
+			case POSITION_MODE:
+				break;
+			case REMOTE_MODE:
+				Chassis_RemoteControl();
+				//Chassis_ImuModeAction();
+				break;
+			default:
+				break;
+		}
 	}
 }
 
@@ -355,14 +344,14 @@ static void Chassis_RemoteControl(void)
 	float left_speed = chassis_cmd_receive.remote_forward - chassis_cmd_receive.remote_turn;
 	float right_speed = chassis_cmd_receive.remote_forward + chassis_cmd_receive.remote_turn;
 
-	motor_l->State = ENABLE;
-	motor_r->State = ENABLE;
+	// motor_l->State = ENABLE;
+	// motor_r->State = ENABLE;
 	Line_flag = 0;
 	Stop_Flag = 0;
 	Spin_start_flag = 0;
 	Spin_succeed_flag = 0;
-	// DCMotor_SetTraceCompensation(motor_l, 0.0f);
-	// DCMotor_SetTraceCompensation(motor_r, 0.0f);
+	DCMotor_SetTraceCompensation(motor_l, 0.0f);
+	DCMotor_SetTraceCompensation(motor_r, 0.0f);
 	Chassis_Trace_Cal();
 
 	if (remote_mode_active == 0U)
