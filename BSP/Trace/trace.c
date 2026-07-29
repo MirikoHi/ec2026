@@ -529,22 +529,6 @@ float Trace_task(void)
     // 获取数字量传感器数据（只有当黑白值填进去之后才会有数字量输出）
     Digtal = Get_Digtal_For_User(&sensor);
 #endif
-
-    uint8_t left_black = 0, right_black = 0;
-    for (int i = 0; i < 4; i++) {
-        if (!(Digtal & (1 << i))) left_black++;   // 统计 bit 0~3 (一侧)
-    }
-    for (int i = 4; i < 8; i++) {
-        if (!(Digtal & (1 << i))) right_black++;  // 统计 bit 4~7 (另一侧)
-    }
-
-    // 只要有一侧有 3 个或以上传感器吃到黑线，判定为直角弯
-    if (left_black >= 3 || right_black >= 3) {
-        PID_clear(&Trace_PID); // 清空 PID
-        return 0.0f;           // 不进行补偿计算，直接返回 0.0f
-    }
-
-
     switch (trace_mode) {
         case TRACE_NORMAL:
             track_err =  raw_transform_easy(Digtal);  //仅把八位数据映射成-7到7的数字，无残留

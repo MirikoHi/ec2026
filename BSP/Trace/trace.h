@@ -3,9 +3,12 @@
 
 #include "ti_msp_dl_config.h"
 #include "PID.h"
+#include "flash_param_store.h"
 
 float Trace_task(void);
 void Trace_Init(void);
+void Trace_FillDefaultParams(FlashParam_Data_s *params);
+void Trace_ApplyParams(const FlashParam_Data_s *params);
 void Trace_ResetLineError(void);
 float raw_transform_easy(uint8_t current_trace);
 float second_process(float raw_val);
@@ -19,8 +22,8 @@ typedef enum {
 }trace_state_e;
 
 typedef enum {
-	TRACE_LOST_DETECT = 0,
-	TRACE_NORMAL,
+	TRACE_NORMAL = 0,
+	TRACE_LOST_DETECT ,
 }trace_mode_e;
 
 

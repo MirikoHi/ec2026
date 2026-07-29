@@ -46,28 +46,41 @@ void Gimbal_Init(void)
 	// pitch_motor = ZDT_Motor_Init(&pitch_config);
 	ZDT_TICK_Init();
 
-	
-	
+	Servo_Init_Config_s servo_yaw_config = {
+		.Servo_type = Servo180,
+		.inst = Servo_INST,
+		.idx = 0,    //对应DL_TIMER_CC_0_INDEX，PA17
+	};
+	servo_yaw = ServoInit(&servo_yaw_config);
+	Servo_Motor_Type_Select(servo_yaw, Free_Angle_mode);
 }
 
 void Gimbal(void)
 {
 	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
-//	
-//	Gimbal_Attitude_Solving();
-	ZDT_Set_Position(yaw_motor,gimbal_cmd_receive.yaw);
-	ZDT_Set_Position(pitch_motor,gimbal_cmd_receive.pitch);
-	switch(gimbal_cmd_receive.task_flag)
-	{
-		case 1:
-			break;
-		case 2:
-			Gimbal_task_2();
-			break;
-		default:
-			break;
-	}
-	
+
+	// //舵机控制，需要时取消注释
+	// int16_t angle;
+	// Servo_Motor_FreeAngle_Set(servo_yaw, angle);
+	// ServeoMotorControl();
+
+	// if (yaw_motor != NULL) {
+	// 	ZDT_Set_Position(yaw_motor, gimbal_cmd_receive.yaw);
+	// }
+	// if (pitch_motor != NULL) {
+	// 	ZDT_Set_Position(pitch_motor, gimbal_cmd_receive.pitch);
+	// }
+	// switch(gimbal_cmd_receive.task_flag)
+	// {
+	// 	case 1:
+	// 		break;
+	// 	case 2:
+	// 		Gimbal_task_2();
+	// 		break;
+	// 	default:
+	// 		break;
+	// }
+
 }
 
 
@@ -83,7 +96,7 @@ void Gimbal_task_2(void)
 {
 	ZDT_Set_Position(yaw_motor,gimbal_cmd_receive.yaw);
 	ZDT_Set_Position(pitch_motor,gimbal_cmd_receive.pitch);
-	if((abs_out(K230_err[0])<=1)&&(abs_out(K230_err[1])<=1)&&DaemonIsOnline(K230_daemon)&&(!relay_first_on_flag))
+	if((abs_out(K230_data.x)<=1)&&(abs_out(K230_data.y)<=1)&&DaemonIsOnline(K230_daemon)&&(!relay_first_on_flag))
 	{
 		gimbal_cmd_receive.relay_on_flag = 1;
 		relay_first_on_flag = 1;

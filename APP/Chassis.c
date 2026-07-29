@@ -13,6 +13,7 @@
 #include "PID.h"
 #include "flash_param_store.h"
 #include "bsp_log.h"
+#include "../BSP/Motor/Servo.h"
 
 static DCMotorInstance *motor_l,*motor_r;
 
@@ -71,6 +72,7 @@ void Chassis_Set_Line(float position);
 static void Chassis_Test_Line(void);
 static void Chassis_TraceCircle(float speed_mps);
 static void Chassis_RightAngleTrace(float follow_speed_mps, float turn_speed);
+static void chassis_servo_test(void);
 /**
   * @brief 填充底盘相关默认参数
   * @param params 待填充参数结构体指针
@@ -304,7 +306,7 @@ void Chassis(void)
 			break;
 		case NORMAL_MODE:
 
-			Chassis_Set_Turn();
+			chassis_servo_test();
 
 			break;
 		case POSITION_MODE:
@@ -1003,6 +1005,52 @@ static float motor_test_gen_ref(float t)
         default:
             return motor_test_config.amplitude;
     }
+}
+
+/* ========================================================================
+ * 舵机测试模块
+ * ========================================================================
+ * 引脚: PA17 (TIMA1 CCP0), PA16 (TIMA1 CCP1)
+ * 在 NORMAL_MODE 下调用，舵机在 0°~180° 之间来回摆动。
+ */
+static void chassis_servo_test(void)
+{
+	static ServoInstance *servo0 = NULL;
+	static ServoInstance *servo1 = NULL;
+	static uint8_t  init_done = 0;
+	static float    angle = 0.0f;
+	static int8_t   direction = 1;
+
+	if (!init_done) {
+		Servo_Init_Config_s cfg0 = {
+			.Servo_type = Servo180,
+			.Servo_Angle_Type = Free_Angle_mode,
+			.inst = Servo_INST,
+			.idx = GPIO_Servo_C0_IDX,   /* PA17 */
+		};
+		servo0 = ServoInit(&cfg0);
+		Servo_Motor_Type_Select(servo0, Free_Angle_mode);
+
+		Servo_Init_Config_s cfg1 = {
+			.Servo_type = Servo180,
+			.Servo_Angle_Type = Free_Angle_mode,
+			.inst = Servo_INST,
+			.idx = GPIO_Servo_C1_IDX,   /* PA16 */
+		};
+		servo1 = ServoInit(&cfg1);
+		Servo_Motor_Type_Select(servo1, Free_Angle_mode);
+
+		init_done = 1;
+	}
+
+	/* 每 5ms 加 0.9°，约 180°/s，2 秒扫完 0↔180 */
+	angle += direction * 0.3f;
+	if (angle >= 180.0f) { angle = 180.0f; direction = -1; }
+	if (angle <= 0.0f)   { angle = 0.0f;   direction = 1;  }
+
+	Servo_Motor_FreeAngle_Set(servo0, (int16_t)angle);
+	Servo_Motor_FreeAngle_Set(servo1, 180 - (int16_t)angle);
+	ServeoMotorControl();
 }
 
 void chassis_motor_test(void)

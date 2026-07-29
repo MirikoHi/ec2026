@@ -88,9 +88,10 @@ void tjc_control(void);
 void draw_sin(void);
 void Gimbal_Pid_Cal(void);
 static void RobotCmd_UpdateRemoteMode(void);
+static uint8_t RobotCmd_ApplySwitchRules(Chassis_Mode_e *last_non_remote_mode,
+                                         Chassis_Mode_e *switch_restore_mode,
+                                         Chassis_Mode_e *active_switch_mode);
 static void RobotCmd_ExitRemoteMode(Chassis_Mode_e restore_mode);
-static uint8_t RobotCmd_IsRemoteSwitchOn(uint16_t channel);
-static uint8_t RobotCmd_IsRemoteDisableOn(uint16_t channel);
 static float RobotCmd_ELRSChannelToNorm(uint16_t channel);
 void RobotCmd_Init(void)
 {
@@ -100,21 +101,14 @@ void RobotCmd_Init(void)
 	gimbal_cmd_queue = xQueueCreate(4,sizeof(gimbal_cmd_q));
 //	while(bsp_Icm42688Init()!=0x00);
 	BSPLogInit();
-//	ELRS_Init();
-//	robotcmd_elrs = ELRS_GetData();
-	
+	ELRS_Init();
+	robotcmd_elrs = ELRS_GetData();
 
-	// chassis_cmd_send.Chassis_Mode = TRACE_MODE;//todo:这里记得改回默认值，调试用
-
-	chassis_cmd_send.Chassis_Mode =IMU_MODE;
-	chassis_cmd_send.circle_set = 1U;
+	// 蓝牙初始化，请在CmakeLists里面指定是1/2哪个蓝牙模块
+	// BlueToothUart_Init();
 
 
-	chassis_cmd_send.remote_disable = 0U;
-	chassis_cmd_send.remote_forward = 0.0f;
-	chassis_cmd_send.remote_turn = 0.0f;
-
-	robotcmd_control_state = DISABLE;
+	chassis_cmd_send.Chassis_Mode = NORMAL_MODE;  //todo:这里记得改回默认值，调试用
 		pid_init_config_s gimbal_yaw_pid_config={
 		.mode = PID_POSITION,
 		.Kp = 0.003f,
@@ -185,7 +179,17 @@ void Robot_Cmd(void)
 	xQueueSend(chassis_cmd_queue, &chassis_cmd_send, 0U);
 	xQueueSend(gimbal_cmd_queue,&gimbal_cmd_send,0U);
 
+	TJC_Process();
+
 	//CANCommSend(chasiss_can_comm, (void *)&chassis_feedback_data);
+
+	// // 蓝牙收发，需要时取消注释
+	// BlueToothUart_Send(&g_bt_tx);
+	// volatile BlueTooth_Rx_t *new_rx = BlueToothUart_Get();
+	// if (new_rx != NULL)
+	// {
+	// 	g_bt_rx = *new_rx;
+	// }
 }
 void Chassis_Mode_Switch_Callback(uint8_t i)
 {
@@ -237,8 +241,8 @@ void draw_sin(void)
 }
 void Gimbal_Pid_Cal(void)
 {
-	PID_calc(&gimbal_yaw_PID,0,K230_err[0]);
-	PID_calc(&gimbal_pitch_PID,0,K230_err[1]);
+	PID_calc(&gimbal_yaw_PID,0,K230_data.x);
+	PID_calc(&gimbal_pitch_PID,0,K230_data.y);
 	gimbal_cmd_send.yaw += gimbal_yaw_PID.out;
 	gimbal_cmd_send.pitch +=gimbal_pitch_PID.out;
 }
@@ -246,10 +250,8 @@ void Gimbal_Pid_Cal(void)
 static void RobotCmd_UpdateRemoteMode(void)
 {
 	static Chassis_Mode_e last_non_remote_mode = TRACE_MODE;
-	uint16_t ch1;
-	uint16_t ch2;
-	uint16_t ch5;
-	uint16_t ch6;
+	static Chassis_Mode_e switch_restore_mode = TRACE_MODE;
+	static Chassis_Mode_e active_switch_mode = NORMAL_MODE;
 
 	/* ELRS尚未初始化时，不接管原有菜单/循迹模式。 */
 	if (robotcmd_elrs == NULL)
@@ -270,23 +272,19 @@ static void RobotCmd_UpdateRemoteMode(void)
 	if (ELRS_IsOnline() == 0U)
 	{
 		chassis_cmd_send.remote_disable = 1U;
+		active_switch_mode = NORMAL_MODE;
 		RobotCmd_ExitRemoteMode(last_non_remote_mode);
 		return;
 	}
 
-	ch1 = robotcmd_elrs->channel[ELRS_REMOTE_TURN_CH - 1U];
-	ch2 = robotcmd_elrs->channel[ELRS_REMOTE_FORWARD_CH - 1U];
-	ch5 = robotcmd_elrs->channel[ELRS_REMOTE_ENABLE_CH - 1U];
-	ch6 = robotcmd_elrs->channel[ELRS_REMOTE_DISABLE_CH - 1U];
-
 	/*
-	 * CH6 is the safety disable switch. It has higher priority than CH5
-	 * remote-enable, so a high CH6 always disables chassis motors.
+	 * 先处理表驱动拨杆，再处理 CH5 手动遥控。
+	 * 表内顺序就是优先级：安全失能优先，其次是动作/模式拨杆。
 	 */
-	if (RobotCmd_IsRemoteDisableOn(ch6) != 0U)
+	if (RobotCmd_ApplySwitchRules(&last_non_remote_mode,
+	                              &switch_restore_mode,
+	                              &active_switch_mode) != 0U)
 	{
-		chassis_cmd_send.remote_disable = 1U;
-		RobotCmd_ExitRemoteMode(last_non_remote_mode);
 		return;
 	}
 
@@ -298,16 +296,77 @@ static void RobotCmd_UpdateRemoteMode(void)
 		last_non_remote_mode = chassis_cmd_send.Chassis_Mode;
 	}
 
-	if (RobotCmd_IsRemoteSwitchOn(ch5) != 0U)
+	/*
+	 * CH5 控制手动遥控，优先级低于 CH6 安全失能和 CH7 IMU 动作。
+	 */
+	if (robotcmd_elrs->channel[ROBOTCMD_ELRS_CH_REMOTE_ENABLE - 1U] > ROBOTCMD_ELRS_REMOTE_ENABLE_TH)
 	{
+		/* CH1 取反是为了匹配当前底盘转向方向约定。 */
 		chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
-		chassis_cmd_send.remote_turn = -1.0f * RobotCmd_ELRSChannelToNorm(ch1) * ELRS_REMOTE_MAX_TURN;
-		chassis_cmd_send.remote_forward = RobotCmd_ELRSChannelToNorm(ch2) * ELRS_REMOTE_MAX_FORWARD;
+		chassis_cmd_send.remote_turn =
+			-1.0f *
+			RobotCmd_ELRSChannelToNorm(robotcmd_elrs->channel[ROBOTCMD_ELRS_CH_TURN - 1U]) *
+			ROBOTCMD_ELRS_MAX_TURN;
+		chassis_cmd_send.remote_forward =
+			RobotCmd_ELRSChannelToNorm(robotcmd_elrs->channel[ROBOTCMD_ELRS_CH_FORWARD - 1U]) *
+			ROBOTCMD_ELRS_MAX_FORWARD;
 	}
 	else if (chassis_cmd_send.Chassis_Mode == REMOTE_MODE)
 	{
 		RobotCmd_ExitRemoteMode(last_non_remote_mode);
 	}
+}
+
+static uint8_t RobotCmd_ApplySwitchRules(Chassis_Mode_e *last_non_remote_mode,
+                                         Chassis_Mode_e *switch_restore_mode,
+                                         Chassis_Mode_e *active_switch_mode)
+{
+	for (uint8_t i = 0U; i < (sizeof(robotcmd_switch_rules) / sizeof(robotcmd_switch_rules[0])); i++)
+	{
+		const RobotCmd_SwitchRule_s *rule = &robotcmd_switch_rules[i];
+		const uint16_t channel_value = robotcmd_elrs->channel[rule->channel - 1U];
+
+		/* 表中的每一行都按同一格式判断：通道原始值超过阈值就执行动作。 */
+		if (channel_value <= rule->threshold)
+		{
+			continue;
+		}
+
+		if (rule->action == ROBOTCMD_SWITCH_ACTION_DISABLE)
+		{
+			/* 安全失能最高优先级，同时清除正在保持的模式拨杆状态。 */
+			chassis_cmd_send.remote_disable = 1U;
+			*active_switch_mode = NORMAL_MODE;
+			RobotCmd_ExitRemoteMode(*last_non_remote_mode);
+			return 1U;
+		}
+
+		if (*active_switch_mode != rule->mode)
+		{
+			/* 记录拨杆释放后要恢复的模式。 */
+			*switch_restore_mode = (chassis_cmd_send.Chassis_Mode == REMOTE_MODE) ?
+			                       *last_non_remote_mode : chassis_cmd_send.Chassis_Mode;
+			*active_switch_mode = rule->mode;
+		}
+
+		chassis_cmd_send.remote_disable = 0U;
+		chassis_cmd_send.Chassis_Mode = rule->mode;
+		chassis_cmd_send.remote_turn = 0.0f;
+		chassis_cmd_send.remote_forward = 0.0f;
+		return 1U;
+	}
+
+	/* 当前没有模式拨杆触发；若刚释放拨杆，只恢复一次原模式。 */
+	if (*active_switch_mode != NORMAL_MODE)
+	{
+		if (chassis_cmd_send.Chassis_Mode == *active_switch_mode)
+		{
+			chassis_cmd_send.Chassis_Mode = *switch_restore_mode;
+		}
+		*active_switch_mode = NORMAL_MODE;
+	}
+
+	return 0U;
 }
 
 static void RobotCmd_ExitRemoteMode(Chassis_Mode_e restore_mode)
@@ -316,18 +375,9 @@ static void RobotCmd_ExitRemoteMode(Chassis_Mode_e restore_mode)
 	{
 		chassis_cmd_send.Chassis_Mode = restore_mode;
 	}
+	/* 退出或绕过 REMOTE_MODE 时清零，避免底盘收到残留摇杆速度。 */
 	chassis_cmd_send.remote_turn = 0.0f;
 	chassis_cmd_send.remote_forward = 0.0f;
-}
-
-static uint8_t RobotCmd_IsRemoteSwitchOn(uint16_t channel)
-{
-	return channel > ELRS_REMOTE_ENABLE_VALUE;
-}
-
-static uint8_t RobotCmd_IsRemoteDisableOn(uint16_t channel)
-{
-	return channel > ELRS_REMOTE_DISABLE_VALUE;
 }
 
 static float RobotCmd_ELRSChannelToNorm(uint16_t channel)
@@ -345,7 +395,7 @@ static float RobotCmd_ELRSChannelToNorm(uint16_t channel)
 		          (float)(ELRS_CHANNEL_VALUE_MID - ELRS_CHANNEL_VALUE_MIN));
 	}
 
-	if ((value > -ELRS_REMOTE_DEADBAND) && (value < ELRS_REMOTE_DEADBAND))
+	if ((value > -ROBOTCMD_ELRS_REMOTE_DEADBAND) && (value < ROBOTCMD_ELRS_REMOTE_DEADBAND))
 	{
 		value = 0.0f;
 	}

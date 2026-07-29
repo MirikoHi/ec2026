@@ -34,6 +34,9 @@ void Robot_Init(void)
 	K230_Init();
 	free_heap = xPortGetFreeHeapSize();
 	LOGWARNING("heap after K230_Init: %u", (uint32_t)free_heap);
+	TJC_Init();
+	free_heap = xPortGetFreeHeapSize();
+	LOGWARNING("heap after TJC_Init: %u", (uint32_t)free_heap);
 	__enable_irq();
 	vTaskStartScheduler();
 }
