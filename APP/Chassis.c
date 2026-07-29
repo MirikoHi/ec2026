@@ -12,6 +12,7 @@
 #include "IMU_Mahony.h"
 #include "PID.h"
 #include "bsp_log.h"
+#include "K230.h"
 
 static DCMotorInstance *motor_l,*motor_r;
 
@@ -47,6 +48,7 @@ volatile JY901s_IMU_Data_s* JY901s_IMU_Data;
 
 extern State robotcmd_control_state;
 
+steel_ball_movement_typedef steel_ball_movement_data;
 
 /**
  * @brief 初始化底盘左右电机和 IMU
@@ -153,6 +155,7 @@ void Chassis(void)
 
 	// 更新 BMI088 姿态数据，耗时约 1ms。
 	IMU_Mahony_GetYawPitchRoll((float *)IMU_data);
+	K230_Read(&steel_ball_movement_data);
 
 	if (chassis_cmd_receive.remote_lost)
 	{

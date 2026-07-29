@@ -158,7 +158,6 @@ static void GimbalTask(void *pvParameters);
 static void StepMotorTask(void *pvParameters);
 static void MotorTask(void *pvParameters);
 static void MenuTask(void *pvParameters);
-static void k230ReadTask(void *pvParameters);
 /* Called by Robot_Init() to create all application tasks.
  * Defined in APP/app_tasks.h */
 /*-----------------------------------------------------------*/
@@ -176,7 +175,6 @@ static TaskHandle_t xDaemonTaskHandle    = NULL;
 static TaskHandle_t xMenuTaskHandle      = NULL;
 static TaskHandle_t xHwmotorTaskHandle   = NULL;
 static TaskHandle_t xTraceTaskHandle     = NULL;
-static TaskHandle_t xK230ReadHandle     = NULL;
 #endif
 
 #if ENABLE_STACK_MONITOR
@@ -222,12 +220,6 @@ void app_tasks_init(void)
 			             (void *) HwMotor_PARAMETER, tskIDLE_PRIORITY+2,
 			             STACK_HANDLE(Hwmotor));
 			configASSERT(xResult == pdPASS);
-
-			xResult=xTaskCreate(k230ReadTask, "k230Read", 128,
-            (void *) K230Read_PARAMETER, tskIDLE_PRIORITY+2,
-            NULL);
- 			configASSERT(xResult == pdPASS);
-
 
 			xResult=xTaskCreate(RobotCmdTask, "RobotCmd", ROBOTCMD_TASK_STACK_DEPTH,
             (void *) RobotCmd_PARAMETER, tskIDLE_PRIORITY+2,
@@ -404,17 +396,17 @@ static void StepMotorTask(void *pvParameters)
 		}
 }
 
-static void k230ReadTask(void *pvParameters)
-{
-	configASSERT(
-		((unsigned long) pvParameters) == K230Read_PARAMETER);
-	vTaskDelay(1000);
-	steel_ball_movement_typedef steel_ball_movement_data;
-	for (;;){
-		if (k230_data_valid) K230_Read(&steel_ball_movement_data);
-		vTaskDelay(pdMS_TO_TICKS(5));
-	}
-}
+// static void k230ReadTask(void *pvParameters)
+// {
+// 	configASSERT(
+// 		((unsigned long) pvParameters) == K230Read_PARAMETER);
+// 	vTaskDelay(1000);
+// 	steel_ball_movement_typedef steel_ball_movement_data;
+// 	for (;;){
+// 		if (k230_data_valid) K230_Read(&steel_ball_movement_data);
+// 		vTaskDelay(pdMS_TO_TICKS(5));
+// 	}
+// }
 
 static void RobotCmdTask(void *pvParameters)
 {

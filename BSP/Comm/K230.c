@@ -51,77 +51,53 @@ uint8_t get_CRC8(const uint8_t *data, uint32_t len) {
     }
     return crc;
 }
+// 状态枚举
+typedef enum {
+    STATE_IDLE,      // 等待包头
+    STATE_RECEIVING  // 正在接收数据
+} RxState_t;
 
 void K230_ReceiveData(const uint8_t RxData) {
-    static volatile uint8_t RxState = 0;
-    static uint8_t RxIndex = 0;
-    switch (RxState) {
-        case 0: {
-            k230_data_valid = 0;
-            RxIndex = 0;
-            RxBuffer[RxIndex] = RxData;
-            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
-            RxState = 1;
-            break;
+    static RxState_t state = STATE_IDLE;
+    static uint8_t index = 0;
+
+    if (state == STATE_IDLE) {
+        if (RxData == 0xA5) {
+            RxBuffer[0] = RxData;
+            index = 1;
+            state = STATE_RECEIVING;
         }
-        case 1: {
-            RxBuffer[RxIndex] = RxData;
-            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
-            RxState = 2;
-            break;
+    } else { // STATE_RECEIVING
+        // 如果在收包过程中收到新的包头，则重新同步
+        if (RxData == 0xA5) {
+            RxBuffer[0] = RxData;
+            index = 1;
+            // 状态保持为 RECEIVING，但重新开始计数
+            return;
         }
-        case 2: {
-            RxBuffer[RxIndex] = RxData;
-            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
-            RxState = 3;
-            break;
-        }
-        case 3: {
-            RxBuffer[RxIndex] = RxData;
-            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
-            RxState = 4;
-            break;
-        }
-        case 4: {
-            RxBuffer[RxIndex] = RxData;
-            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
-            RxState = 5;
-            break;
-        }
-        case 5: {
-            RxBuffer[RxIndex] = RxData;
-            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
-            RxState = 6;
-            break;
-        }
-        case 6: {
-            RxBuffer[RxIndex] = RxData;
-            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
-            RxState = 7;
-            break;
-        }
-        case 7: {
-            RxBuffer[RxIndex] = RxData;
-            RxIndex = 0;
-            RxState = 8;
-            break;
-        }
-        case 8: {
+
+        RxBuffer[index] = RxData;
+        index++;
+
+        if (index == DATA_PACKET_LENGTH) {
+            // 完整包已接收，进行校验
             const uint8_t crc = get_CRC8(RxBuffer, DATA_PACKET_LENGTH - 1);
             if (crc == RxBuffer[DATA_PACKET_LENGTH - 1]) {
                 x_pos_union.byte[0] = RxBuffer[1];
                 x_pos_union.byte[1] = RxBuffer[2];
-                dt_union.byte[0] = RxBuffer[3];
-                dt_union.byte[1] = RxBuffer[4];
-                dt_union.byte[2] = RxBuffer[5];
-                dt_union.byte[3] = RxBuffer[6];
-                current_steel_ball_movement.dt = dt_union.dt;
+                dt_union.byte[0]   = RxBuffer[3];
+                dt_union.byte[1]   = RxBuffer[4];
+                dt_union.byte[2]   = RxBuffer[5];
+                dt_union.byte[3]   = RxBuffer[6];
+                current_steel_ball_movement.dt        = dt_union.dt;
                 current_steel_ball_movement.x_position = x_pos_union.word;
                 k230_data_valid = 1;
             } else {
                 k230_data_valid = 0;
             }
-
+            // 复位状态，准备接收下一包
+            state = STATE_IDLE;
+            index = 0;
         }
     }
 }
