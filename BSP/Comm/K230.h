@@ -4,12 +4,14 @@
 #include "ti_msp_dl_config.h"
 #include "daemon.h"
 
+typedef struct {
+    uint16_t x_position;
+    float    dt;
+} steel_ball_movement_typedef;
+
+volatile uint8_t k230_data_valid = 0;
 
 void K230_Init(void);
-void K230_ReceiveData(uint8_t RxData);
+uint8_t K230_Read(steel_ball_movement_typedef *steel_ball_movement);
 
-extern int16_t K230_err[2];
-
-extern DaemonInstance* K230_daemon;
-extern DaemonInstance* K230_Lost_Target_daemon;
 #endif

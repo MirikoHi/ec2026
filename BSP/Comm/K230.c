@@ -1,113 +1,137 @@
 #include "K230.h"
 #include "daemon.h"
-//#include <ti/devices/msp/msp.h>   // ????MSP?豸????
-//#include <ti/driverlib/dl_uart.h> // ????UART??????????
-#define DATA_PACKET_LENGTH 7
+//#include <ti/devices/msp/msp.h>
+//#include <ti/driverlib/dl_uart.h>
+#define DATA_PACKET_LENGTH 8
 
-static uint8_t RxBuffer[DATA_PACKET_LENGTH]; // ????????????
-static volatile uint8_t RxState = 0; // ?????????λ
-static uint8_t RxIndex = 0;         // ????????????
-int16_t K230_err[2]={0};
-static void K230LostCallback(void *ptr);
-DaemonInstance* K230_daemon,*K230_Lost_Target_daemon;
+static volatile uint8_t RxBuffer[DATA_PACKET_LENGTH];
+extern volatile uint8_t k230_data_valid;
+
+typedef union {
+    uint16_t word;
+    uint8_t byte[2];
+} x_pos_union_typedef;
+
+typedef union {
+    float dt;
+    uint8_t byte[4];
+} dt_union_typedef;
+
+static x_pos_union_typedef x_pos_union;
+static dt_union_typedef    dt_union;
+static steel_ball_movement_typedef current_steel_ball_movement;
+
 void Clear_UART_FIFO(void) {
     while (!DL_UART_isRXFIFOEmpty(K230_INST)) {
         (void)DL_UART_receiveData(K230_INST); // ????????
     }
 }
-void K230_Init(void)
-{
+void K230_Init(void) {
     Clear_UART_FIFO(); // ???????????????FIFO
     NVIC_ClearPendingIRQ(K230_INST_INT_IRQN);
     NVIC_EnableIRQ(K230_INST_INT_IRQN);
     DL_UART_clearInterruptStatus(K230_INST, DL_UART_INTERRUPT_RX); // ????ж???λ
 }
 
-/**
- * @brief       ?????????????
- * @param       ????????????RxData
- * @retval      ??
- */
-void K230_ReceiveData(uint8_t RxData)
-{
-    static uint8_t sum = 0;
-    // ????????????
-    if(RxData == 0x15 && RxState != 0)
-    {
-        RxState = 0;  // ??????????????????
-        RxIndex = 0;
-    }
-    if (RxState == 0) // ??????
-    {
-        if (RxData == 0x15)
-        {
-            RxBuffer[0] = RxData;
-            RxState = 1;
-            RxIndex = 1;
-            sum = RxData; // ?????У???
+uint8_t get_CRC8(const uint8_t *data, uint32_t len) {
+    uint8_t crc = 0x00U;
+    while (len--) {
+        crc ^= *data++;
+        for (uint8_t i = 0; i < 8; i++) {
+            if (crc & 0x80U) {
+                crc = (uint8_t)((crc << 1) ^ 0x07U);
+            } else {
+                crc <<= 1;
+            }
         }
     }
-    else if (RxState == 1) // ?ж?????????
-    {
-        if (RxData == 0x11) 
-        {
-            RxBuffer[RxIndex++] = RxData;
-            RxState = 2;
-            sum += RxData; // ???????????
-        }
-        else
-        {
-            RxState = 0;
+    return crc;
+}
+
+void K230_ReceiveData(const uint8_t RxData) {
+    static volatile uint8_t RxState = 0;
+    static uint8_t RxIndex = 0;
+    switch (RxState) {
+        case 0: {
+            k230_data_valid = 0;
             RxIndex = 0;
-        }
-    }
-    else if (RxState == 2) // ????????
-    {
-        if(RxIndex < DATA_PACKET_LENGTH)
-        {
             RxBuffer[RxIndex] = RxData;
-            
-            // ????????????У??????????
-            if (RxIndex < (DATA_PACKET_LENGTH - 1)) {
-                sum += RxData;
-            }
-            
-            RxIndex++;
-            
-            if (RxIndex == DATA_PACKET_LENGTH) // ???????
-            {
-                // ??????????У??????????У?????????
-                if (sum == RxBuffer[DATA_PACKET_LENGTH - 1])
-                {
-                    // ???????? (С????)
-                    K230_err[0] = (RxBuffer[3] << 8) | RxBuffer[2];
-                    K230_err[1] = (RxBuffer[5] << 8) | RxBuffer[4];
-//                    int16_t data2 = (RxBuffer[7] << 8) | RxBuffer[6];
-//                    int16_t data3 = (RxBuffer[9] << 8) | RxBuffer[8];
-                    DaemonReload(K230_daemon);
-										DaemonReload(K230_Lost_Target_daemon);
-                    // ????????
-                    // ????: ????????
-                }
-                // ????????
-                RxState = 0;
-                RxIndex = 0;
-            }
+            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
+            RxState = 1;
+            break;
         }
-        else
-        {
-            RxState = 0;
+        case 1: {
+            RxBuffer[RxIndex] = RxData;
+            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
+            RxState = 2;
+            break;
+        }
+        case 2: {
+            RxBuffer[RxIndex] = RxData;
+            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
+            RxState = 3;
+            break;
+        }
+        case 3: {
+            RxBuffer[RxIndex] = RxData;
+            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
+            RxState = 4;
+            break;
+        }
+        case 4: {
+            RxBuffer[RxIndex] = RxData;
+            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
+            RxState = 5;
+            break;
+        }
+        case 5: {
+            RxBuffer[RxIndex] = RxData;
+            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
+            RxState = 6;
+            break;
+        }
+        case 6: {
+            RxBuffer[RxIndex] = RxData;
+            RxIndex = (RxIndex + 1) % DATA_PACKET_LENGTH;
+            RxState = 7;
+            break;
+        }
+        case 7: {
+            RxBuffer[RxIndex] = RxData;
             RxIndex = 0;
+            RxState = 8;
+            break;
+        }
+        case 8: {
+            const uint8_t crc = get_CRC8(RxBuffer, DATA_PACKET_LENGTH - 1);
+            if (crc == RxBuffer[DATA_PACKET_LENGTH - 1]) {
+                x_pos_union.byte[0] = RxBuffer[1];
+                x_pos_union.byte[1] = RxBuffer[2];
+                dt_union.byte[0] = RxBuffer[3];
+                dt_union.byte[1] = RxBuffer[4];
+                dt_union.byte[2] = RxBuffer[5];
+                dt_union.byte[3] = RxBuffer[6];
+                current_steel_ball_movement.dt = dt_union.dt;
+                current_steel_ball_movement.x_position = x_pos_union.word;
+                k230_data_valid = 1;
+            } else {
+                k230_data_valid = 0;
+            }
         }
     }
 }
-static void K230LostCallback(void *ptr)
-{
-	K230_err[0] = 0;
-	K230_err[1] = 0;
-}
-void K230_INST_IRQHandler(void)
-{
+
+void K230_INST_IRQHandler(void) {
     uint8_t RxData = DL_UART_receiveData(K230_INST);
     K230_ReceiveData(RxData);
+}
+
+uint8_t K230_Read(steel_ball_movement_typedef *steel_ball_movement) {
+    if (k230_data_valid) {
+        steel_ball_movement->dt = current_steel_ball_movement.dt;
+        steel_ball_movement->x_position = x_pos_union.word;
+        k230_data_valid = 0;
+        return 1;
+    }
+    return 0;
 }
