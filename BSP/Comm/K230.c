@@ -1,73 +1,59 @@
 #include "K230.h"
 #include "daemon.h"
-//#include <ti/devices/msp/msp.h>   // Ìí¼ÓMSPÉè±¸Í·ÎÄ¼þ
-//#include <ti/driverlib/dl_uart.h> // Ìí¼ÓUARTÇý¶¯¿âÍ·ÎÄ¼þ
+//#include <ti/devices/msp/msp.h>   // ????MSP?è±¸????
+//#include <ti/driverlib/dl_uart.h> // ????UART??????????
 #define DATA_PACKET_LENGTH 7
 
-static uint8_t RxBuffer[DATA_PACKET_LENGTH]; // ½ÓÊÕÊý¾ÝÊý×é
-static volatile uint8_t RxState = 0; // ½ÓÊÕ×´Ì¬±êÖ¾Î»
-static uint8_t RxIndex = 0;         // ½ÓÊÕÊý×éË÷Òý
+static uint8_t RxBuffer[DATA_PACKET_LENGTH]; // ????????????
+static volatile uint8_t RxState = 0; // ?????????Î»
+static uint8_t RxIndex = 0;         // ????????????
 int16_t K230_err[2]={0};
 static void K230LostCallback(void *ptr);
 DaemonInstance* K230_daemon,*K230_Lost_Target_daemon;
 void Clear_UART_FIFO(void) {
     while (!DL_UART_isRXFIFOEmpty(K230_INST)) {
-        (void)DL_UART_receiveData(K230_INST); // ¶ªÆúÊý¾Ý
+        (void)DL_UART_receiveData(K230_INST); // ????????
     }
 }
 void K230_Init(void)
 {
-    Clear_UART_FIFO(); // ÐÂÔö£º³õÊ¼»¯Ç°Çå¿ÕFIFO
+    Clear_UART_FIFO(); // ???????????????FIFO
     NVIC_ClearPendingIRQ(K230_INST_INT_IRQN);
     NVIC_EnableIRQ(K230_INST_INT_IRQN);
-		DL_UART_clearInterruptStatus(K230_INST, DL_UART_INTERRUPT_RX); // Çå³ýÖÐ¶Ï±êÖ¾Î»
-		Daemon_Init_Config_s Daemon_Uart_Init_s = 
-		{
-			.owner_id = K230_INST,
-			.reload_count = 11,
-			.callback = K230LostCallback,
-		};
-		K230_daemon = DaemonRegister(&Daemon_Uart_Init_s);
-		Daemon_Init_Config_s Daemon_Lost_Target_Init_s = 
-		{
-			.owner_id = K230_INST,
-			.reload_count = 50,
-			.callback = NULL,
-		};
-		K230_Lost_Target_daemon = DaemonRegister(&Daemon_Lost_Target_Init_s);
+    DL_UART_clearInterruptStatus(K230_INST, DL_UART_INTERRUPT_RX); // ????Ð¶???Î»
 }
 
 /**
- * @brief       Êý¾Ý°ü´¦Àíº¯Êý
- * @param       ´®¿Ú½ÓÊÕµÄÊý¾ÝRxData
- * @retval      ÎÞ
+ * @brief       ?????????????
+ * @param       ????????????RxData
+ * @retval      ??
  */
 void K230_ReceiveData(uint8_t RxData)
 {
     static uint8_t sum = 0;
-    // Ìí¼Ó°üÍ·Ç¿ÖÆÍ¬²½
+    // ????????????
     if(RxData == 0x15 && RxState != 0)
     {
-        RxState = 0;  // ·¢ÏÖ°üÍ·Á¢¼´ÖØÖÃ×´Ì¬»ú
+        RxState = 0;  // ??????????????????
         RxIndex = 0;
     }
-    if (RxState == 0) // µÈ´ý°üÍ·
+    if (RxState == 0) // ??????
     {
         if (RxData == 0x15)
         {
             RxBuffer[0] = RxData;
             RxState = 1;
             RxIndex = 1;
-            sum = RxData; // ³õÊ¼»¯Ð£ÑéºÍ
+            sum = RxData; // ?????Ð£???
         }
     }
-    else if (RxState == 1) // ÅÐ¶ÏÊý¾ÝÀàÐÍ
+    else if (RxState == 1) // ?Ð¶?????????
     {
         if (RxData == 0x11) 
         {
             RxBuffer[RxIndex++] = RxData;
             RxState = 2;
-            sum += RxData; // ÀÛ¼ÓÊý¾ÝÀàÐÍ
+            sum += RxData; // ???????????
         }
         else
         {
@@ -75,35 +61,35 @@ void K230_ReceiveData(uint8_t RxData)
             RxIndex = 0;
         }
     }
-    else if (RxState == 2) // ½ÓÊÕÊý¾Ý
+    else if (RxState == 2) // ????????
     {
         if(RxIndex < DATA_PACKET_LENGTH)
         {
             RxBuffer[RxIndex] = RxData;
             
-            // ¹Ø¼üÐÞ¸Ä£ºÖ»ÀÛ¼Óµ½Ð£ÑéºÍÇ°Ò»¸ö×Ö½Ú
+            // ????????????Ð£??????????
             if (RxIndex < (DATA_PACKET_LENGTH - 1)) {
                 sum += RxData;
             }
             
             RxIndex++;
             
-            if (RxIndex == DATA_PACKET_LENGTH) // ½ÓÊÕÍê³É
+            if (RxIndex == DATA_PACKET_LENGTH) // ???????
             {
-                // ¹Ø¼üÐÞ¸Ä£º±È½ÏÐ£ÑéºÍÊ±²»°üº¬Ð£ÑéºÍ×Ö½Ú±¾Éí
+                // ??????????Ð£??????????Ð£?????????
                 if (sum == RxBuffer[DATA_PACKET_LENGTH - 1])
                 {
-                    // ½âÎöÊý¾Ý (Ð¡¶ËÄ£Ê½)
+                    // ???????? (Ð¡????)
                     K230_err[0] = (RxBuffer[3] << 8) | RxBuffer[2];
                     K230_err[1] = (RxBuffer[5] << 8) | RxBuffer[4];
 //                    int16_t data2 = (RxBuffer[7] << 8) | RxBuffer[6];
 //                    int16_t data3 = (RxBuffer[9] << 8) | RxBuffer[8];
                     DaemonReload(K230_daemon);
 										DaemonReload(K230_Lost_Target_daemon);
-                    // ´¦ÀíÊý¾Ý
-                    // ÀýÈç: ¿ØÖÆµç»úµÈ
+                    // ????????
+                    // ????: ????????
                 }
-                // ÖØÖÃ×´Ì¬»ú
+                // ????????
                 RxState = 0;
                 RxIndex = 0;
             }
