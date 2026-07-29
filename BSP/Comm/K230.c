@@ -118,7 +118,7 @@ void K230_ReceiveData(const uint8_t RxData) {
             } else {
                 k230_data_valid = 0;
             }
-            DL_UART_clearInterruptStatus(K230_INST, DL_UART_INTERRUPT_RX);
+
         }
     }
 }
@@ -126,6 +126,7 @@ void K230_ReceiveData(const uint8_t RxData) {
 void K230_INST_IRQHandler(void) {
     uint8_t RxData = DL_UART_receiveData(K230_INST);
     K230_ReceiveData(RxData);
+    DL_UART_clearInterruptStatus(K230_INST, DL_UART_INTERRUPT_RX);
 }
 
 uint8_t K230_Read(steel_ball_movement_typedef *steel_ball_movement) {

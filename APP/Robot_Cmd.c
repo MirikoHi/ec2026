@@ -96,7 +96,7 @@ void RobotCmd_Init(void)
  * @brief 核心cmd任务，向云台和底盘发送命令，在RTOS中以200Hz运行
  */
 void Robot_Cmd(void)
-{	LicheeRec_Send(0x42, 3.14f);
+{
 	xQueueReceive(trace_fetch_data_queue, &trace_fetch_data, 1);
 	LicheeRec_Frame = LicheeRec_GetFrame();
 	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_Frame.cmdid,LicheeRec_Frame.data);

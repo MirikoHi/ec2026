@@ -120,6 +120,7 @@
 #define StepMotor_PARAMETER (0x14UL)
 #define MotorTask_PARAMETER (0x15UL)
 #define Menu_PARAMETER       (0x16UL)
+#define K230Read_PARAMETER   (0x17UL)
 
 
 // 是否打开栈水位监控功能 ： 1开启 0关闭   todo：在实际运行的时候看栈水位，优化大小节省sram空间
@@ -175,6 +176,7 @@ static TaskHandle_t xDaemonTaskHandle    = NULL;
 static TaskHandle_t xMenuTaskHandle      = NULL;
 static TaskHandle_t xHwmotorTaskHandle   = NULL;
 static TaskHandle_t xTraceTaskHandle     = NULL;
+static TaskHandle_t xK230ReadHandle     = NULL;
 #endif
 
 #if ENABLE_STACK_MONITOR
@@ -222,7 +224,7 @@ void app_tasks_init(void)
 			configASSERT(xResult == pdPASS);
 
 			xResult=xTaskCreate(k230ReadTask, "k230Read", 128,
-            (void *) StepMotor_PARAMETER, tskIDLE_PRIORITY+1,
+            (void *) K230Read_PARAMETER, tskIDLE_PRIORITY+2,
             NULL);
  			configASSERT(xResult == pdPASS);
 
@@ -405,7 +407,7 @@ static void StepMotorTask(void *pvParameters)
 static void k230ReadTask(void *pvParameters)
 {
 	configASSERT(
-		((unsigned long) pvParameters) == RobotCmd_PARAMETER);
+		((unsigned long) pvParameters) == K230Read_PARAMETER);
 	vTaskDelay(1000);
 	steel_ball_movement_typedef steel_ball_movement_data;
 	for (;;){
