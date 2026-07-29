@@ -22,8 +22,11 @@ static dt_union_typedef    dt_union;
 static steel_ball_movement_typedef current_steel_ball_movement;
 
 void Clear_UART_FIFO(void) {
-    while (!DL_UART_isRXFIFOEmpty(K230_INST)) {
-        (void)DL_UART_receiveData(K230_INST); // ????????
+    /* 限定最多清 16 次，防止 DL_UART_isRXFIFOEmpty 不可靠导致死循环 */
+    for (int _i = 0; _i < 16; _i++) {
+        if (DL_UART_isRXFIFOEmpty(K230_INST))
+            break;
+        (void)DL_UART_receiveData(K230_INST);
     }
 }
 void K230_Init(void) {
