@@ -177,16 +177,32 @@ void Gimbal_Init(void)
 	/* 初始化滑槽小球位置闭环 */
 	Slide_Control_Init();
 }
-
+int16_t test_angle = 0;
+uint16_t testtt = 0;
 void Gimbal(void)
 {
 	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
 
+	// test_angle = sin(DWT_GetTimeline_ms()/100)*10+85;
+
+	testtt++;
+	if (testtt > 250) {
+		if (testtt >= 500) testtt = 0;
+		Servo_Motor_FreeAngle_Set(servo_yaw , 65);
+	}else if (testtt <= 250) {
+		// else
+		Servo_Motor_FreeAngle_Set(servo_yaw , 120);
+	}
+
+	// vTaskDelay(1000);
+	// Servo_Motor_FreeAngle_Set(servo_yaw , 65);
+	// // vTaskDelay(1000);
+	ServeoMotorControl(servo_yaw);
+
 	if (K230_Read(&steel_ball_movement_data)) {
 		/* 滑槽小球位置闭环: PID + 速度前馈 */
-		Slide_Control_Run();
+		// Slide_Control_Run();
 	}
-	Gimbal_Task();
 	// switch(gimbal_cmd_receive.task_flag)
 	// {
 	// 	case 0:
@@ -211,7 +227,5 @@ void Gimbal_Attitude_Solving(void)
 	gimbal_cmd_receive.yaw = -atan2f(aim_x,GIMBAL_LENGTH_TO_CENTER)*180.0f/PI;
 	gimbal_cmd_receive.pitch = atan2f(aim_y,sqrtf(GIMBAL_LENGTH_TO_CENTER*GIMBAL_LENGTH_TO_CENTER+aim_x*aim_x))*180.0f/PI;
 }
-void Gimbal_Task() {
 
-}
 

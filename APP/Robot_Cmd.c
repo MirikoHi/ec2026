@@ -47,6 +47,7 @@ void RobotCmd_Init(void)
 	BSPLogInit();
 
 	chassis_cmd_send.Chassis_Mode = NORMAL_MODE;  //todo:这里记得改回默认值，调试用
+	last_chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
 
 	chassis_feedback_data.real_vy = 100;
 	//双板通信can初始化
