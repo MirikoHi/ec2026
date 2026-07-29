@@ -3,6 +3,7 @@
 #include "No_Mcu_Ganv_Grayscale_Sensor_Config.h"
 #include "dwt.h"
 #include "gray_serial.h"
+#include "flash_param_store.h"
 #define SENSOR_WEIGHTS { -4.0f, -3.0f, -2.0f, -1.0f, 1.0f, 2.0f, 3.0f, 4.0f }
 
 /* ---- filter_raw 可调参数 ---- */
@@ -20,6 +21,7 @@ unsigned short Normal[8];
 unsigned char rx_buff[256]={0};
 //巡线状态机
 trace_state_e trace_state;
+trace_mode_e trace_mode;
 //原始数据
 unsigned char Digtal;
 // //滤除多余数据后的8位数据
@@ -31,6 +33,53 @@ No_MCU_Sensor sensor;
 
 //处理原始八路数据后获得的-7.0-7.0的映射值
 volatile float track_err;
+
+/* ---- CalcLineError 状态变量（文件作用域，供 Trace_ResetLineError 访问） ---- */
+static float   calcline_last_output = 0.0f;
+static int     calcline_single_pos  = -1;
+static uint8_t calcline_single_cnt  = 0;
+static uint8_t calcline_ff_gap_cnt  = 0;
+
+/**
+  * @brief 填充循迹相关默认参数
+  * @param params 待填充参数结构体指针
+  * @note 默认值保留在循迹使用处，Flash 参数无效时由存储库调用本函数恢复默认循迹参数
+  */
+void Trace_FillDefaultParams(FlashParam_Data_s *params)
+{
+    if (params == NULL)
+    {
+        return;
+    }
+
+    params->trace_pid = (pid_init_config_s) {
+        .mode = PID_POSITION,
+        .Kp = 0.006f,
+        .Ki = 0.0f,
+        .Kd = 0.0f,
+        .max_out = 500.0f,
+        .max_iout = 200.0f,
+        .deadzone = 0.0f,
+        .ff_type = FF_None,
+    };
+}
+
+/**
+  * @brief 应用循迹运行参数
+  * @param params 待应用参数结构体指针
+  * @note 用法：上电初始化或屏幕端 FlashParam_Save() 成功后调用，使循迹 PID 立即生效
+  */
+void Trace_ApplyParams(const FlashParam_Data_s *params)
+{
+    if (params == NULL)
+    {
+        return;
+    }
+
+    pid_init_config_s trace_config = params->trace_pid;
+    PID_init(&Trace_PID, &trace_config);
+    Trace_ResetLineError();
+}
 
 void Trace_Init(void)
 {
@@ -50,16 +99,8 @@ void Trace_Init(void)
     No_MCU_Ganv_Sensor_Init(&sensor,white,black);
     DWT_Delay(0.1);
 #endif
-	pid_init_config_s trace_config={
-		.mode = PID_POSITION,
-		.Kp = 0.006f,
-		.Kd = 0.0f,
-		.Ki = 0.0f,
-		.max_out = 500.0f,
-		.max_iout = 200.0f,
-		//.feedforward = 0.0f,
-	};
-	PID_init(&Trace_PID,&trace_config);
+	// 使用上电从 Flash 读取到的循迹 PID 参数。
+	Trace_ApplyParams(FlashParam_GetActive());
 }
 
 //旧版逻辑，暂时不用
@@ -365,11 +406,6 @@ float raw_transform_easy(uint8_t current_trace)
  */
 static float CalcLineError(uint8_t raw)
 {
-    static float   last_output = 0.0f;    // 上一帧输出（LPF 状态 + keep）
-    static int     single_pos  = -1;      // 跟踪的孤立 0 位置，-1=无
-    static uint8_t single_cnt  = 0;       // 同一孤立 0 连续帧数
-    static uint8_t ff_gap_cnt  = 0;       // 当前孤立 0 出现前，连续 0xFF 帧数
-
     /* ---- 找最大连续 0 块 ---- */
     int best_start = -1, best_len = 0;
     int cur_start  = -1, cur_len  = 0;
@@ -397,41 +433,58 @@ static float CalcLineError(uint8_t raw)
     if (len >= 2) {
         /* 2+ 相邻传感器 → 有效线 */
         raw_err = 7.0f - 2.0f * c;
-        single_pos  = -1;
-        single_cnt  = 0;
-        ff_gap_cnt  = 0;
+        calcline_single_pos  = -1;
+        calcline_single_cnt  = 0;
+        calcline_ff_gap_cnt  = 0;
     } else if (len == 1) {
         /* 单传感器 → 上下文感知 debounce */
-        if (single_pos == best_start) {
-            single_cnt++;
+        if (calcline_single_pos == best_start) {
+            calcline_single_cnt++;
         } else {
-            single_pos = best_start;
-            single_cnt = 1;
+            calcline_single_pos = best_start;
+            calcline_single_cnt = 1;
         }
 
-        uint8_t threshold = (ff_gap_cnt <= 1) ? 2 : 8;
+        uint8_t threshold = (calcline_ff_gap_cnt <= 1) ? 2 : 8;
 
-        if (single_cnt >= threshold) {
+        if (calcline_single_cnt >= threshold) {
             /* 确认有效 */
             raw_err = 7.0f - 2.0f * c;
         } else {
             /* debounce 中：保持上一帧 */
-            raw_err = last_output;
+            raw_err = calcline_last_output;
         }
     } else {
         /* raw == 0xFF：全白 → 保持上一帧位置 */
-        raw_err = last_output;
-        ff_gap_cnt++;
-        single_pos = -1;
-        single_cnt = 0;
+        raw_err = calcline_last_output;
+        calcline_ff_gap_cnt++;
+        calcline_single_pos = -1;
+        calcline_single_cnt = 0;
     }
 
     /* ---- LPF 平滑 ---- */
-    float output = last_output + 0.8 * (raw_err - last_output);  //这里滤波系数可以调，越靠近0越平滑
-    last_output = output;
+    float output = calcline_last_output + 0.8 * (raw_err - calcline_last_output);  //这里滤波系数可以调，越靠近0越平滑
+    calcline_last_output = output;
 
     //这里反转一下方向，为了和PID输出对应
     return -output;
+}
+
+/**
+ * @brief 清除 CalcLineError 的静态残留值
+ *
+ * 将 last_output 归零，同时重置单比特去抖动状态和丢线间隔计数。
+ * 调用后，若持续收到 0xFF，CalcLineError 将输出 ~0.0f，
+ * Trace_State_Judge 会在约 200ms 后自然收敛到 TRACE_END。
+ *
+ * 典型调用时机：巡线任务结束 / 模式切换 / 遥控接管时。
+ */
+void Trace_ResetLineError(void)
+{
+    calcline_last_output = 0.0f;
+    calcline_single_pos  = -1;
+    calcline_single_cnt  = 0;
+    calcline_ff_gap_cnt  = 0;
 }
 
 /**
@@ -476,8 +529,34 @@ float Trace_task(void)
     // 获取数字量传感器数据（只有当黑白值填进去之后才会有数字量输出）
     Digtal = Get_Digtal_For_User(&sensor);
 #endif
-    //第一版数据处理
-    track_err = CalcLineError(Digtal);
+
+    uint8_t left_black = 0, right_black = 0;
+    for (int i = 0; i < 4; i++) {
+        if (!(Digtal & (1 << i))) left_black++;   // 统计 bit 0~3 (一侧)
+    }
+    for (int i = 4; i < 8; i++) {
+        if (!(Digtal & (1 << i))) right_black++;  // 统计 bit 4~7 (另一侧)
+    }
+
+    // 只要有一侧有 3 个或以上传感器吃到黑线，判定为直角弯
+    if (left_black >= 3 || right_black >= 3) {
+        PID_clear(&Trace_PID); // 清空 PID
+        return 0.0f;           // 不进行补偿计算，直接返回 0.0f
+    }
+
+
+    switch (trace_mode) {
+        case TRACE_NORMAL:
+            track_err =  raw_transform_easy(Digtal);  //仅把八位数据映射成-7到7的数字，无残留
+            break;
+        case TRACE_LOST_DETECT:   //有丢线检测逻辑，但会残留上一丢线次的值作为一个丢线找回的功能
+            track_err = CalcLineError(Digtal);
+            break;
+        default:
+            LOGERROR("trace_mode error");
+            break;
+    }
+
     // //第二版数据处理
     // raw_track_err = filter_raw(Digtal);   //先对原始数据处理优化，保留残留值这个逻辑
     // process_digital = raw_transform_easy(raw_track_err);//把八位数据映射成-7到7的数字
@@ -491,7 +570,9 @@ float Trace_task(void)
     float temp = track_err;
     if (trace_state == TRACE_END) {
         temp =  0.0f;
+        PID_clear(&Trace_PID);
+        return 0.0f;
     }
-    PID_calc(&Trace_PID, 0, temp ); //todo:这里从原来的权重换成了-7到7的数据，边缘速度减小了，得细调
+    PID_calc(&Trace_PID, 0, temp );
     return Trace_PID.out;
 }

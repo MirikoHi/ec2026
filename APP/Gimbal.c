@@ -7,6 +7,7 @@
 #include "K230.h"
 #include "daemon.h"
 #include "dwt.h"
+#include "Servo.h"
 
 ZDT_Motor_t *yaw_motor,*pitch_motor;
 float angle_debug;
@@ -15,6 +16,8 @@ gimbal_cmd_q gimbal_cmd_receive={0};
 float relay_on_time;
 uint8_t relay_first_on_flag=0;
 void Gimbal_Attitude_Solving(void);
+
+ServoInstance*  servo_yaw;
 
 void Gimbal_task_2(void);
 void Gimbal_Init(void)

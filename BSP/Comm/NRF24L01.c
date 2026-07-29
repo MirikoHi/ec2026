@@ -157,9 +157,9 @@ void NRF24L01_W_CE(uint8_t BitValue)
 	/*根据BitValue的值，将CE置高电平或者低电平*/
 //	GPIO_WriteBit(GPIOA, GPIO_Pin_0, (BitAction)BitValue);
 	if(BitValue) {
-        DL_GPIO_setPins(NRF24L_PORT, NRF24L_CE_PIN);   // 设置高电平
+//        DL_GPIO_setPins(NRF24L_PORT, NRF24L_CE_PIN);   // 设置高电平
     } else {
-        DL_GPIO_clearPins(NRF24L_PORT, NRF24L_CE_PIN); // 设置低电平
+//        DL_GPIO_clearPins(NRF24L_PORT, NRF24L_CE_PIN); // 设置低电平
     }
 }
 
@@ -176,9 +176,9 @@ void NRF24L01_W_CSN(uint8_t BitValue)
 	/*根据BitValue的值，将CSN置高电平或者低电平*/
 //	GPIO_WriteBit(GPIOA, GPIO_Pin_1, (BitAction)BitValue);
 	if(BitValue) {
-        DL_GPIO_setPins(NRF24L_PORT, NRF24L_CSN_PIN);   // 设置高电平
+//        DL_GPIO_setPins(NRF24L_PORT, NRF24L_CSN_PIN);   // 设置高电平
     } else {
-        DL_GPIO_clearPins(NRF24L_PORT, NRF24L_CSN_PIN); // 设置低电平
+//        DL_GPIO_clearPins(NRF24L_PORT, NRF24L_CSN_PIN); // 设置低电平
     }
 }
 
@@ -214,13 +214,13 @@ void NRF24L01_GPIO_Init(void)
 uint8_t NRF24L01_SPI_SwapByte(uint8_t Byte)
 {
 	/*硬件SPI（NRF24L01_INST，即SPI1）发送一个字节*/
-	DL_SPI_transmitData8(NRF24L01_INST, Byte);
+//	DL_SPI_transmitData8(NRF24L01_INST, Byte);
 
 	/*等待发送完成，SPI总线空闲*/
-	while (DL_SPI_isBusy(NRF24L01_INST));
+//	while (DL_SPI_isBusy(NRF24L01_INST));
 
 	/*返回接收FIFO中收到的一个字节*/
-	return DL_SPI_receiveData8(NRF24L01_INST);
+//	return DL_SPI_receiveData8(NRF24L01_INST);
 }
 
 /*********************通信协议*/

@@ -8,6 +8,7 @@
 #include "misc.h"
 #include "dwt.h"
 //#include "tjc.h"
+#include "../BSP/Comm/TJC.h"
 #include "Chassis.h"
 #include "math.h"
 #include "K230.h"
@@ -24,6 +25,9 @@ QueueHandle_t chassis_cmd_queue = NULL,gimbal_cmd_queue =NULL;
 QueueHandle_t chassis_fetch_data_queue = NULL;
 QueueHandle_t trace_fetch_data_queue = NULL;
 
+BlueTooth_Tx_t g_bt_tx = {0};
+volatile BlueTooth_Rx_t g_bt_rx = {0};
+
 chassis_cmd_q chassis_cmd_send={0};
 gimbal_cmd_q gimbal_cmd_send ={0};
 trace_fetch_data_q trace_fetch_data={0};
@@ -37,15 +41,48 @@ float last_trace_imu_switch_s=0;
 float now_time=0;
 State robotcmd_control_state = DISABLE;
 
-#define ELRS_REMOTE_ENABLE_CH       5U
-#define ELRS_REMOTE_DISABLE_CH      6U
-#define ELRS_REMOTE_TURN_CH         1U
-#define ELRS_REMOTE_FORWARD_CH      2U
-#define ELRS_REMOTE_ENABLE_VALUE    900U
-#define ELRS_REMOTE_DISABLE_VALUE   ELRS_CHANNEL_VALUE_MID
-#define ELRS_REMOTE_DEADBAND        0.04f
-#define ELRS_REMOTE_MAX_FORWARD     0.25f
-#define ELRS_REMOTE_MAX_TURN        0.18f
+/* ELRS 通道映射：这里用 1 开始的通道号，和遥控器界面保持一致。 */
+#define ROBOTCMD_ELRS_CH_TURN             1U    /* CH1：手动遥控转向摇杆。 */
+#define ROBOTCMD_ELRS_CH_FORWARD          2U    /* CH2：手动遥控前后摇杆。 */
+#define ROBOTCMD_ELRS_CH_REMOTE_ENABLE    5U    /* CH5：进入手动遥控模式。 */
+#define ROBOTCMD_ELRS_CH_SAFETY_DISABLE   6U    /* CH6：底盘安全失能。 */
+#define ROBOTCMD_ELRS_CH_IMU_ACTION       7U    /* CH7：进入 IMU_MODE，执行 Chassis_ImuModeAction。 */
+
+/* 拨杆阈值使用 CRSF 原始通道值，不是 PWM 微秒值。 */
+#define ROBOTCMD_ELRS_REMOTE_ENABLE_TH    900U
+#define ROBOTCMD_ELRS_SAFETY_DISABLE_TH   ELRS_CHANNEL_VALUE_MID
+#define ROBOTCMD_ELRS_IMU_ACTION_TH       1000U
+
+/* 手动遥控速度缩放：摇杆通道先由 CRSF 原始值归一化到 [-1, 1]。 */
+#define ROBOTCMD_ELRS_REMOTE_DEADBAND     0.04f
+#define ROBOTCMD_ELRS_MAX_FORWARD         0.25f
+#define ROBOTCMD_ELRS_MAX_TURN            0.18f
+
+typedef enum
+{
+	ROBOTCMD_SWITCH_ACTION_DISABLE = 0,  /* 立即失能底盘输出。 */
+	ROBOTCMD_SWITCH_ACTION_MODE,         /* 拨杆保持时强制进入指定底盘模式。 */
+} RobotCmd_SwitchAction_e;
+
+typedef struct
+{
+	uint8_t channel;                 /* 1 开始的 ELRS 通道号。 */
+	uint16_t threshold;              /* 原始通道值大于该阈值时触发。 */
+	RobotCmd_SwitchAction_e action;  /* 该拨杆触发后的动作类型。 */
+	Chassis_Mode_e mode;             /* MODE 类型动作对应的目标底盘模式。 */
+} RobotCmd_SwitchRule_s;
+
+/*
+ * 模式/安全类拨杆统一写在这里，表的顺序就是优先级。
+ * 后续增加新功能只需要按同样格式加一行，例如：
+ * { 8U, 1000U, ROBOTCMD_SWITCH_ACTION_MODE, POSITION_MODE },
+ */
+static const RobotCmd_SwitchRule_s robotcmd_switch_rules[] = {
+	{ ROBOTCMD_ELRS_CH_SAFETY_DISABLE, ROBOTCMD_ELRS_SAFETY_DISABLE_TH,
+	  ROBOTCMD_SWITCH_ACTION_DISABLE,  NORMAL_MODE },
+	{ ROBOTCMD_ELRS_CH_IMU_ACTION,     ROBOTCMD_ELRS_IMU_ACTION_TH,
+	  ROBOTCMD_SWITCH_ACTION_MODE,     IMU_MODE },
+};
 
 void tjc_control(void);
 void draw_sin(void);
@@ -63,11 +100,21 @@ void RobotCmd_Init(void)
 	gimbal_cmd_queue = xQueueCreate(4,sizeof(gimbal_cmd_q));
 //	while(bsp_Icm42688Init()!=0x00);
 	BSPLogInit();
-	ELRS_Init();
-	robotcmd_elrs = ELRS_GetData();
+//	ELRS_Init();
+//	robotcmd_elrs = ELRS_GetData();
 	
 
-	chassis_cmd_send.Chassis_Mode = TRACE_MODE;  //todo:这里记得改回默认值，调试用
+	// chassis_cmd_send.Chassis_Mode = TRACE_MODE;//todo:这里记得改回默认值，调试用
+
+	chassis_cmd_send.Chassis_Mode =IMU_MODE;
+	chassis_cmd_send.circle_set = 1U;
+
+
+	chassis_cmd_send.remote_disable = 0U;
+	chassis_cmd_send.remote_forward = 0.0f;
+	chassis_cmd_send.remote_turn = 0.0f;
+
+	robotcmd_control_state = DISABLE;
 		pid_init_config_s gimbal_yaw_pid_config={
 		.mode = PID_POSITION,
 		.Kp = 0.003f,
