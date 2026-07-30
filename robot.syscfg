@@ -427,6 +427,7 @@ UART2.enabledInterrupts                = ["RX"];
 UART2.targetBaudRate                   = 115200;
 UART2.$name                            = "STEPPER_MOTOR";
 UART2.uartClkDiv                       = "2";
+UART2.interruptPriority                = "2";
 UART2.peripheral.$assign               = "UART3";
 UART2.peripheral.rxPin.$assign         = "PB13";
 UART2.peripheral.txPin.$assign         = "PB12";

@@ -103,6 +103,8 @@ void K230_ReceiveData(const uint8_t RxData) {
 }
 
 void K230_INST_IRQHandler(void) {
+    static uint16_t cntr = 0;
+    cntr ++;
     uint8_t RxData = DL_UART_receiveData(K230_INST);
     K230_ReceiveData(RxData);
     DL_UART_clearInterruptStatus(K230_INST, DL_UART_INTERRUPT_RX);

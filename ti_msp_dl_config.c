@@ -852,6 +852,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_STEPPER_MOTOR_init(void)
     /* Configure Interrupts */
     DL_UART_Main_enableInterrupt(STEPPER_MOTOR_INST,
                                  DL_UART_MAIN_INTERRUPT_RX);
+    /* Setting the Interrupt Priority */
+    NVIC_SetPriority(STEPPER_MOTOR_INST_INT_IRQN, 2);
 
 
     DL_UART_Main_enable(STEPPER_MOTOR_INST);
