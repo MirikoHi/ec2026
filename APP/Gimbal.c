@@ -27,6 +27,8 @@ gimbal_cmd_q gimbal_cmd_send ={0};
 float x;
 float dt;
 
+float target_angle_deg = 0;
+
 steel_ball_movement_typedef steel_ball_movement_data;
 ServoInstance*  servo_yaw;
 /* ═══════════════════════════════════════════════════════════════════════
@@ -43,14 +45,15 @@ ServoInstance*  servo_yaw;
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
 
-#define SLIDE_TARGET_X         200     /* 目标位置: 画面中心 (640/2) */
-#define SLIDE_SERVO_RANGE      10     /* 最大clock范围 (±520) */
+#define SLIDE_TARGET_X         320     /* 目标位置: 画面中心 (640/2) */
+#define SLIDE_SERVO_RANGE      60     /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.001f   /* 速度前馈增益 */
+#define SLIDE_VEL_FF_GAIN      0.002f   /* 速度前馈增益 */
+
 
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
 static float        slide_prev_x = 320;   /* 上一帧 X 位置 */
-static float        slide_velocity = 0;   /* 滤波后的小球速度 (px/s) */
+int16_t        slide_velocity = 0;   /* 滤波后的小球速度 (px/s) */
 static float     stepper_current_clock = 0;
 
 static void Gimbal_ZDT_UART_Send(const uint8_t *data, uint8_t len)
@@ -66,8 +69,8 @@ static void Slide_Control_Init(void)
 {
     pid_init_config_s cfg = {
         .mode    = PID_POSITION,
-        .Kp      = 0.50f,     /* 比例: 每像素误差产生多少度倾角 */
-        .Kd      = 0.00f,     /* 微分: 抑制震荡 */
+        .Kp      = 0.08f,     /* 比例: 每像素误差产生多少度倾角 */
+        .Kd      = 0.05f,     /* 微分: 抑制震荡 */
         .Ki      = 0.00f,    /* 积分: 消除静差 */
         .max_out = SLIDE_SERVO_RANGE,
         .max_iout = 10.0f,
@@ -85,8 +88,14 @@ static void Slide_Control_Init(void)
  *   4. 速度前馈: 球速越大 → 倾角补偿越大
  *   5. 合成最终角度, 限幅后输出到舵机
  */
+
+uint64_t start_time = 0;
+uint64_t current_time = 0;
+uint64_t delta_time = 0;
 static void Slide_Control_Run(void)
 {
+	start_time = DWT_GetTimeline_us();
+
     if (!K230_Read(&steel_ball_movement_data)) return;
 
     x  = (float)steel_ball_movement_data.x_position;
@@ -102,8 +111,7 @@ static void Slide_Control_Run(void)
     slide_prev_x = x;
 
     /* 一阶低通滤波, 滤除视觉抖动 */
-    slide_velocity = slide_velocity * (1.0f - SLIDE_VEL_LPF_ALPHA)
-                   + raw_v * SLIDE_VEL_LPF_ALPHA;
+    slide_velocity = raw_v /10;
 
     /* ── 2. 位置 PID ── */
     float error = SLIDE_TARGET_X - x;
@@ -112,20 +120,22 @@ static void Slide_Control_Run(void)
     /* ── 3. 速度前馈 ──
      * 球向右运动 (v>0) → 需要左倾 (减小角度) 来"接住"球
      * 球速越大 → 前馈幅度越大 → 舵机提前动作 */
-    float velocity_ff = -slide_velocity * SLIDE_VEL_FF_GAIN;
+    float velocity_ff = (float)slide_velocity * SLIDE_VEL_FF_GAIN;
 
     /* ── 4. 合成角度 = 中心角度 + PID输出 + 速度前馈 ── */
 
-	float output = slide_ball_pid.out + velocity_ff;
+	target_angle_deg = slide_ball_pid.out + velocity_ff;
 
-	if (output >   SLIDE_SERVO_RANGE)  output =   SLIDE_SERVO_RANGE;
-	if (output < -(SLIDE_SERVO_RANGE)) output = -(SLIDE_SERVO_RANGE);
-    float stepper_clock = (output);
-	uint8_t dir = stepper_clock >= 0 ? 1 : 0;
-	(dir == 0) ? stepper_clock = -stepper_clock : stepper_clock;
+	if (target_angle_deg >   SLIDE_SERVO_RANGE)  target_angle_deg =   SLIDE_SERVO_RANGE;
+	if (target_angle_deg < -(SLIDE_SERVO_RANGE)) target_angle_deg = -(SLIDE_SERVO_RANGE);
 
-    //ZDT_Emm_Pos_Control(1, dir, 50, 0, (uint32_t)stepper_clock, 1, false);
-	ZDT_Emm_Vel_Control(1, dir, (uint32_t)stepper_clock, 0, false);
+	int32_t pulses = (int32_t)(target_angle_deg * 3200.0f / 360.0f);
+
+	uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
+	uint8_t dir = pulses >= 0 ? 1 : 0;
+
+    ZDT_Emm_Pos_Control(1, dir, 500, 200, (uint32_t)pulse_count, 1, false);
+	//ZDT_Emm_Vel_Control(1, dir, (uint32_t)stepper_clock, 0, false);
 }
 
 
@@ -209,14 +219,15 @@ void Gimbal_Init(void)
 	Slide_Control_Init();
 
 	DWT_Delay(1);
-	ZDT_Emm_Vel_Control(1, 0, (uint32_t)100, 0, false);
+	//ZDT_Emm_Vel_Control(1, 0, (uint32_t)100, 0, false);
+	ZDT_Emm_Pos_Control(1, 1, 500, 200, 0, 1, false);
 }
 
 
 void Gimbal(void)
 {
 	Slide_Control_Run();
-
+	//ZDT_Emm_Pos_Control(1, 0, 200, 0, 100, 1, false);
 }
 
 void Gimbal_Pid_Cal(void)
