@@ -10,6 +10,8 @@
 #include "dwt.h"
 #include "Servo.h"
 
+
+
 ZDT_Motor_t *yaw_motor,*pitch_motor;
 float angle_debug;
 gimbal_cmd_q gimbal_cmd_receive={0};
@@ -46,11 +48,20 @@ ServoInstance*  servo_yaw;
  * ═══════════════════════════════════════════════════════════════════════ */
 
 float SLIDE_TARGET_X   =  120.00f ;    /* 目标位置: 画面中心 (640/2) */
+uint32_t motor_zero_point =  0;
 #define SLIDE_SERVO_RANGE      60     /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
 #define SLIDE_VEL_FF_GAIN      0.3f   /* 速度前馈增益 */
 #define SLIDE_X_LPF_ALPHA      0.25f   /* X坐标低通滤波系数，越小越平滑 */
 
+static pid_init_config_s cfg = {   //动态pid这一块
+	.mode    = PID_POSITION,
+	.Kp      = 0.09f,     /* 比例: 每像素误差产生多少度倾角 */
+	.Kd      = 0.001f,     /* 微分: 抑制震荡 */
+	.Ki      = 0.02f,     /* 积分: 消除静差 */
+	.max_out = SLIDE_SERVO_RANGE,
+	.max_iout = 30.0f,
+};
 
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
 static float        slide_prev_x = 320;   /* 上一帧 X 位置 */
@@ -73,14 +84,7 @@ static void Gimbal_ZDT_UART_Send(const uint8_t *data, uint8_t len)
 
 static void Slide_Control_Init(void)
 {
-    pid_init_config_s cfg = {
-        .mode    = PID_POSITION,
-        .Kp      = 0.085f,     /* 比例: 每像素误差产生多少度倾角 */
-        .Kd      = 0.04f,     /* 微分: 抑制震荡 */
-        .Ki      = 0.02f,     /* 积分: 消除静差 */
-        .max_out = SLIDE_SERVO_RANGE,
-        .max_iout = 10.0f,
-    };
+
     PID_init(&slide_ball_pid, &cfg);
 
     /* 滤波器初始化 */
@@ -100,13 +104,8 @@ static void Slide_Control_Init(void)
  *   5. 速度前馈: 球速越大 → 倾角补偿越大
  *   6. 合成最终角度, 限幅后输出到步进电机
  */
-uint64_t start_time = 0;
-uint64_t current_time = 0;
-uint64_t delta_time = 0;
 static void Slide_Control_Run(void)
 {
-	start_time = DWT_GetTimeline_us();
-
     if (!K230_Read(&steel_ball_movement_data)) return;
 
     /* 原始视觉坐标 */
@@ -154,7 +153,7 @@ static void Slide_Control_Run(void)
 	uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
 	uint8_t dir = pulses >= 0 ? 1 : 0;
 
-    ZDT_Emm_Pos_Control(1, dir, 500, 230, (uint32_t)pulse_count, 1, false);
+    ZDT_Emm_Pos_Control(1, dir, 10, 0, (uint32_t)pulse_count, 1, false);
 }
 
 
@@ -186,12 +185,12 @@ void Gimbal_Init(void)
 	Slide_Control_Init();
 
 	DWT_Delay(1);
-	ZDT_Emm_Pos_Control(1, 1, 100, 190, 0, 1, false);
+	ZDT_Emm_Pos_Control(1, 1, 10, 0, 0, 1, false);
 }
 
 
 void Gimbal(void)
-{
+{   //ZDT_Emm_Pos_Control(1, 1, 190, 0, 0, 1, false);
 	Slide_Control_Run();
 }
 
