@@ -12,6 +12,7 @@
 #include "IMU_Mahony.h"
 #include "PID.h"
 #include "bsp_log.h"
+#include "bsp_beep.h"
 #include "../BSP/Motor/Servo.h"
 
 static DCMotorInstance *motor_l,*motor_r;
@@ -39,53 +40,12 @@ static uint8_t remote_mode_active = 0;
 #define CHASSIS_LINE_MIN_SPEED       0.025f
 #define CHASSIS_TURN_DONE_ERR_DEG    3.0f
 #define CHASSIS_TURN_DONE_TICKS      10U
-#define CHASSIS_ACTION_SPEED		 0.31f
-#define CHASSIS_ACTION_TURN_SPEED	 0.16f
+#define CHASSIS_ACTION_SPEED         0.31f
+#define CHASSIS_ACTION_TURN_SPEED    0.16f
 
-/* ---- 2026H赛道参数 ---- */
-#define CHASSIS_ARC_SPEED             0.20f   /* 弧线跟随线速度 (m/s) */
-#define CHASSIS_STRAIGHT_DIST_M       1.50f   /* 直线段距离 (m) */
-#define CHASSIS_ARC_RADIUS_M          0.50f   /* 半圆半径 (m) */
-#define CHASSIS_TRACK_WIDTH_M         0.20f   /* 左右驱动轮接地点中心距 (m)，当前为实车估测值 */
-#define CHASSIS_TRACE_FORWARD_OFFSET_M 0.22f  /* 驱动轮轴线到八路循迹探头的前向距离 (m) */
-#define CHASSIS_ARC1_EXIT_ANGLE_DEG   177.0f  /* C点略过转，第一半圆提前3°退出 */
-#define CHASSIS_ARC_ANGLE_DEG         180.0f  /* 半圆总转角 (deg) */
-#define CHASSIS_FINAL_APPROACH_SPEED  0.08f   /* 终点逼近慢速 (m/s) */
-#define CHASSIS_FINAL_MAX_DIST_M      0.50f   /* 终点逼近最大搜索距离 (m) */
-#define CHASSIS_START_LINE_SENSORS    4U      /* 起止线最少连续探头数 */
-#define CHASSIS_LINE_DETECT_DEBOUNCE  3U      /* 起止线检测消抖周期数 */
 #define CHASSIS_ACTION_ARC            3U      /* 弧线动作类型 ID */
 #define CHASSIS_STOP_DONE_STEP        99U     /* 停车完成步骤号 */
-#define CHASSIS_PI                    3.14159265f
 #define CHASSIS_ARC_DONE_YAW_ERR_DEG  3.0f
-#define CHASSIS_STADIUM_STRAIGHT_SPEED 0.26f  /* 平衡球模式直线巡航速度 (m/s) */
-#define CHASSIS_STADIUM_ARC_SPEED      0.22f  /* 平衡球模式圆弧中心速度 (m/s) */
-#define CHASSIS_STADIUM_MAX_ACCEL      0.18f  /* 最大前进加速度 (m/s^2) */
-#define CHASSIS_STADIUM_MAX_DECEL      0.22f  /* 最大制动加速度 (m/s^2) */
-#define CHASSIS_STADIUM_MAX_JERK       0.80f  /* 最大加加速度 (m/s^3) */
-#define CHASSIS_STADIUM_CONTROL_DT     0.005f /* ChassisTask 标称周期 (s) */
-#define CHASSIS_FAST_STRAIGHT_SPEED     0.42f
-#define CHASSIS_FAST_ARC_SPEED          0.34f
-#define CHASSIS_FAST_MAX_ACCEL          0.65f
-#define CHASSIS_FAST_MAX_DECEL          0.75f
-#define CHASSIS_FAST_MAX_JERK           4.00f
-#define CHASSIS_FAST_FINISH_SPEED       0.03f
-#define CHASSIS_FAST_BRAKE_MARGIN       1.50f /* 补偿jerk限制增加的实际制动距离 */
-/*
- * 实车坐标约定：左轮快、右轮慢会产生顺时针转动；ICM42688在该方向下
- * yaw递减。因此差速曲率仍用正值表示顺时针，但IMU目标角增量必须为负。
- */
-#define CHASSIS_CLOCKWISE_YAW_SIGN       (-1.0f)
-#define CHASSIS_YAW_FEEDBACK_MAX_MPS     0.06f
-
-typedef enum {
-	CHASSIS_STADIUM_STRAIGHT_1 = 0,
-	CHASSIS_STADIUM_ARC_1,
-	CHASSIS_STADIUM_STRAIGHT_2,
-	CHASSIS_STADIUM_ARC_2,
-	CHASSIS_STADIUM_FINISH_BRAKE,
-	CHASSIS_STADIUM_STOP
-} Chassis_Stadium_Step_e;
 
 static pid_type_def chassis_line_yaw_pid;
 static pid_type_def chassis_turn_pid;
@@ -107,21 +67,26 @@ static uint8_t chassis_step4_initialized = 0U;         /* 终点逼近是否已�
 static float   chassis_step4_target_yaw = 0.0f;        /* 终点逼近保持方向 (deg) */
 
 /* 体育场连续轨迹控制状态，同时作为滚球控制的底盘运动前馈。 */
-static Chassis_Stadium_Step_e chassis_stadium_step = CHASSIS_STADIUM_STRAIGHT_1;
-static uint8_t chassis_stadium_initialized = 0U;
-static uint8_t chassis_stadium_finish_line_latched = 0U;
-static float chassis_stadium_finish_line_odom = 0.0f;
-static float chassis_stadium_segment_start_odom = 0.0f;
-static float chassis_stadium_segment_start_yaw = 0.0f;
-static float chassis_stadium_speed_cmd = 0.0f;
-static float chassis_stadium_accel_cmd = 0.0f;
-static float chassis_stadium_curvature_cmd = 0.0f;
-static H_Task_e chassis_stadium_task = H_TASK_NONE;
-static uint8_t chassis_last_task_start_seq = 0U;
-static volatile uint8_t chassis_emergency_stop_requested = 0U;
-static float chassis_stadium_start_time_s = 0.0f;
-static float chassis_stadium_elapsed_s = 0.0f;
-static uint8_t chassis_stadium_timer_running = 0U;
+static Chassis_Stadium_Step_e chassis_stadium_step = CHASSIS_STADIUM_STRAIGHT_1; /* 当前所在AB/BC/CD/DA步骤 */
+static uint8_t chassis_stadium_initialized = 0U;       /* 0：本圈尚未初始化；1：状态机正在运行 */
+static uint8_t chassis_stadium_finish_line_latched = 0U; /* 1：已确认A横线，之后不再重复检测 */
+static float chassis_stadium_finish_line_odom = 0.0f; /* 探头确认A横线瞬间的编码器前向里程(m) */
+static float chassis_stadium_segment_start_odom = 0.0f; /* 当前直线/圆弧开始时的前向里程(m) */
+static float chassis_stadium_segment_start_yaw = 0.0f;  /* 当前段开始时的IMU航向(deg)，用于调试记录 */
+static float chassis_stadium_initial_yaw = 0.0f;      /* 上电从A出发时的绝对航向；最终停车也对准它 */
+static float chassis_stadium_speed_cmd = 0.0f;        /* jerk规划后的车体中心速度指令(m/s) */
+static float chassis_stadium_accel_cmd = 0.0f;        /* jerk规划器当前加速度状态(m/s^2) */
+static float chassis_stadium_curvature_cmd = 0.0f;    /* 当前下发曲率(1/m)，供滚球前馈与调试读取 */
+static H_Task_e chassis_stadium_task = H_TASK_NONE;   /* 本圈执行的H题任务编号，决定速度/加速度参数 */
+static uint8_t chassis_last_task_start_seq = 0U;      /* 最近一次启动序号，序号变化即可重新跑一圈 */
+static volatile uint8_t chassis_emergency_stop_requested = 0U; /* KEY4等异步来源置1，请求立即停机 */
+static float chassis_stadium_start_time_s = 0.0f;     /* 本圈实际开始的DWT时间戳(s) */
+static float chassis_stadium_elapsed_s = 0.0f;        /* 已用时间(s)，停车后冻结用于显示 */
+static uint8_t chassis_stadium_timer_running = 0U;    /* 1：计时中；0：尚未开始或已经停车 */
+static uint8_t chassis_finish_beep_mode = 0U;         /* 0关闭，1成功两声，2漏检持续鸣叫 */
+static uint8_t chassis_finish_beep_count = 0U;        /* 成功提示已经完成的鸣叫次数 */
+static uint8_t chassis_finish_beep_level = 0U;        /* 当前蜂鸣器输出状态：0关闭，1打开 */
+static float chassis_finish_beep_change_time = 0.0f;  /* 下一次切换蜂鸣器状态的时间戳(s) */
 
 float IMU_data[3] = {0};
 volatile JY901s_IMU_Data_s* JY901s_IMU_Data;
@@ -142,8 +107,10 @@ static float Chassis_StadiumUpdateSpeed(float target_speed);
 static void Chassis_StadiumSetDrive(float center_speed, float curvature, float target_yaw);
 static void Chassis_StadiumEnterStep(Chassis_Stadium_Step_e next_step);
 static void Chassis_StadiumDetectFinishLine(void);
-static uint8_t Chassis_StadiumStopAxleAtFinish(float curvature, float target_yaw,
-                                               float speed_limit);
+static uint8_t Chassis_StadiumStopCenterAtFinish(float curvature, float target_yaw,
+                                                 float speed_limit);
+static void Chassis_StadiumStartFinishBeep(uint8_t detected);
+static void Chassis_StadiumUpdateFinishBeep(void);
 /**
  * @brief 初始化底盘左右电机和 IMU
  */
@@ -394,29 +361,50 @@ static void Chassis_Trace_Cal(void) {
  */
 static float Chassis_StadiumUpdateSpeed(float target_speed)
 {
-	float max_accel = (chassis_stadium_task == H_TASK_2_FAST_LAP) ?
-	                  CHASSIS_FAST_MAX_ACCEL : CHASSIS_STADIUM_MAX_ACCEL;
-	float max_decel = (chassis_stadium_task == H_TASK_2_FAST_LAP) ?
-	                  CHASSIS_FAST_MAX_DECEL : CHASSIS_STADIUM_MAX_DECEL;
-	float max_jerk = (chassis_stadium_task == H_TASK_2_FAST_LAP) ?
-	                 CHASSIS_FAST_MAX_JERK : CHASSIS_STADIUM_MAX_JERK;
+	/* 根据当前任务选择加速度、减速度和加加速度上限。 */
+	float max_accel;
+	float max_decel;
+	float max_jerk;
+	if (chassis_stadium_task == H_TASK_2_FAST_LAP)
+	{
+		max_accel = CHASSIS_FAST_MAX_ACCEL;
+		max_decel = CHASSIS_FAST_MAX_DECEL;
+		max_jerk = CHASSIS_FAST_MAX_JERK;
+	}
+	else
+	{
+		max_accel = CHASSIS_STADIUM_MAX_ACCEL;
+		max_decel = CHASSIS_STADIUM_MAX_DECEL;
+		max_jerk = CHASSIS_STADIUM_MAX_JERK;
+	}
+	/* 根据目标速度和当前速度计算理想加速度。 */
 	float desired_accel = (target_speed - chassis_stadium_speed_cmd) /
 	                      CHASSIS_STADIUM_CONTROL_DT;
+	/* 限制理想加速度，防止电机突然加速或制动。 */
 	limit_max_min(desired_accel, max_accel, -max_decel);
 
+	/* 计算本周期允许的最大加速度变化量。 */
 	float max_accel_step = max_jerk * CHASSIS_STADIUM_CONTROL_DT;
+	/* 只允许加速度按jerk限制变化。 */
 	float accel_delta = desired_accel - chassis_stadium_accel_cmd;
 	limit_max_min(accel_delta, max_accel_step, -max_accel_step);
+	/* 保存新的加速度状态。 */
 	chassis_stadium_accel_cmd += accel_delta;
 
+	/* 保存积分前的速度误差，用于判断是否越过目标速度。 */
 	float previous_error = target_speed - chassis_stadium_speed_cmd;
+	/* 按控制周期积分得到新的速度。 */
 	chassis_stadium_speed_cmd += chassis_stadium_accel_cmd * CHASSIS_STADIUM_CONTROL_DT;
+	/* 计算积分后的速度误差。 */
 	float current_error = target_speed - chassis_stadium_speed_cmd;
 	if ((previous_error * current_error) <= 0.0f)
 	{
+		/* 发生越过时直接钳位，避免速度在目标值附近来回振荡。 */
 		chassis_stadium_speed_cmd = target_speed;
+		/* 目标速度已达到，清除加速度状态。 */
 		chassis_stadium_accel_cmd = 0.0f;
 	}
+	/* 返回本周期最终速度指令。 */
 	return chassis_stadium_speed_cmd;
 }
 
@@ -428,9 +416,12 @@ static float Chassis_StadiumUpdateSpeed(float target_speed)
  */
 static void Chassis_StadiumSetDrive(float center_speed, float curvature, float target_yaw)
 {
+	/* 保存曲率，供滚球控制器读取横向加速度前馈。 */
 	chassis_stadium_curvature_cmd = curvature;
+	/* 确保两个电机工作在速度环。 */
 	motor_l->loop_mode = SPEED_MODE;
 	motor_r->loop_mode = SPEED_MODE;
+	/* 使能两个驱动电机。 */
 	motor_l->State = ENABLE;
 	motor_r->State = ENABLE;
 
@@ -440,11 +431,15 @@ static void Chassis_StadiumSetDrive(float center_speed, float curvature, float t
 	 * 轮胎打滑和轮距估计误差。当前底盘顺时针时左轮应更快，但IMU yaw
 	 * 递减，所以航向PID输出还需乘以CHASSIS_CLOCKWISE_YAW_SIGN完成坐标转换。
 	 */
+	/* 计算期望航向与实际航向的最短角度误差。 */
 	float yaw_error = Chassis_AngleNormalize(target_yaw - Chassis_GetYawDeg());
+	/* 将航向误差转换成左右轮的差速修正量。 */
 	float yaw_feedback = CHASSIS_CLOCKWISE_YAW_SIGN *
 	                     PID_calc(&chassis_line_yaw_pid, yaw_error, 0.0f);
+	/* 计算曲率造成的左右轮速度比例差。 */
 	float wheel_ratio = 0.5f * CHASSIS_TRACK_WIDTH_M * curvature;
 
+	/* 左轮速度增加，右轮速度减少，形成当前方向的差速转弯。 */
 	DC_Motor_SetRef(motor_l, center_speed * (1.0f + wheel_ratio) + yaw_feedback);
 	DC_Motor_SetRef(motor_r, center_speed * (1.0f - wheel_ratio) - yaw_feedback);
 }
@@ -452,53 +447,150 @@ static void Chassis_StadiumSetDrive(float center_speed, float curvature, float t
 /** @brief 连续切换体育场轨迹步骤，不停车、不清速度环。 */
 static void Chassis_StadiumEnterStep(Chassis_Stadium_Step_e next_step)
 {
+	/* 保存新的路线状态。 */
 	chassis_stadium_step = next_step;
+	/* 记录新状态的里程起点。 */
 	chassis_stadium_segment_start_odom = Chassis_GetForwardOdom();
+	/* 记录新状态的航向起点，便于调试和故障分析。 */
 	chassis_stadium_segment_start_yaw = Chassis_GetYawDeg();
+	/* 清除上一段的航向PID历史，避免旧误差影响新段。 */
 	PID_clear(&chassis_line_yaw_pid);
 }
 
 /**
  * @brief 对A点横向黑线进行连续帧消抖，并记录探头过线瞬间的驱动轮里程
  *
- * 横线由前置22 cm的八路探头检测。记录此刻里程后，驱动轮还需继续前进
- * CHASSIS_TRACE_FORWARD_OFFSET_M，驱动轮轴线才会到达同一条A线。
+ * 横线由前置探头检测。记录此刻里程后，车辆继续行驶“探头到车体中心”
+ * 的实测距离，最终保证题目规定的车体中心而不是驱动轮轴线停在A线上。
  */
 static void Chassis_StadiumDetectFinishLine(void)
 {
+	/* 已锁存时不再重复采样，避免重复刷新过线里程。 */
 	if (chassis_stadium_finish_line_latched != 0U)
 	{
 		return;
 	}
 
+	/* 读取横线判定结果。 */
 	if (Trace_DetectCrossLine(CHASSIS_START_LINE_SENSORS) != 0U)
 	{
+		/* 累加连续检测次数。 */
 		if (++chassis_stop_line_detect_count >= CHASSIS_LINE_DETECT_DEBOUNCE)
 		{
+			/* 连续确认后锁存终点状态。 */
 			chassis_stadium_finish_line_latched = 1U;
+			/* 保存探头过线瞬间的编码器里程。 */
 			chassis_stadium_finish_line_odom = Chassis_GetForwardOdom();
+			/* 只在首次锁存时启动两声成功提示，避免每个周期重复重置提示音。 */
+			Chassis_StadiumStartFinishBeep(1U);
 		}
 	}
 	else
 	{
+		/* 当前帧不是横线，清除连续计数。 */
 		chassis_stop_line_detect_count = 0U;
 	}
 }
 
 /**
- * @brief 探头锁存A横线后，按22 cm机械偏置控制驱动轮轴线停到A
+ * @brief 启动终点提示音。
+ * @param detected 1表示检测到A线，0表示DA弧线走完但漏检A线。
+ */
+static void Chassis_StadiumStartFinishBeep(uint8_t detected)
+{
+	/* 保存提示音模式：成功两声，漏检持续鸣叫。 */
+	if (detected != 0U)
+	{
+		chassis_finish_beep_mode = 1U;
+	}
+	else
+	{
+		chassis_finish_beep_mode = 2U;
+	}
+	/* 从关闭状态开始，避免切换状态时蜂鸣器残留。 */
+	chassis_finish_beep_count = 0U;
+	chassis_finish_beep_level = 0U;
+	chassis_finish_beep_change_time = DWT_GetTimeline_s();
+	beep_off();
+}
+
+/**
+ * @brief 非阻塞更新终点蜂鸣器。
+ * 成功模式输出两次“响-停”，漏检模式保持一直响，不占用控制周期。
+ */
+static void Chassis_StadiumUpdateFinishBeep(void)
+{
+	/* 读取当前时间，所有时间均由DWT提供。 */
+	float now = DWT_GetTimeline_s();
+	/* 没有提示任务时保持蜂鸣器关闭。 */
+	if (chassis_finish_beep_mode == 0U)
+	{
+		beep_off();
+		return;
+	}
+	/* 漏检模式：持续打开蜂鸣器，直到重新启动任务或复位状态。 */
+	if (chassis_finish_beep_mode == 2U)
+	{
+		beep_on();
+		return;
+	}
+	/* 成功模式尚未到切换时间时保持当前电平。 */
+	if (now < chassis_finish_beep_change_time)
+	{
+		return;
+	}
+	/* 切换蜂鸣器电平；每个完整的响段计数一次。 */
+	if (chassis_finish_beep_level == 0U)
+	{
+		beep_on();
+		chassis_finish_beep_level = 1U;
+		chassis_finish_beep_change_time = now + 0.12f;
+	}
+	else
+	{
+		beep_off();
+		chassis_finish_beep_level = 0U;
+		chassis_finish_beep_count++;
+		chassis_finish_beep_change_time = now + 0.12f;
+		/* 两次响声完成后关闭提示任务。 */
+		if (chassis_finish_beep_count >= 2U)
+		{
+			chassis_finish_beep_mode = 0U;
+		}
+	}
+}
+
+/**
+ * @brief 探头锁存A横线后，按“探头到车体中心”的机械偏置让中心停到A
  * @param curvature 当前路径曲率；仍在第二半圆时保持圆弧，进入直线后为0
  * @param target_yaw 当前期望航向角
  * @param speed_limit 偏置补偿阶段允许的最高中心速度
  * @return 1表示已经停车，0表示仍在接近目标
  */
-static uint8_t Chassis_StadiumStopAxleAtFinish(float curvature, float target_yaw,
-                                               float speed_limit)
+static uint8_t Chassis_StadiumStopCenterAtFinish(float curvature, float target_yaw,
+                                                 float speed_limit)
 {
+	/* 探头确认横线后，编码器已经继续前进的距离(m)。 */
 	float traveled_after_line = fabsf(Chassis_GetForwardOdom() -
 	                                  chassis_stadium_finish_line_odom);
-	float remaining = CHASSIS_TRACE_FORWARD_OFFSET_M - traveled_after_line;
+	/* 剩余距离=探头到中心的安装距离-过线后已走距离；小于0表示中心已越过A线。 */
+	float remaining = CHASSIS_TRACE_TO_CENTER_M - traveled_after_line;
 	float target_speed;
+
+	/* 最后4 cm直接撤销速度给定，避免速度规划器的惯性拖过A线20~30 cm。 */
+	if (remaining <= 0.04f)
+	{
+		DCMotor_SetTraceCompensation(motor_l, 0.0f);
+		DCMotor_SetTraceCompensation(motor_r, 0.0f);
+		DC_Motor_SetRef(motor_l, 0.0f);
+		DC_Motor_SetRef(motor_r, 0.0f);
+		chassis_stadium_speed_cmd = 0.0f;
+		chassis_stadium_accel_cmd = 0.0f;
+		chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
+		chassis_stadium_timer_running = 0U;
+		Chassis_StadiumEnterStep(CHASSIS_STADIUM_STOP);
+		return 1U;
+	}
 
 	if (remaining <= 0.003f)
 	{
@@ -508,7 +600,7 @@ static uint8_t Chassis_StadiumStopAxleAtFinish(float curvature, float target_yaw
 	{
 		/*
 		 * 按剩余距离生成平方根减速曲线。0.65系数给jerk限制和实车惯性留余量，
-		 * 避免走满22 cm后才开始制动。最低速度用于克服低速静摩擦。
+		 * 避免走满补偿距离后才开始制动。最低速度用于克服低速静摩擦。
 		 */
 		target_speed = 0.65f * sqrtf(2.0f * CHASSIS_FAST_MAX_DECEL * remaining);
 		if (target_speed > speed_limit) target_speed = speed_limit;
@@ -518,9 +610,10 @@ static uint8_t Chassis_StadiumStopAxleAtFinish(float curvature, float target_yaw
 		}
 	}
 
+	/* 经过jerk限制后的实际中心速度指令，可能不会立刻等于target_speed。 */
 	float center_speed = Chassis_StadiumUpdateSpeed(target_speed);
-	/* 在22 cm补偿行程内把圆弧曲率线性减到0，使车身到A时恢复切线方向。 */
-	float curvature_scale = remaining / CHASSIS_TRACE_FORWARD_OFFSET_M;
+	/* 在探头到中心的补偿行程内把曲率线性减到0，使车身到A时恢复切线方向。 */
+	float curvature_scale = remaining / CHASSIS_TRACE_TO_CENTER_M;
 	if (curvature_scale < 0.0f) curvature_scale = 0.0f;
 	if (curvature_scale > 1.0f) curvature_scale = 1.0f;
 	Chassis_StadiumSetDrive(center_speed, curvature * curvature_scale, target_yaw);
@@ -545,45 +638,79 @@ static void Chassis_StadiumControl(void)
 {
 	if (chassis_stadium_initialized == 0U)
 	{
+		/* 第一次进入时初始化整圈状态，后续周期不重复清零。 */
 		chassis_stadium_initialized = 1U;
+		/* 清除上一圈的终点检测结果。 */
 		chassis_stadium_finish_line_latched = 0U;
 		chassis_stadium_finish_line_odom = 0.0f;
 		chassis_stop_line_detect_count = 0U;
 		chassis_stadium_speed_cmd = 0.0f;
 		chassis_stadium_accel_cmd = 0.0f;
+		/* 保存当前任务类型，统一决定本圈速度参数。 */
 		chassis_stadium_task = chassis_cmd_receive.competition_task;
+		/* 保存A点的绝对航向，后续各段均由它推导，避免逐段累计角度误差。 */
+		chassis_stadium_initial_yaw = Chassis_GetYawDeg();
 		chassis_stadium_start_time_s = DWT_GetTimeline_s();
 		chassis_stadium_elapsed_s = 0.0f;
 		chassis_stadium_timer_running = 1U;
+		/* 将驱动轮轴线在A点的里程设为0。 */
 		Chassis_ResetEncoderOdom();
+		/* 从A到B直线开始。 */
 		Chassis_StadiumEnterStep(CHASSIS_STADIUM_STRAIGHT_1);
 	}
 
-	/* 整圈黑线连续存在，所以直线和圆弧都保留红外横向闭环。 */
+	/* 每周期读取探头并更新巡线补偿。 */
 	Chassis_Trace_Cal();
+	/* 当前步骤已经行驶的弧长/直线距离(m)，切换步骤时会重新从0累计。 */
 	float segment_distance = fabsf(Chassis_GetForwardOdom() -
 	                               chassis_stadium_segment_start_odom);
-	float center_speed;
-	float target_yaw;
-	float straight_speed = (chassis_stadium_task == H_TASK_2_FAST_LAP) ?
-	                       CHASSIS_FAST_STRAIGHT_SPEED : CHASSIS_STADIUM_STRAIGHT_SPEED;
-	float arc_speed = (chassis_stadium_task == H_TASK_2_FAST_LAP) ?
-	                  CHASSIS_FAST_ARC_SPEED : CHASSIS_STADIUM_ARC_SPEED;
+	float center_speed; /* 本周期经过速度规划后，下发的车体中心速度(m/s)。 */
+	float target_yaw;   /* 本周期按理论路线生成的IMU目标航向(deg)。 */
+	float straight_speed;
+	float arc_speed;
+	if (chassis_stadium_task == H_TASK_2_FAST_LAP)
+	{
+		straight_speed = CHASSIS_FAST_STRAIGHT_SPEED;
+		arc_speed = CHASSIS_FAST_ARC_SPEED;
+	}
+	else
+	{
+		straight_speed = CHASSIS_STADIUM_STRAIGHT_SPEED;
+		arc_speed = CHASSIS_STADIUM_ARC_SPEED;
+	}
 
+	/* 当前状态只负责当前的一段路线。 */
 	switch (chassis_stadium_step)
 	{
 		case CHASSIS_STADIUM_STRAIGHT_1:
 		case CHASSIS_STADIUM_STRAIGHT_2:
 		{
 			/*
-			 * B点实测正常，第一直线保留用户标定的1.48 m。
-			 * D点探头会先于驱动轮22 cm看到弯道，因此第二直线提前进入圆弧前馈。
+			 * B点提前6 cm切换，以抵消速度规划器建立左右轮差速时继续前行的距离。
+			 * D点使用实测23 cm探头前置距离，让探头到弯道时同步进入圆弧前馈。
 			 */
-			float straight_exit_distance = (chassis_stadium_step == CHASSIS_STADIUM_STRAIGHT_2) ?
-			                               (CHASSIS_STRAIGHT_DIST_M - CHASSIS_TRACE_FORWARD_OFFSET_M) :
-			                               CHASSIS_STRAIGHT_DIST_M;
+			float straight_exit_distance;
+			if (chassis_stadium_step == CHASSIS_STADIUM_STRAIGHT_2)
+			{
+				straight_exit_distance = CHASSIS_STRAIGHT_DIST_M - CHASSIS_TRACE_TO_CENTER_M;
+			}
+			else
+			{
+				/* AB也按探头前置距离提前切换，避免探头已经进入弯道而底盘仍按直线跑。 */
+				straight_exit_distance = CHASSIS_STRAIGHT_DIST_M - CHASSIS_TRACE_FORWARD_OFFSET_M;
+			}
 			center_speed = Chassis_StadiumUpdateSpeed(straight_speed);
-			Chassis_StadiumSetDrive(center_speed, 0.0f, chassis_stadium_segment_start_yaw);
+			float straight_target_yaw;
+			if (chassis_stadium_step == CHASSIS_STADIUM_STRAIGHT_1)
+			{
+				straight_target_yaw = chassis_stadium_initial_yaw;
+			}
+			else
+			{
+				straight_target_yaw = Chassis_AngleNormalize(chassis_stadium_initial_yaw +
+				                                           CHASSIS_CLOCKWISE_YAW_SIGN * 180.0f);
+			}
+			Chassis_StadiumSetDrive(center_speed, 0.0f, straight_target_yaw);
 			if (segment_distance >= straight_exit_distance)
 			{
 				if ((chassis_stadium_step == CHASSIS_STADIUM_STRAIGHT_1) &&
@@ -594,9 +721,14 @@ static void Chassis_StadiumControl(void)
 				}
 				else
 				{
-					Chassis_StadiumEnterStep(
-						(chassis_stadium_step == CHASSIS_STADIUM_STRAIGHT_1) ?
-						CHASSIS_STADIUM_ARC_1 : CHASSIS_STADIUM_ARC_2);
+					if (chassis_stadium_step == CHASSIS_STADIUM_STRAIGHT_1)
+					{
+						Chassis_StadiumEnterStep(CHASSIS_STADIUM_ARC_1);
+					}
+					else
+					{
+						Chassis_StadiumEnterStep(CHASSIS_STADIUM_ARC_2);
+					}
 				}
 			}
 			break;
@@ -605,76 +737,119 @@ static void Chassis_StadiumControl(void)
 		case CHASSIS_STADIUM_ARC_1:
 		case CHASSIS_STADIUM_ARC_2:
 		{
-			float arc_exit_angle_deg = (chassis_stadium_step == CHASSIS_STADIUM_ARC_1) ?
-			                           CHASSIS_ARC1_EXIT_ANGLE_DEG : CHASSIS_ARC_ANGLE_DEG;
+			float arc_exit_angle_deg;
+			if (chassis_stadium_step == CHASSIS_STADIUM_ARC_1)
+			{
+				/* C点容易超调，第一弯提前15度结束圆弧前馈。 */
+				arc_exit_angle_deg = CHASSIS_BC_EXIT_ANGLE_DEG;
+			}
+			else
+			{
+				arc_exit_angle_deg = CHASSIS_ARC_ANGLE_DEG;
+			}
+			/* 用题目规定的0.5 m几何半径计算状态切换所需弧长。 */
 			float arc_length = CHASSIS_ARC_RADIUS_M * arc_exit_angle_deg *
 			                   (CHASSIS_PI / 180.0f);
 			float remaining_arc = arc_length - segment_distance;
-			float max_decel = (chassis_stadium_task == H_TASK_2_FAST_LAP) ?
-			                  CHASSIS_FAST_MAX_DECEL : CHASSIS_STADIUM_MAX_DECEL;
-			float finish_speed = (chassis_stadium_task == H_TASK_2_FAST_LAP) ?
-			                     CHASSIS_FAST_FINISH_SPEED : CHASSIS_FINAL_APPROACH_SPEED;
+			float max_decel;
+			float finish_speed;
+			if (chassis_stadium_task == H_TASK_2_FAST_LAP)
+			{
+				max_decel = CHASSIS_FAST_MAX_DECEL;
+				finish_speed = CHASSIS_FAST_FINISH_SPEED;
+			}
+			else
+			{
+				max_decel = CHASSIS_STADIUM_MAX_DECEL;
+				finish_speed = CHASSIS_FINAL_APPROACH_SPEED;
+			}
 			float brake_distance = (arc_speed * arc_speed - finish_speed * finish_speed) /
 			                       (2.0f * max_decel);
 			if (chassis_stadium_task == H_TASK_2_FAST_LAP)
 			{
 				brake_distance *= CHASSIS_FAST_BRAKE_MARGIN;
 			}
-			float arc_target_speed = ((chassis_stadium_step == CHASSIS_STADIUM_ARC_2) &&
-			                          (remaining_arc <= brake_distance)) ?
-			                         finish_speed : arc_speed;
+			float arc_target_speed = arc_speed;
+			if ((chassis_stadium_step == CHASSIS_STADIUM_ARC_2) &&
+			    (remaining_arc <= brake_distance))
+			{
+				arc_target_speed = finish_speed;
+			}
 			/*
 			 * 实车顺时针转动时IMU yaw递减，因此目标航向按负方向变化。
 			 * segment_distance/R得到弧度，再换算为角度；走完pi*R正好增加180°。
 			 */
-			float yaw_distance = (segment_distance < arc_length) ? segment_distance : arc_length;
-			target_yaw = chassis_stadium_segment_start_yaw +
+			float yaw_distance = segment_distance;
+			if (yaw_distance > arc_length)
+			{
+				yaw_distance = arc_length;
+			}
+			float arc_base_yaw;
+			if (chassis_stadium_step == CHASSIS_STADIUM_ARC_1)
+			{
+				arc_base_yaw = chassis_stadium_initial_yaw;
+			}
+			else
+			{
+				arc_base_yaw = Chassis_AngleNormalize(chassis_stadium_initial_yaw +
+				                                    CHASSIS_CLOCKWISE_YAW_SIGN * 180.0f);
+			}
+			target_yaw = arc_base_yaw +
 			             CHASSIS_CLOCKWISE_YAW_SIGN * yaw_distance /
 			             CHASSIS_ARC_RADIUS_M * (180.0f / CHASSIS_PI);
 			target_yaw = Chassis_AngleNormalize(target_yaw);
-
 			/*
 			 * 第二半圆后65%开始寻找A横线，避免到几何圆弧结束后才检测而漏线。
 			 * 一旦锁存横线，立即按探头前置距离规划停车，不再依赖固定圆弧里程。
 			 */
 			if ((chassis_stadium_step == CHASSIS_STADIUM_ARC_2) &&
-			    (segment_distance >= 0.65f * arc_length))
+			    (segment_distance >= CHASSIS_FINISH_DETECT_RATIO * arc_length))
 			{
 				Chassis_StadiumDetectFinishLine();
 				if (chassis_stadium_finish_line_latched != 0U)
 				{
-					(void)Chassis_StadiumStopAxleAtFinish(1.0f / CHASSIS_ARC_RADIUS_M,
-					                                          target_yaw, arc_speed);
+					/* 使用第二半圆最终180°航向收正，避免A点斜停。 */
+					(void)Chassis_StadiumStopCenterAtFinish(1.0f / CHASSIS_ARC_DRIVE_RADIUS_M,
+					                                          chassis_stadium_initial_yaw, arc_speed);
 					break;
 				}
 			}
 			/* 未锁存终点线时，本周期只执行一次常规圆弧速度更新。 */
 			center_speed = Chassis_StadiumUpdateSpeed(arc_target_speed);
-			Chassis_StadiumSetDrive(center_speed, 1.0f / CHASSIS_ARC_RADIUS_M, target_yaw);
+			Chassis_StadiumSetDrive(center_speed, 1.0f / CHASSIS_ARC_DRIVE_RADIUS_M, target_yaw);
 			if (segment_distance >= arc_length)
 			{
-				Chassis_StadiumEnterStep(
-					(chassis_stadium_step == CHASSIS_STADIUM_ARC_1) ?
-					CHASSIS_STADIUM_STRAIGHT_2 : CHASSIS_STADIUM_FINISH_BRAKE);
+				if (chassis_stadium_step == CHASSIS_STADIUM_ARC_1)
+				{
+					Chassis_StadiumEnterStep(CHASSIS_STADIUM_STRAIGHT_2);
+				}
+				else
+				{
+					/* DA理论弧线已完成，说明A线应已越过；漏检时不再继续搜索。 */
+					Chassis_StadiumStartFinishBeep(0U);
+					chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
+					chassis_stadium_timer_running = 0U;
+					Chassis_StadiumEnterStep(CHASSIS_STADIUM_STOP);
+				}
 			}
 			break;
 		}
 
 		case CHASSIS_STADIUM_FINISH_BRAKE:
-			Chassis_StadiumDetectFinishLine();
-			if (chassis_stadium_finish_line_latched != 0U)
-			{
-				(void)Chassis_StadiumStopAxleAtFinish(0.0f,
-				                                          chassis_stadium_segment_start_yaw,
-				                                          CHASSIS_FINAL_APPROACH_SPEED);
-				break;
-			}
-
-			float search_speed = (chassis_stadium_task == H_TASK_2_FAST_LAP) ?
-			                     CHASSIS_FAST_FINISH_SPEED : CHASSIS_FINAL_APPROACH_SPEED;
-			center_speed = Chassis_StadiumUpdateSpeed(search_speed);
-			Chassis_StadiumSetDrive(center_speed, 0.0f, chassis_stadium_segment_start_yaw);
+		{
+			/* 该状态仅兼容旧任务；新跑道逻辑不再搜索，进入即停车并持续报警。 */
+			Chassis_StadiumStartFinishBeep(0U);
+			chassis_stadium_speed_cmd = 0.0f;
+			chassis_stadium_accel_cmd = 0.0f;
+			chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
+			chassis_stadium_timer_running = 0U;
+			DCMotor_SetTraceCompensation(motor_l, 0.0f);
+			DCMotor_SetTraceCompensation(motor_r, 0.0f);
+			DC_Motor_SetRef(motor_l, 0.0f);
+			DC_Motor_SetRef(motor_r, 0.0f);
+			Chassis_StadiumEnterStep(CHASSIS_STADIUM_STOP);
 			break;
+		}
 
 		case CHASSIS_STADIUM_STOP:
 		default:
@@ -684,6 +859,8 @@ static void Chassis_StadiumControl(void)
 			DCMotor_SetTraceCompensation(motor_r, 0.0f);
 			DC_Motor_SetRef(motor_l, 0.0f);
 			DC_Motor_SetRef(motor_r, 0.0f);
+			/* 停车状态仍更新蜂鸣器，成功两声或漏检持续鸣叫。 */
+			Chassis_StadiumUpdateFinishBeep();
 			break;
 	}
 }
@@ -1022,11 +1199,18 @@ void Chassis_ResetAction(void)
 	chassis_stadium_finish_line_odom = 0.0f;
 	chassis_stadium_segment_start_odom = 0.0f;
 	chassis_stadium_segment_start_yaw = 0.0f;
+	chassis_stadium_initial_yaw = 0.0f;
 	chassis_stadium_speed_cmd = 0.0f;
 	chassis_stadium_accel_cmd = 0.0f;
 	chassis_stadium_curvature_cmd = 0.0f;
 	chassis_stadium_task = H_TASK_NONE;
 	chassis_stadium_timer_running = 0U;
+	/* 清除上一圈的蜂鸣器提示状态，并确保蜂鸣器关闭。 */
+	chassis_finish_beep_mode = 0U;
+	chassis_finish_beep_count = 0U;
+	chassis_finish_beep_level = 0U;
+	chassis_finish_beep_change_time = 0.0f;
+	beep_off();
 }
 
 /** @brief 获取体育场轨迹规划器当前中心速度指令，供滚球控制前馈使用。 */
@@ -1151,7 +1335,8 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 		progress = 0.0f;
 	}
 
-	base_speed = (remain > 0.0f) ? abs_speed : -abs_speed;
+	if (remain > 0.0f) base_speed = abs_speed;
+	else base_speed = -abs_speed;
 	if (progress < CHASSIS_LINE_ACCEL_M)
 	{
 		float accel_speed = CHASSIS_LINE_MIN_SPEED +
@@ -1160,7 +1345,8 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 		/*
 		 * 起步前 0.1m 线性加速，避免一进入直线动作就给满速度。
 		 */
-		base_speed = (remain > 0.0f) ? accel_speed : -accel_speed;
+		if (remain > 0.0f) base_speed = accel_speed;
+		else base_speed = -accel_speed;
 	}
 	if (fabsf(remain) < CHASSIS_LINE_SLOWDOWN_M)
 	{
@@ -1181,7 +1367,8 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 
 		if (fabsf(slowdown_speed) < fabsf(base_speed))
 		{
-			base_speed = (remain > 0.0f) ? slowdown_speed : -slowdown_speed;
+			if (remain > 0.0f) base_speed = slowdown_speed;
+			else base_speed = -slowdown_speed;
 		}
 	}
 
@@ -1347,7 +1534,13 @@ uint8_t Chassis_MoveArc(float radius_m, float total_angle_deg, float speed_mps)
 	/* 转向方向：radius > 0 且 angle > 0 → 逆时针 (CCW = +1)
 	 *           radius > 0 且 angle < 0 → 顺时针 (CW  = -1)
 	 * 取两者符号的乘积作为最终转动方向 */
-	int turn_dir = ((radius_m > 0.0f) ? 1 : -1) * ((total_angle_deg > 0.0f) ? 1 : -1);
+	int radius_dir;
+	int angle_dir;
+	if (radius_m > 0.0f) radius_dir = 1;
+	else radius_dir = -1;
+	if (total_angle_deg > 0.0f) angle_dir = 1;
+	else angle_dir = -1;
+	int turn_dir = radius_dir * angle_dir;
 
 	/* 转角太小，无需执行 */
 	if (abs_angle <= CHASSIS_TURN_DONE_ERR_DEG || total_arc_distance <= CHASSIS_LINE_DONE_ERR_M)
@@ -1412,7 +1605,9 @@ uint8_t Chassis_MoveArc(float radius_m, float total_angle_deg, float speed_mps)
 
 	/* ---- 速度曲线：起步加速 + 末段减速 ---- */
 	float progress = chassis_arc_total_distance - remain;
-	float base_speed = (remain > 0.0f) ? abs_speed : 0.0f;
+	float base_speed;
+	if (remain > 0.0f) base_speed = abs_speed;
+	else base_speed = 0.0f;
 
 	if (progress < CHASSIS_LINE_ACCEL_M)
 	{
