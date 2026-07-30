@@ -1,5 +1,6 @@
 #include "Gimbal.h"
 #include "ZDT_Motor.h"
+#include "ZDT_Emm.h"
 #include "Robot_cmd.h"
 #include "math.h"
 #include "misc.h"
@@ -20,6 +21,8 @@ pid_type_def gimbal_yaw_PID={0};
 pid_type_def gimbal_pitch_PID={0};
 pid_type_def gimbal_yaw_forwardfeed_PID = {0};
 gimbal_cmd_q gimbal_cmd_send ={0};
+
+
 
 float x;
 float dt;
@@ -49,6 +52,21 @@ ServoInstance*  servo_yaw;
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
 static float        slide_prev_x = 320;   /* 上一帧 X 位置 */
 static float        slide_velocity = 0;   /* 滤波后的小球速度 (px/s) */
+
+
+
+/* ---- 调试变量：在调试器中修改 target_angle_deg，电机自动转到对应角度 ---- */
+static volatile float target_angle_deg = 0.0f;
+static float last_target_deg = -1.0f;  /* -1 确保首次匹配时触发 */
+
+static void Gimbal_ZDT_UART_Send(const uint8_t *data, uint8_t len)
+{
+	for (uint8_t i = 0; i < len; i++) {
+		while (DL_UART_isBusy(STEPPER_MOTOR_INST)) {}
+		DL_UART_Main_transmitData(STEPPER_MOTOR_INST, data[i]);
+	}
+}
+
 
 static void Slide_Control_Init(void)
 {
@@ -168,6 +186,19 @@ void Gimbal_Init(void)
 	// 	.max_iout = 1.0f,
 	// };
 	// PID_init(&gimbal_yaw_forwardfeed_PID,&gimbal_yaw_forwardfeed_pid_config);
+	/* RX FIFO */
+	fifo_initQueue(&zdt_emm_rx_fifo);
+
+	/* UART 发送回调 */
+	ZDT_Emm_RegisterSendCallback(Gimbal_ZDT_UART_Send);
+
+	/* RX 中断 */
+	NVIC_ClearPendingIRQ(STEPPER_MOTOR_INST_INT_IRQN);
+	NVIC_EnableIRQ(STEPPER_MOTOR_INST_INT_IRQN);
+
+	/* 使能电机 (rotate, addr=1) */
+	ZDT_Emm_En_Control(1, true, false);
+
 
 	Servo_Init_Config_s servo_yaw_config = {
 		.Servo_type = Servo180,
@@ -182,11 +213,9 @@ void Gimbal_Init(void)
 }
 int16_t test_angle = 0;
 uint16_t testtt = 0;
+
 void Gimbal(void)
 {
-	//xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
-
-	// test_angle = sin(DWT_GetTimeline_ms()/100)*10+85;
 	// /* 目标未变，不重复发送 */
 	// if (target_angle_deg == last_target_deg) return;
 	// last_target_deg = target_angle_deg;
@@ -197,13 +226,11 @@ void Gimbal(void)
 	// /* 绝对位置模式 (raF=1): dir=0(CW), dir=1(CCW), clk 为无符号脉冲数 */
 	// uint8_t dir = (pulses >= 0) ? 0U : 1U;
 	// uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
-	// ZDT_Emm_Pos_Control(1, dir, MOTOR_DEFAULT_VEL, MOTOR_DEFAULT_ACC,
+	// ZDT_Emm_Pos_Control(1, dir, 200, 0,
 	// 					pulse_count,
 	// 					1, false);
-	// // vTaskDelay(1000);
-	// // Servo_Motor_FreeAngle_Set(servo_yaw , 65);
-	// // // vTaskDelay(1000);
-	// ServeoMotorControl(servo_yaw);
+
+	//ServeoMotorControl(servo_yaw);
 	Slide_Control_Run();
 }
 
