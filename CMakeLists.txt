@@ -1,4 +1,27 @@
 cmake_minimum_required(VERSION 3.20)
+
+set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_SYSTEM_PROCESSOR ARM)
+
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+
+set(TOOLCHAIN_PREFIX arm-none-eabi)
+
+set(CMAKE_C_COMPILER ${TOOLCHAIN_PREFIX}-gcc)
+set(CMAKE_ASM_COMPILER ${TOOLCHAIN_PREFIX}-gcc)
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}-g++)
+
+set(CMAKE_OBJCOPY ${TOOLCHAIN_PREFIX}-objcopy)
+set(CMAKE_SIZE ${TOOLCHAIN_PREFIX}-size)
+set(CMAKE_AR ${TOOLCHAIN_PREFIX}-ar)
+set(CMAKE_OBJDUMP ${TOOLCHAIN_PREFIX}-objdump)
+# Enable compile command to ease indexing with e.g. clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+
 project(electric-competition-robot C ASM)
 
 # ============================================================
@@ -7,9 +30,11 @@ project(electric-competition-robot C ASM)
 #   1. 直接改下面这行的 ON/OFF
 #   2. 或在命令行传参：cmake -DUSE_MSPM0G3519=OFF ..
 # ============================================================
-option(USE_MSPM0G3519 "Build for MSPM0G3519 (OFF = MSPM0G3507)" OFF)
+option(USE_MSPM0G3519 "Build for MSPM0G3519 (OFF = MSPM0G3507)" ON)
+
 # 蓝牙串口板号：板1烧录时用 BLUETOOTH_BOARD_1，板2烧录时改为 BLUETOOTH_BOARD_2
 add_compile_definitions(BLUETOOTH_BOARD_1)
+
 # ============================================================
 # MCU and compiler flags
 # (CPU architecture flags are set in the toolchain file)
@@ -61,6 +86,18 @@ if(SYSCONFIG_CLI)
 else()
     message(STATUS "SysConfig CLI not found — using pre-generated ti_msp_dl_config.c/h")
 endif()
+
+add_compile_options(
+    -mcpu=cortex-m0plus
+    -mthumb
+    -mfloat-abi=soft
+)
+
+add_link_options(
+    -mcpu=cortex-m0plus
+    -mthumb
+    -mfloat-abi=soft
+)
 
 # ============================================================
 # 递归包含头文件目录的函数

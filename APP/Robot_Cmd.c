@@ -81,7 +81,7 @@ void Robot_Cmd(void)
 //	chassis_cmd_send.vx=70.0f;
 	
 	xQueueReceive(trace_fetch_data_queue, &trace_fetch_data, 1);
-	RobotCmd_UpdateRemoteMode();
+	// RobotCmd_UpdateRemoteMode();
 //	bsp_IcmGetGyroscope(&Chassis_Gyro);
 	/* 滚球目标由任务回调设置，禁止在主控制循环中自动扫动步进电机。 */
 
