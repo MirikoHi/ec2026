@@ -290,32 +290,34 @@ void Chassis(void)
 			Stop_Detect();
 			break;
 		case IMU_MODE:
-			if (chassis_emergency_stop_requested != 0U)
-			{
-				chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
-				chassis_stadium_timer_running = 0U;
-				chassis_stadium_step = CHASSIS_STADIUM_STOP;
-				DCMotor_SetTraceCompensation(motor_l, 0.0f);
-				DCMotor_SetTraceCompensation(motor_r, 0.0f);
-				DC_Motor_SetRef(motor_l, 0.0f);
-				DC_Motor_SetRef(motor_r, 0.0f);
-				DCMotor_Cmd(motor_l, DISABLE);
-				DCMotor_Cmd(motor_r, DISABLE);
-				return;
-			}
-			if (IMU_Mahony_IsReady() != 0U)
-			{
-				Chassis_StadiumControl();
-			}
-			else
-			{
-				DCMotor_SetTraceCompensation(motor_l, 0.0f);
-				DCMotor_SetTraceCompensation(motor_r, 0.0f);
-				DC_Motor_SetRef(motor_l, 0.0f);
-				DC_Motor_SetRef(motor_r, 0.0f);
-				DCMotor_Cmd(motor_l, DISABLE);
-				DCMotor_Cmd(motor_r, DISABLE);
-				return;
+			if (chassis_cmd_receive.competition_task == H_TASK_2_FAST_LAP){
+				if (chassis_emergency_stop_requested != 0U)
+				{
+					chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
+					chassis_stadium_timer_running = 0U;
+					chassis_stadium_step = CHASSIS_STADIUM_STOP;
+					DCMotor_SetTraceCompensation(motor_l, 0.0f);
+					DCMotor_SetTraceCompensation(motor_r, 0.0f);
+					DC_Motor_SetRef(motor_l, 0.0f);
+					DC_Motor_SetRef(motor_r, 0.0f);
+					DCMotor_Cmd(motor_l, DISABLE);
+					DCMotor_Cmd(motor_r, DISABLE);
+					return;
+				}
+				if (IMU_Mahony_IsReady() != 0U)
+				{
+					Chassis_StadiumControl();
+				}
+				else
+				{
+					DCMotor_SetTraceCompensation(motor_l, 0.0f);
+					DCMotor_SetTraceCompensation(motor_r, 0.0f);
+					DC_Motor_SetRef(motor_l, 0.0f);
+					DC_Motor_SetRef(motor_r, 0.0f);
+					DCMotor_Cmd(motor_l, DISABLE);
+					DCMotor_Cmd(motor_r, DISABLE);
+					return;
+				}
 			}
 			break;
 		case NORMAL_MODE:

@@ -58,10 +58,12 @@ void RobotCmd_Init(void)
 
 	/* 上电直接执行任务2，不依赖菜单回调；task_start_seq 用于重新启动状态机。 */
 	chassis_cmd_send.Chassis_Mode = IMU_MODE;
-	chassis_cmd_send.competition_task = H_TASK_2_FAST_LAP;
-	chassis_cmd_send.task_start_seq = 1U;
-	gimbal_cmd_send.task_flag = (uint8_t)H_TASK_2_FAST_LAP;
-	gimbal_cmd_send.task_start_seq = 1U;
+	/* 上电先别执行任务2
+		chassis_cmd_send.competition_task = H_TASK_2_FAST_LAP;
+		chassis_cmd_send.task_start_seq = 1U;
+		gimbal_cmd_send.task_flag = (uint8_t)H_TASK_2_FAST_LAP;
+		gimbal_cmd_send.task_start_seq = 1U;
+	*/
 	chassis_feedback_data.real_vy = 100;
 	//双板通信can初始化
 	CANComm_Init_Config_s comm_conf = {
