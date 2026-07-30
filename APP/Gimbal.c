@@ -187,16 +187,19 @@ void Gimbal(void)
 	//xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
 
 	// test_angle = sin(DWT_GetTimeline_ms()/100)*10+85;
-
-	// testtt++;
-	// if (testtt > 250) {
-	// 	if (testtt >= 500) testtt = 0;
-	// 	Servo_Motor_FreeAngle_Set(servo_yaw , 65);
-	// }else if (testtt <= 250) {
-	// 	// else
-	// 	Servo_Motor_FreeAngle_Set(servo_yaw , 120);
-	// }
+	// /* 目标未变，不重复发送 */
+	// if (target_angle_deg == last_target_deg) return;
+	// last_target_deg = target_angle_deg;
 	//
+	// /* 角度 → 脉冲 (3200 脉冲/圈 = 360°, 16细分) */
+	// int32_t pulses = (int32_t)(target_angle_deg * 3200.0f / 360.0f);
+	//
+	// /* 绝对位置模式 (raF=1): dir=0(CW), dir=1(CCW), clk 为无符号脉冲数 */
+	// uint8_t dir = (pulses >= 0) ? 0U : 1U;
+	// uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
+	// ZDT_Emm_Pos_Control(1, dir, MOTOR_DEFAULT_VEL, MOTOR_DEFAULT_ACC,
+	// 					pulse_count,
+	// 					1, false);
 	// // vTaskDelay(1000);
 	// // Servo_Motor_FreeAngle_Set(servo_yaw , 65);
 	// // // vTaskDelay(1000);
