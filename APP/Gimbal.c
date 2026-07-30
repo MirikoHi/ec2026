@@ -57,8 +57,8 @@ uint32_t motor_zero_point =  0;
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
 	.Kp      = 0.088f,     /* 比例: 每像素误差产生多少度倾角 */
-	.Kd      = 0.05f,     /* 微分: 抑制震荡 */
-	.Ki      = 0.0055f,     /* 积分: 消除静差 */
+	.Kd      = 0.0085f,     /* 微分: 抑制震荡 */
+	.Ki      = 0.05f,     /* 积分: 消除静差 */
 	.max_out = SLIDE_SERVO_RANGE,
 	.max_iout = 30.0f,
 };
