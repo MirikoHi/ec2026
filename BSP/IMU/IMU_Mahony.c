@@ -162,11 +162,34 @@ static void mahony_get_rotation_matrix(float r[3][3])
 
 void IMU_Mahony_Init(void)
 {
-    if (ICM42688_Improved_Init() == 0) {
-        mahony_init();
-        last_update_ms = DWT_GetTimeline_ms();
-        imu_initialized = 1U;
+    /*
+     * ICM 初始化内部包含约 1.7 s 的静止陀螺校准。
+     * 传感器通信成功是允许底盘运行的必要条件；校准失败只表示偏置
+     * 未能可靠估计，不能把底盘永久锁死，否则会出现上电偶发不动。
+     * 校准失败时偏置保持为 0，系统仍可运行，但正式测试必须保证上电
+     * 期间车体静止，以尽量获得有效偏置。
+     */
+    imu_initialized = 0U;
+
+    /*
+     * 上电瞬间电源或SPI时序尚未稳定时，第一次WHO_AM_I读取可能失败。
+     * 这里最多尝试3次；使用有限重试而不是死循环，避免传感器断线时
+     * 整个系统永远卡在初始化函数中。
+     */
+    for (uint8_t retry = 0U; retry < 3U; ++retry) {
+        if (ICM42688_Improved_Init() == 0) {
+            mahony_init();
+            last_update_ms = DWT_GetTimeline_ms();
+            imu_initialized = 1U;
+            break;
+        }
+        DWT_Delay(0.02f);
     }
+}
+
+uint8_t IMU_Mahony_IsReady(void)
+{
+    return imu_initialized;
 }
 
 void IMU_Mahony_GetYawPitchRoll(float *ypr)

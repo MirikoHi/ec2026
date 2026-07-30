@@ -574,8 +574,9 @@ static void MenuTask(void *pvParameters)
         menu_task();
         Menu_dt = DWT_GetTimeline_ms() - Menu_start;
     	//LOGINFO("Menu Task dt = [%f]", Menu_dt);
-        if (Menu_dt > 5)
-            LOGERROR("[freeRTOS] Menu Task is being DELAY! dt = [%f]", Menu_dt);
+		/* OLED 全屏刷新实测约 10 ms；超过 20 ms 才说明任务异常阻塞。 */
+		if (Menu_dt > 20)
+			LOGERROR("[freeRTOS] Menu Task is being DELAY! dt = [%f]", Menu_dt);
 
     	//10Hz固定频率刷新屏幕显示
     	vTaskDelay(pdMS_TO_TICKS(50));

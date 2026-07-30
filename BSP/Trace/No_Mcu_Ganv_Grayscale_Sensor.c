@@ -119,7 +119,8 @@ void No_MCU_Ganv_Sensor_Init_Frist(No_MCU_Sensor*sensor)
     }
     
     // 初始化状态变量
-    sensor->Digtal=0;
+    /* 滞回区会保持上一状态；上电时未知通道应默认白色，避免误判为全黑。 */
+    sensor->Digtal=0xFFU;
     sensor->Time_out=0;
     sensor->Tick=0;
     sensor->ok=0;  // 标记未完成校准

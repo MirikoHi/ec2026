@@ -8,10 +8,11 @@
 #define MOTOR_PWM_MAX (2500-1)
 #define SPEED_SMOOTH_COEF 0.85f //滤波系数
 #define Control_Period 10   //单位ms
-#define PulseofCirlce 	728  28*2*13
+#define ENCODER_COUNTS_PER_WHEEL_REV 728.0f
+#define PulseofCirlce                728U
 #define MOTOR_MAX_NUM 2
-#define ENCODER_TO_SPEED_MS (100 * 0.065 * PI /728)  // 编码器到速度的转换系数//最大0.5m/s
-#define ENCODER_TO_DISDAN_M (0.065 * PI /728) //0.01==10cm
+#define ENCODER_TO_SPEED_MS (100.0f * 0.065f * PI / ENCODER_COUNTS_PER_WHEEL_REV)
+#define ENCODER_TO_DISDAN_M (0.065f * PI / ENCODER_COUNTS_PER_WHEEL_REV)
 
 
 
@@ -61,6 +62,8 @@ typedef struct {
 		Motor_Speed_Filter_e filter;
 		float speed_measure;//rpm
 		float position_measure;
+		/* 上层规划器基础轮速；与PID内部实际Ref分离，避免两个任务交替覆盖。 */
+		float Speed_Ref_Command;
 		float Trace_Compensation;
 		State State;
 }__attribute__((aligned(4)))DCMotorInstance;

@@ -32,10 +32,6 @@ gimbal_cmd_q gimbal_cmd_send ={0};
 trace_fetch_data_q trace_fetch_data={0};
 /* ELRS 已弃用 */
 
-pid_type_def gimbal_yaw_PID={0};
-pid_type_def gimbal_pitch_PID={0};
-pid_type_def gimbal_yaw_forwardfeed_PID = {0};
-
 float last_trace_imu_switch_s=0;
 float now_time=0;
 State robotcmd_control_state = DISABLE;
@@ -44,7 +40,6 @@ State robotcmd_control_state = DISABLE;
 
 void tjc_control(void);
 void draw_sin(void);
-void Gimbal_Pid_Cal(void);
 static void RobotCmd_UpdateRemoteMode(void);
 static void RobotCmd_ExitRemoteMode(Chassis_Mode_e restore_mode);
 void RobotCmd_Init(void)
@@ -61,41 +56,12 @@ void RobotCmd_Init(void)
 	// BlueToothUart_Init();
 	
 
-	chassis_cmd_send.Chassis_Mode = IMU_MODE;  //todo:这里记得改回默认值，调试用
-		pid_init_config_s gimbal_yaw_pid_config={
-		.mode = PID_POSITION,
-		.Kp = 0.003f,
-		.Kd = 0.0001f,
-		.Ki = 0.0f,
-		.max_out = 4.0f,
-		.max_iout = 1.0f,
-		
-	};
-	PID_init(&gimbal_yaw_PID,&gimbal_yaw_pid_config);
-	
-	
-	pid_init_config_s gimbal_pitch_pid_config={
-		.mode = PID_POSITION,
-		.Kp = -0.003f,
-		.Kd = -0.0001f,
-		.Ki = 0.0f,
-		.max_out = 4.0f,
-		.max_iout = 1.0f,
-		
-	};
-	PID_init(&gimbal_pitch_PID,&gimbal_pitch_pid_config);
-	
-	pid_init_config_s gimbal_yaw_forwardfeed_pid_config={
-		.mode = PID_POSITION,
-		.Kp = 0.000f,
-		.Kd = -0.0001f,
-		.Ki = 0.0f,
-		.max_out = 4.0f,
-		.max_iout = 1.0f,
-		
-	};
-	PID_init(&gimbal_yaw_forwardfeed_PID,&gimbal_yaw_forwardfeed_pid_config);
-
+	/* 上电直接执行任务2，不依赖菜单回调；task_start_seq 用于重新启动状态机。 */
+	chassis_cmd_send.Chassis_Mode = IMU_MODE;
+	chassis_cmd_send.competition_task = H_TASK_2_FAST_LAP;
+	chassis_cmd_send.task_start_seq = 1U;
+	gimbal_cmd_send.task_flag = (uint8_t)H_TASK_2_FAST_LAP;
+	gimbal_cmd_send.task_start_seq = 1U;
 	chassis_feedback_data.real_vy = 100;
 	//双板通信can初始化
 	CANComm_Init_Config_s comm_conf = {
@@ -117,17 +83,7 @@ void Robot_Cmd(void)
 	xQueueReceive(trace_fetch_data_queue, &trace_fetch_data, 1);
 	RobotCmd_UpdateRemoteMode();
 //	bsp_IcmGetGyroscope(&Chassis_Gyro);
-	static float test_angle = 0;
-
-
-	test_angle +=1.0f;
-
-	if(test_angle>90)
-		test_angle=0;
-
-
-	gimbal_cmd_send.yaw = test_angle;
-//	draw_sin();
+	/* 滚球目标由任务回调设置，禁止在主控制循环中自动扫动步进电机。 */
 
 	//通过队列向云台和底盘发送命令
 	xQueueSend(chassis_cmd_queue, &chassis_cmd_send, 0U);
@@ -191,13 +147,6 @@ void draw_sin(void)
 	gimbal_cmd_send.aim_y=0.1*sinf(aim_x/T_x*PI);
 	
 }
-void Gimbal_Pid_Cal(void)
-{
-	PID_calc(&gimbal_yaw_PID,0,K230_data.x);
-	PID_calc(&gimbal_pitch_PID,0,K230_data.y);
-	gimbal_cmd_send.yaw += gimbal_yaw_PID.out;
-	gimbal_cmd_send.pitch +=gimbal_pitch_PID.out;
-}
 
 static void RobotCmd_UpdateRemoteMode(void)
 {
@@ -218,12 +167,20 @@ static void RobotCmd_ExitRemoteMode(Chassis_Mode_e restore_mode)
 
 void Task_Callback(uint8_t i)
 {
-	if(i==0)
-	{
-		gimbal_cmd_send.task_flag = 1;
-	}
-	else if(i==1)
-	{
-		gimbal_cmd_send.task_flag = 2;
-	}
+	static const H_Task_e task_map[] = {
+		H_TASK_2_FAST_LAP,
+		H_TASK_3_STATIC_BALL,
+		H_TASK_4_AB_BALL,
+		H_TASK_5_CENTER_BALL_LAP,
+		H_TASK_6_TARGET_BALL_LAP,
+	};
+	if (i >= (sizeof(task_map) / sizeof(task_map[0]))) return;
+
+	chassis_cmd_send.competition_task = task_map[i];
+	gimbal_cmd_send.task_flag = (uint8_t)task_map[i];
+	++chassis_cmd_send.task_start_seq;
+	gimbal_cmd_send.task_start_seq = chassis_cmd_send.task_start_seq;
+	/* 任务3仅控制静止摆杆，其余任务启动体育场底盘控制器。 */
+	chassis_cmd_send.Chassis_Mode = (task_map[i] == H_TASK_3_STATIC_BALL) ?
+	                                 POSITION_MODE : IMU_MODE;
 }

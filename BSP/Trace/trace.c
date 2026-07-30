@@ -485,33 +485,19 @@ static void Trace_State_Judge(uint8_t raw_data,float process_digital){
 /**
  * @brief 在task里面以1kHz运行，保证数据采样的连续
  */
-float Trace_task(void)
+void Trace_UpdateSensor(void)
 {
-    // 定时调用传感器任务，包含模拟数据采集和数字化一整个流程
 #ifdef USE_GRAY_SERIAL
     Digtal = Gray_Serial_Read();
 #else
     No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
-    // 定时调用传感器任务，包含模拟数据采集和数字化一整个流程
-//            No_Mcu_Ganv_Sensor_Task_With_tick(&sensor)
-    // 获取数字量传感器数据（只有当黑白值填进去之后才会有数字量输出）
     Digtal = Get_Digtal_For_User(&sensor);
 #endif
+}
 
-    uint8_t left_black = 0, right_black = 0;
-    for (int i = 0; i < 4; i++) {
-        if (!(Digtal & (1 << i))) left_black++;   // 统计 bit 0~3 (一侧)
-    }
-    for (int i = 4; i < 8; i++) {
-        if (!(Digtal & (1 << i))) right_black++;  // 统计 bit 4~7 (另一侧)
-    }
-
-    // 只要有一侧有 3 个或以上传感器吃到黑线，判定为直角弯
-    if (left_black >= 3 || right_black >= 3) {
-        PID_clear(&Trace_PID); // 清空 PID
-        return 0.0f;           // 不进行补偿计算，直接返回 0.0f
-    }
-
+float Trace_task(void)
+{
+    Trace_UpdateSensor();
 
     switch (trace_mode) {
         case TRACE_NORMAL:

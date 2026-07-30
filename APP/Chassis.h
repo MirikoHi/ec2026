@@ -14,6 +14,18 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps);
 uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed);
 uint8_t Chassis_MoveArc(float radius_m, float total_angle_deg, float speed_mps);
 
+/* 供滚球控制器读取的底盘轨迹前馈，单位分别为 m/s 和 m/s^2。 */
+float Chassis_GetCommandedSpeed(void);
+float Chassis_GetCommandedAcceleration(void);
+float Chassis_GetCommandedLateralAcceleration(void);
+float Chassis_GetCommandedYawRate(void);
+float Chassis_GetRunTimeSeconds(void);
+uint8_t Chassis_IsRunTimerActive(void);
+uint8_t Chassis_GetStadiumStep(void);
+
+/** 请求比赛任务立即停车；由底盘控制任务在下一个 5 ms 周期执行。 */
+void Chassis_RequestEmergencyStop(void);
+
 typedef enum {
 	Chassis_Line = 0,
 	Chassis_Turn,

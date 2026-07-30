@@ -27,9 +27,20 @@ typedef enum {
 	REMOTE_MODE,
 }Chassis_Mode_e;
 
+typedef enum {
+	H_TASK_NONE = 0,
+	H_TASK_2_FAST_LAP = 2,
+	H_TASK_3_STATIC_BALL = 3,
+	H_TASK_4_AB_BALL = 4,
+	H_TASK_5_CENTER_BALL_LAP = 5,
+	H_TASK_6_TARGET_BALL_LAP = 6,
+} H_Task_e;
+
 typedef struct {
 		Chassis_Mode_e Chassis_Mode;
 		uint8_t circle_set;
+		H_Task_e competition_task;
+		uint8_t task_start_seq;  /* 每次确认任务时递增，同一任务可重复启动 */
 		uint8_t remote_disable;
 		float remote_forward;
 		float remote_turn;
@@ -45,6 +56,7 @@ typedef struct {
 		float aim_y;
 		uint8_t relay_on_flag;
 		uint8_t task_flag;
+		uint8_t task_start_seq;
 }gimbal_cmd_q;
 
 //这里一定要pack取消对齐字节，会出现双板字节位数对不上，回调函数中直接return

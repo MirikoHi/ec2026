@@ -22,6 +22,8 @@ DCMotorInstance* DCMotor_Init(DCMotorInitConfig_s *config)
 	instance->Output_Dir = config->Output_Dir;
 	instance->feedforward = config->feedforward;
 	instance->loop_mode = config->loop_mode;
+	/* 基础速度命令单独初始化，后续不与PID内部Ref共用存储。 */
+	instance->Speed_Ref_Command = 0.0f;
 	instance->Trace_Compensation = 0.0f;
 	DCMotor_Cmd(instance,DISABLE);
 	
@@ -79,8 +81,14 @@ void DCMotor_SetTraceCompensation(DCMotorInstance *motor,float compensation)
 
 void DC_Motor_SetRef(DCMotorInstance * motor,float ref) {
 	if (motor->loop_mode == SPEED_MODE) {
-		motor->speed_pid.Ref = ref;
-		motor->speed_pid.pid_update_flag = 1;
+		/*
+		 * 保存规划器基础轮速，不直接写PID内部Ref。PID_calc自身会写Ref，
+		 * 两个任务共用该字段会造成基础值与补偿后数值周期性交替。
+		 */
+		if (fabsf(ref - motor->Speed_Ref_Command) > 1e-6f) {
+			motor->Speed_Ref_Command = ref;
+			motor->speed_pid.pid_update_flag = 1;
+		}
 	}
 	if (motor->loop_mode == ANGLE_MODE) {
 		motor->position_pid.Ref = ref;
@@ -112,7 +120,14 @@ void Hw_Motor_Task(void)
 		}
 		if (dcmotor_instance[i].loop_mode == SPEED_MODE) {
 			//计算速度环输出
-			PID_calc(&dcmotor_instance[i].speed_pid,dcmotor_instance[i].Trace_Compensation+dcmotor_instance[i].speed_pid.Ref,dcmotor_instance[i].filter.speed_filtered);
+			/*
+			 * 实际PID目标只在电机任务中合成一次。speed_pid.Ref供PID内部记录，
+			 * Speed_Ref_Command始终保留上层给出的基础轮速。
+			 */
+			float speed_target = dcmotor_instance[i].Speed_Ref_Command +
+			                     dcmotor_instance[i].Trace_Compensation;
+			PID_calc(&dcmotor_instance[i].speed_pid, speed_target,
+			         dcmotor_instance[i].filter.speed_filtered);
 		}
 		//前馈
 		if (fabsf(dcmotor_instance[i].speed_pid.Ref) > 0.005f) //在有目标值的时候进行累加，目标值为0停下的时候不给前馈
@@ -128,4 +143,3 @@ void Hw_Motor_Task(void)
 	}
 		
 }
-

@@ -24,6 +24,7 @@
 #include "../../APP/Chassis.h"
 #include "../../APP/Robot_Cmd.h"
 #include "../../APP/Gimbal.h"
+#include "dwt.h"
 
 //当前激活的菜单实例指针（指向 ALL_Menu_Instance 中的某一项） */
 MenuInstance* now_menu;
@@ -168,15 +169,19 @@ MenuInitConfig_s second_menu_config[3]	={
 		},
 		[2] = {
 			.string={
-				[0] = "任务一",
-				[1] = "任务二",
-				[2] = NULL,
-				[3] = NULL,
-				[4]	= NULL,
+				[0] = "任务2 快速圈",
+				[1] = "任务3 静态球",
+				[2] = "任务4 AB稳球",
+				[3] = "任务5 中心圈",
+				[4]	= "任务6 指定圈",
+				[5] = NULL,
 			},
 			.callback={
 				[0] = Task_Callback,
 				[1] = Task_Callback,
+				[2] = Task_Callback,
+				[3] = Task_Callback,
+				[4] = Task_Callback,
 			},
 			.next_menu_config={
 			
@@ -733,6 +738,31 @@ void menu_task(void)
 {
 	uint8_t item_count;
 	uint8_t selected_idx;
+	static uint8_t run_screen_active = 0U;
+	static float run_screen_last_ms = 0.0f;
+	uint8_t timer_active = Chassis_IsRunTimerActive();
+
+	/* 比赛任务运行时锁定计时页；停车后再刷新一次并保留最终成绩。 */
+	if (timer_active || run_screen_active)
+	{
+		/* 比赛运行页锁定期间，KEY4 始终保留为急停键。 */
+		if (timer_active && Key_Check(3, KEY_SINGLE | KEY_LONG))
+		{
+			Chassis_RequestEmergencyStop();
+		}
+		float now_ms = DWT_GetTimeline_ms();
+		if ((now_ms - run_screen_last_ms >= 100.0f) || !timer_active)
+		{
+			run_screen_last_ms = now_ms;
+			OLED_Clear();
+			OLED_ShowString(0, 0, timer_active ? "RUN" : "FINISH", OLED_8X16);
+			OLED_Printf(0, 20, OLED_8X16, "T:%5.2fs", Chassis_GetRunTimeSeconds());
+			OLED_Printf(0, 40, OLED_6X8, "STEP:%u", Chassis_GetStadiumStep());
+			OLED_Update();
+		}
+		run_screen_active = timer_active;
+		return;
+	}
 
 	menu_process_refresh_step();
 

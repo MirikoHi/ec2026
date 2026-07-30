@@ -8,6 +8,7 @@ static uint8_t RxBuffer[DATA_PACKET_LENGTH]; // �����������
 static volatile uint8_t RxState = 0; // ����״̬��־λ
 static uint8_t RxIndex = 0;         // ������������
 K230_Data_t K230_data = {0};
+static volatile uint32_t K230_frame_id = 0;
 static void K230LostCallback(void *ptr);
 DaemonInstance* K230_daemon,*K230_Lost_Target_daemon;
 void Clear_UART_FIFO(void) {
@@ -97,6 +98,7 @@ void K230_ReceiveData(uint8_t RxData)
                 {
                     // 直接拷贝到结构体（小端序，无需字节交换）
                     memcpy(&K230_data, &RxBuffer[2], sizeof(K230_Data_t));
+                    ++K230_frame_id;
                     DaemonReload(K230_daemon);
 					DaemonReload(K230_Lost_Target_daemon);
                     // ��������
@@ -113,6 +115,25 @@ void K230_ReceiveData(uint8_t RxData)
             RxIndex = 0;
         }
     }
+}
+
+uint8_t K230_GetSnapshot(K230_Data_t *data, uint32_t *frame_id)
+{
+    uint32_t before;
+    uint32_t after;
+    if (data == NULL || frame_id == NULL) return 0U;
+    do {
+        before = K230_frame_id;
+        *data = K230_data;
+        after = K230_frame_id;
+    } while (before != after);
+    *frame_id = after;
+    return (uint8_t)(after != 0U);
+}
+
+uint8_t K230_IsOnline(void)
+{
+    return (uint8_t)(K230_daemon != NULL && DaemonIsOnline(K230_daemon));
 }
 static void K230LostCallback(void *ptr)
 {
