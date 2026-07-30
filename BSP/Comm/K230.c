@@ -37,7 +37,7 @@ void K230_Init(void) {
     DL_UART_clearInterruptStatus(K230_INST, DL_UART_INTERRUPT_RX); // ????ж???λ
 }
 
-uint8_t get_CRC8(const uint8_t *data, uint32_t len) {
+uint8_t get_CRC8(uint8_t *data, uint32_t len) {
     uint8_t crc = 0x00U;
     while (len--) {
         crc ^= *data++;

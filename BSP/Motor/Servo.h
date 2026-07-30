@@ -85,5 +85,5 @@ ServoInstance *ServoInit(Servo_Init_Config_s *Servo_Init_Config);
 void Servo_Motor_FreeAngle_Set(ServoInstance *Servo_Motor, uint16_t S_angle);
 void Servo_Motor_StartSTOP_Angle_Set(ServoInstance *Servo_Motor, int16_t Start_angle, int16_t Final_angle);
 void Servo_Motor_Type_Select(ServoInstance *Servo_Motor,int16_t mode);
-void ServeoMotorControl();
+void ServeoMotorControl(const ServoInstance *Servo_Motor);
 #endif // SERVO_MOTOR_H

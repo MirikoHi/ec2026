@@ -21,6 +21,9 @@ pid_type_def gimbal_pitch_PID={0};
 pid_type_def gimbal_yaw_forwardfeed_PID = {0};
 gimbal_cmd_q gimbal_cmd_send ={0};
 
+float x;
+float dt;
+
 steel_ball_movement_typedef steel_ball_movement_data;
 ServoInstance*  servo_yaw;
 /* ═══════════════════════════════════════════════════════════════════════
@@ -37,11 +40,11 @@ ServoInstance*  servo_yaw;
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
 
-#define SLIDE_TARGET_X         320     /* 目标位置: 画面中心 (640/2) */
+#define SLIDE_TARGET_X         200     /* 目标位置: 画面中心 (640/2) */
 #define SLIDE_SERVO_CENTER     90      /* 滑槽水平时舵机角度 */
-#define SLIDE_SERVO_RANGE      30      /* 最大倾角范围 (±50°) */
+#define SLIDE_SERVO_RANGE      50     /* 最大倾角范围 (±50°) */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.08f   /* 速度前馈增益 */
+#define SLIDE_VEL_FF_GAIN      0.1f   /* 速度前馈增益 */
 
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
 static float        slide_prev_x = 320;   /* 上一帧 X 位置 */
@@ -51,9 +54,9 @@ static void Slide_Control_Init(void)
 {
     pid_init_config_s cfg = {
         .mode    = PID_POSITION,
-        .Kp      = 0.15f,     /* 比例: 每像素误差产生多少度倾角 */
-        .Kd      = 0.06f,     /* 微分: 抑制震荡 */
-        .Ki      = 0.015f,    /* 积分: 消除静差 */
+        .Kp      = 0.50f,     /* 比例: 每像素误差产生多少度倾角 */
+        .Kd      = 0.01f,     /* 微分: 抑制震荡 */
+        .Ki      = 0.00f,    /* 积分: 消除静差 */
         .max_out = SLIDE_SERVO_RANGE,
         .max_iout = 10.0f,
     };
@@ -72,10 +75,10 @@ static void Slide_Control_Init(void)
  */
 static void Slide_Control_Run(void)
 {
-    if (!k230_data_valid) return;
+    if (!K230_Read(&steel_ball_movement_data)) return;
 
-    float x  = (float)steel_ball_movement_data.x_position;
-    float dt = steel_ball_movement_data.dt;
+    x  = (float)steel_ball_movement_data.x_position;
+    dt = steel_ball_movement_data.dt;
 
     /* 保护: dt 异常时使用默认值 */
     if (dt <= 0.0f || dt > 0.5f) {
@@ -100,14 +103,14 @@ static void Slide_Control_Run(void)
     float velocity_ff = -slide_velocity * SLIDE_VEL_FF_GAIN;
 
     /* ── 4. 合成角度 = 中心角度 + PID输出 + 速度前馈 ── */
-    float angle = SLIDE_SERVO_CENTER + slide_ball_pid.out + velocity_ff;
+    float angle = (SLIDE_SERVO_CENTER - slide_ball_pid.out + velocity_ff);
 
     /* 限幅到舵机有效范围 */
-    if (angle > 180.0f) angle = 180.0f;
-    if (angle < 0.0f)   angle = 0.0f;
+    if (angle > 120.0f) angle = 120.0f;
+    if (angle < 65.0f)   angle = 65.0f;
 
     Servo_Motor_FreeAngle_Set(servo_yaw, (int16_t)angle);
-    ServeoMotorControl();
+    ServeoMotorControl(servo_yaw);
 }
 
 
@@ -135,7 +138,7 @@ void Gimbal_Init(void)
 	// 	.delay_ms = 0.1f,
 	// };
 	// pitch_motor = ZDT_Motor_Init(&pitch_config);
-	ZDT_TICK_Init();
+	//ZDT_TICK_Init();
 	// pid_init_config_s gimbal_yaw_pid_config={
 	// 	.mode = PID_POSITION,
 	// 	.Kp = 0.003f,
@@ -146,25 +149,25 @@ void Gimbal_Init(void)
 	// };
 	// PID_init(&gimbal_yaw_PID,&gimbal_yaw_pid_config);
 
-	pid_init_config_s gimbal_pitch_pid_config={
-		.mode = PID_POSITION,
-		.Kp = -0.003f,
-		.Kd = -0.0001f,
-		.Ki = 0.0f,
-		.max_out = 4.0f,
-		.max_iout = 1.0f,
-	};
-	PID_init(&gimbal_pitch_PID,&gimbal_pitch_pid_config);
-
-	pid_init_config_s gimbal_yaw_forwardfeed_pid_config={
-		.mode = PID_POSITION,
-		.Kp = 0.000f,
-		.Kd = -0.0001f,
-		.Ki = 0.0f,
-		.max_out = 4.0f,
-		.max_iout = 1.0f,
-	};
-	PID_init(&gimbal_yaw_forwardfeed_PID,&gimbal_yaw_forwardfeed_pid_config);
+	// pid_init_config_s gimbal_pitch_pid_config={
+	// 	.mode = PID_POSITION,
+	// 	.Kp = -0.003f,
+	// 	.Kd = -0.0001f,
+	// 	.Ki = 0.0f,
+	// 	.max_out = 4.0f,
+	// 	.max_iout = 1.0f,
+	// };
+	// PID_init(&gimbal_pitch_PID,&gimbal_pitch_pid_config);
+	//
+	// pid_init_config_s gimbal_yaw_forwardfeed_pid_config={
+	// 	.mode = PID_POSITION,
+	// 	.Kp = 0.000f,
+	// 	.Kd = -0.0001f,
+	// 	.Ki = 0.0f,
+	// 	.max_out = 4.0f,
+	// 	.max_iout = 1.0f,
+	// };
+	// PID_init(&gimbal_yaw_forwardfeed_PID,&gimbal_yaw_forwardfeed_pid_config);
 
 	Servo_Init_Config_s servo_yaw_config = {
 		.Servo_type = Servo180,
@@ -181,36 +184,24 @@ int16_t test_angle = 0;
 uint16_t testtt = 0;
 void Gimbal(void)
 {
-	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
+	//xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
 
 	// test_angle = sin(DWT_GetTimeline_ms()/100)*10+85;
 
-	testtt++;
-	if (testtt > 250) {
-		if (testtt >= 500) testtt = 0;
-		Servo_Motor_FreeAngle_Set(servo_yaw , 65);
-	}else if (testtt <= 250) {
-		// else
-		Servo_Motor_FreeAngle_Set(servo_yaw , 120);
-	}
-
-	// vTaskDelay(1000);
-	// Servo_Motor_FreeAngle_Set(servo_yaw , 65);
-	// // vTaskDelay(1000);
-	ServeoMotorControl(servo_yaw);
-
-	if (K230_Read(&steel_ball_movement_data)) {
-		/* 滑槽小球位置闭环: PID + 速度前馈 */
-		// Slide_Control_Run();
-	}
-	// switch(gimbal_cmd_receive.task_flag)
-	// {
-	// 	case 0:
-	//
-	// 		break;
-	// 	default:
-	// 		break;
+	// testtt++;
+	// if (testtt > 250) {
+	// 	if (testtt >= 500) testtt = 0;
+	// 	Servo_Motor_FreeAngle_Set(servo_yaw , 65);
+	// }else if (testtt <= 250) {
+	// 	// else
+	// 	Servo_Motor_FreeAngle_Set(servo_yaw , 120);
 	// }
+	//
+	// // vTaskDelay(1000);
+	// // Servo_Motor_FreeAngle_Set(servo_yaw , 65);
+	// // // vTaskDelay(1000);
+	// ServeoMotorControl(servo_yaw);
+	Slide_Control_Run();
 }
 
 void Gimbal_Pid_Cal(void)
