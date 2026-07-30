@@ -39,8 +39,21 @@ static uint8_t remote_mode_active = 0;
 #define CHASSIS_LINE_MIN_SPEED       0.025f
 #define CHASSIS_TURN_DONE_ERR_DEG    3.0f
 #define CHASSIS_TURN_DONE_TICKS      10U
-#define CHASSIS_ACTION_SPEED		 0.4f
-#define CHASSIS_ACTION_TURN_SPEED	 0.1f
+#define CHASSIS_ACTION_SPEED		 0.31f
+#define CHASSIS_ACTION_TURN_SPEED	 0.16f
+
+/* ---- 2026h 体育场赛道参数 ---- */
+#define CHASSIS_ARC_SPEED             0.20f   /* 弧线跟随线速度 (m/s) */
+#define CHASSIS_STRAIGHT_DIST_M       1.50f   /* 直线段距离 (m) */
+#define CHASSIS_ARC_RADIUS_M          0.50f   /* 半圆半径 (m) */
+#define CHASSIS_ARC_ANGLE_DEG         180.0f  /* 半圆总转角 (deg) */
+#define CHASSIS_FINAL_APPROACH_SPEED  0.08f   /* 终点逼近慢速 (m/s) */
+#define CHASSIS_FINAL_MAX_DIST_M      0.50f   /* 终点逼近最大搜索距离 (m) */
+#define CHASSIS_START_LINE_SENSORS    3U      /* 起止线最少连续探头数 */
+#define CHASSIS_LINE_DETECT_DEBOUNCE  5U      /* 起止线检测消抖周期数 */
+#define CHASSIS_ACTION_ARC            3U      /* 弧线动作类型 ID */
+#define CHASSIS_STOP_DONE_STEP        99U     /* 停车完成步骤号 */
+#define CHASSIS_PI                    3.14159265f
 
 static pid_type_def chassis_line_yaw_pid;
 static pid_type_def chassis_turn_pid;
@@ -51,6 +64,15 @@ static uint8_t chassis_action_done_count = 0U;
 static float chassis_action_target_yaw = 0.0f;
 static float chassis_action_target_distance = 0.0f;
 static uint8_t chassis_imu_action_step = 0U;
+
+/* 弧线跟随专用状态 */
+static float chassis_arc_start_yaw = 0.0f;             /* 弧线起点的 IMU yaw (deg) */
+static float chassis_arc_total_distance = 0.0f;        /* 弧线总路径长度 (m) */
+
+/* 终点起止线检测状态 */
+static uint8_t chassis_stop_line_detect_count = 0U;    /* 连续检测到起止线的周期计数 */
+static uint8_t chassis_step4_initialized = 0U;         /* 终点逼近是否已初始化 */
+static float   chassis_step4_target_yaw = 0.0f;        /* 终点逼近保持方向 (deg) */
 
 float IMU_data[3] = {0};
 volatile JY901s_IMU_Data_s* JY901s_IMU_Data;
@@ -265,140 +287,225 @@ static void Chassis_Trace_Cal(void) {
 	DCMotor_SetTraceCompensation(motor_r,trace_compensation);
 }
 /**
- * @brief IMU_MODE 下的测试动作：按边长 0.2m 的正方形循环行走
+ * @brief IMU_MODE 下的 2026h 体育场赛道动作
+ *
+ * 赛道形状（体育场/田径跑道形）：
+ *   A —— 1.5m 直线 —— B
+ *                        \
+ *                        (  半径 0.5m 半圆 (B→C, 180°)
+ *                        /
+ *   D —— 1.5m 直线 —— C
+ *    \
+ *    (  半径 0.5m 半圆 (D→A, 180°)
+ *    /
+ *   A (起止线)
+ *
+ * 状态机步骤：
+ *   Step 0: A→B 直线 1.5m（前半程循迹，后半程 IMU 保向）
+ *   Step 1: B→C 弧线（半径 0.5m, +180°）
+ *   Step 2: C→D 直线 1.5m（前半程循迹，后半程 IMU 保向）
+ *   Step 3: D→A 弧线（半径 0.5m, +180°）
+ *   Step 4: 终点逼近 → 检测起止线(≥3 连续探头) → 停车(误差≤2cm)
+ *   Step 99: 停车完成，保持静止
  */
 static void Chassis_ImuModeAction(void)
 {
-	switch (chassis_imu_action_step)// todo:现在是前半段循迹  后半段不循迹换成imu
+	float odom;
+	float yaw_error;
+	float yaw_compensation;
+
+	switch (chassis_imu_action_step)
 	{
+		/* ================================================================
+		 * Step 0: A → B  直线 1.5m
+		 *  - 前 1.2m：循迹 + IMU 保向
+		 *  - 1.2m 后：纯 IMU 保向
+		 *  - 0.7~0.8m 窗口记录 yaw 基准角
+		 * ================================================================ */
 		case 0:
-			// 第一条边：使用 ICM42688 yaw 做方向保持，直行 1.0m。
-			if (Chassis_MoveStraight(1.0f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveStraight(CHASSIS_STRAIGHT_DIST_M, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 1U;
 			}
-			else {
-				if (Chassis_GetForwardOdom()>0.7f || Chassis_GetForwardOdom()<0.3f)//大于0.7米时不再循迹
+			else
+			{
+				if (Chassis_GetForwardOdom() > 1.2f)
 				{
-					// Trace_ResetLineError();
-					// DCMotor_SetTraceCompensation(motor_l,0);
-					// DCMotor_SetTraceCompensation(motor_r,0);
-					Chassis_Trace_Cal();
+					/* 后段：停止循迹，纯 IMU 保向 */
+					Trace_ResetLineError();
+					DCMotor_SetTraceCompensation(motor_l, 0.0f);
+					DCMotor_SetTraceCompensation(motor_r, 0.0f);
 				}
-				else {
-					//Chassis_Trace_Cal();//小于0.7继续循迹
-					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
-						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
+				else
+				{
+					/* 前段：循迹辅助修正横向偏差 */
+					Chassis_Trace_Cal();
+					odom = Chassis_GetForwardOdom();
+					if (odom > 0.7f && odom < 0.8f)
+					{
+						/* 车身稳定后记录当前 yaw 作为后续 IMU 保向的参考基准 */
+						chassis_action_target_yaw = Chassis_GetYawDeg();
 					}
 				}
 			}
 			break;
+
+		/* ================================================================
+		 * Step 1: B → C  半径 0.5m 半圆 (弧长 ≈ 1.57m, +180°)
+		 *  - 编码器里程计 + IMU yaw 联合控制弧线跟随
+		 *  - 左转弯（CCW），半径为正
+		 * ================================================================ */
 		case 1:
-			// 第一次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(90.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveArc(CHASSIS_ARC_RADIUS_M, CHASSIS_ARC_ANGLE_DEG, CHASSIS_ARC_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 2U;
 			}
 			break;
+
+		/* ================================================================
+		 * Step 2: C → D  直线 1.5m
+		 *  - 前 0.7m：循迹辅助修正弧线结束后的横向偏差
+		 *  - 0.7m 后：纯 IMU 保向
+		 *  - 0.4~0.5m 窗口记录 yaw 基准角
+		 * ================================================================ */
 		case 2:
-			// 第二条边：直行 1.0m。
-			if (Chassis_MoveStraight(1.0f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
+			if (Chassis_MoveStraight(CHASSIS_STRAIGHT_DIST_M, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
 			{
 				chassis_imu_action_step = 3U;
 			}
-			else {
-				if (Chassis_GetForwardOdom()>0.7f || Chassis_GetForwardOdom()< 0.3f)//大于0.7米时不再循迹
-				{
-					// Trace_ResetLineError();
-					// DCMotor_SetTraceCompensation(motor_l,0);
-					// DCMotor_SetTraceCompensation(motor_r,0);
-					Chassis_Trace_Cal();
-				}
-				else {
-					//Chassis_Trace_Cal();//小于0.7继续循迹
-					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
-						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
-					}
-				}			}
-			break;
-		case 3:
-			// 第二次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(90.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
+			else
 			{
+				odom = Chassis_GetForwardOdom();
+				if (odom > 0.7f)
+				{
+					Trace_ResetLineError();
+					DCMotor_SetTraceCompensation(motor_l, 0.0f);
+					DCMotor_SetTraceCompensation(motor_r, 0.0f);
+				}
+				else
+				{
+					Chassis_Trace_Cal();
+					if (odom > 0.4f && odom < 0.5f)
+					{
+						chassis_action_target_yaw = Chassis_GetYawDeg();
+					}
+				}
+			}
+			break;
+
+		/* ================================================================
+		 * Step 3: D → A  半径 0.5m 半圆 (弧长 ≈ 1.57m, +180°)
+		 *  - 与 Step 1 同向的弧线，完成后应回到 A 点附近
+		 * ================================================================ */
+		case 3:
+			if (Chassis_MoveArc(CHASSIS_ARC_RADIUS_M, CHASSIS_ARC_ANGLE_DEG, CHASSIS_ARC_SPEED) == CHASSIS_ACTION_DONE)
+			{
+				/* 弧线完成后进入终点逼近阶段，初始化状态 */
+				chassis_step4_initialized = 0U;
+				chassis_stop_line_detect_count = 0U;
 				chassis_imu_action_step = 4U;
 			}
 			break;
+
+		/* ================================================================
+		 * Step 4: 终点逼近 → 检测起止线 → 精确停车
+		 *
+		 * 策略：
+		 *   1. 慢速前进（0.08 m/s），IMU 保向
+		 *   2. 每周期读取 8 路灰度探头原始数据
+		 *   3. 连续 ≥3 个探头踩到黑线 → 判定为起止线
+		 *   4. 消抖：连续 5 周期检测到后才确认停车
+		 *   5. 安全兜底：前进超过 0.5m 仍未检测到则强制停车
+		 *
+		 * 起止线说明：
+		 *   A 点有一条垂直于前进方向的黑线（起止线）。
+		 *   车体经过时，至少 3 个连续的灰度探头会同时检测到黑线，
+		 *   与普通循迹线（约 1~2 个探头）有显著区别。
+		 * ================================================================ */
 		case 4:
-			// 第三条边：直行 1.0m。
-			if (Chassis_MoveStraight(1.0f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
+		{
+			/* 首周期初始化 */
+			if (chassis_step4_initialized == 0U)
 			{
-				chassis_imu_action_step = 5U;
+				chassis_step4_initialized = 1U;
+				chassis_stop_line_detect_count = 0U;
+				chassis_step4_target_yaw = Chassis_GetYawDeg();
+				Chassis_ResetEncoderOdom();
+				PID_clear(&chassis_line_yaw_pid);
+				DCMotor_SetTraceCompensation(motor_l, 0.0f);
+				DCMotor_SetTraceCompensation(motor_r, 0.0f);
 			}
-			else {
-				if (Chassis_GetForwardOdom()>0.7f || Chassis_GetForwardOdom() < 0.3f)//大于0.7米时不再循迹
+
+			motor_l->loop_mode = SPEED_MODE;
+			motor_r->loop_mode = SPEED_MODE;
+			motor_l->State = ENABLE;
+			motor_r->State = ENABLE;
+
+			odom = Chassis_GetForwardOdom();
+
+			/* ---- 起止线检测（核心逻辑）---- */
+			if (Trace_DetectCrossLine(CHASSIS_START_LINE_SENSORS))
+			{
+				chassis_stop_line_detect_count++;
+				if (chassis_stop_line_detect_count >= CHASSIS_LINE_DETECT_DEBOUNCE)
 				{
-					// Trace_ResetLineError();
-					// DCMotor_SetTraceCompensation(motor_l,0);
-					// DCMotor_SetTraceCompensation(motor_r,0);
-					Chassis_Trace_Cal();
-				}
-				else {
-					//Chassis_Trace_Cal();//小于0.7继续循迹
-					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
-						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
-					}
+					/* 确认检测到起止线：立即停车 */
+					DC_Motor_SetRef(motor_l, 0.0f);
+					DC_Motor_SetRef(motor_r, 0.0f);
+					Chassis_ResetAction();
+					chassis_step4_initialized = 0U;
+					chassis_stop_line_detect_count = 0U;
+					chassis_imu_action_step = CHASSIS_STOP_DONE_STEP;
+					break;
 				}
 			}
-			break;
-		case 5:
-			// 第三次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(90.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
+			else
 			{
-				chassis_imu_action_step = 6U;
+				chassis_stop_line_detect_count = 0U;
 			}
-			break;
-		case 6:
-			// 第四条边：直行 1.0m。
-			if (Chassis_MoveStraight(1.0f, CHASSIS_ACTION_SPEED) == CHASSIS_ACTION_DONE)
+
+			/* ---- 安全兜底：超过最大搜索距离 ---- */
+			if (odom > CHASSIS_FINAL_MAX_DIST_M)
 			{
-				chassis_imu_action_step = 7U;
+				DC_Motor_SetRef(motor_l, 0.0f);
+				DC_Motor_SetRef(motor_r, 0.0f);
+				Chassis_ResetAction();
+				chassis_step4_initialized = 0U;
+				chassis_stop_line_detect_count = 0U;
+				chassis_imu_action_step = CHASSIS_STOP_DONE_STEP;
+				break;
 			}
-			else {
-				if (Chassis_GetForwardOdom()>0.7f || Chassis_GetForwardOdom()<0.3f )//大于0.7米时不再循迹
-				{
-					// Trace_ResetLineError();
-					// DCMotor_SetTraceCompensation(motor_l,0);
-					// DCMotor_SetTraceCompensation(motor_r,0);
-					Chassis_Trace_Cal();
-				}
-				else {
-					//Chassis_Trace_Cal();//小于0.7继续循迹
-					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
-						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
-					}
-				}
-			}
+
+			/* ---- 慢速前进 + IMU yaw 保向 ---- */
+			yaw_error = Chassis_AngleNormalize(chassis_step4_target_yaw - Chassis_GetYawDeg());
+			yaw_compensation = PID_calc(&chassis_line_yaw_pid, 0.0f, yaw_error);
+
+			DC_Motor_SetRef(motor_l, CHASSIS_FINAL_APPROACH_SPEED + yaw_compensation);
+			DC_Motor_SetRef(motor_r, CHASSIS_FINAL_APPROACH_SPEED - yaw_compensation);
+		}
+		break;
+
+		/* ================================================================
+		 * Step 99: 停车完成，保持静止
+		 *  - 等待上位机切出 IMU_MODE 后复位
+		 * ================================================================ */
+		case CHASSIS_STOP_DONE_STEP:
+			/* 静默保持，不做任何动作 */
 			break;
-		case 7:
-			// 第四次转角完成后回到第一条边，形成正方形循环。
-			if (Chassis_TurnAngle(90.0f, CHASSIS_ACTION_TURN_SPEED) == CHASSIS_ACTION_DONE)
-			{
-				chassis_imu_action_step = 0U;
-			}
-			break;
+
 		default:
-			// 异常状态下复位到第一条边。
+			/* 异常状态：关闭电机输出，复位到起点 */
 			DC_Motor_SetRef(motor_l, 0.0f);
 			DC_Motor_SetRef(motor_r, 0.0f);
 			chassis_imu_action_step = 0U;
+			chassis_step4_initialized = 0U;
+			chassis_stop_line_detect_count = 0U;
 			break;
 	}
 }
 
 static void Chassis_RemoteControl(void)
 {
-	static float left_out;
-	static float right_out;
 	// 遥控模式使用速度环，直接给左右轮差速速度。
 	motor_l->loop_mode = SPEED_MODE;
 	motor_r->loop_mode = SPEED_MODE;
@@ -414,7 +521,7 @@ static void Chassis_RemoteControl(void)
 	Spin_succeed_flag = 0;
 	// DCMotor_SetTraceCompensation(motor_l, 0.0f);
 	// DCMotor_SetTraceCompensation(motor_r, 0.0f);
-	// Chassis_Trace_Cal();
+	Chassis_Trace_Cal();
 
 	if (remote_mode_active == 0U)
 	{
@@ -450,6 +557,12 @@ static void Chassis_RemoteLostDisable(void)
 
 /**
  * @brief 清除底盘自动动作状态，并将左右轮速度给定清零
+ *
+ * @note 清除层级递进：
+ *       1. 底盘级 PID（chassis_line_yaw_pid / chassis_turn_pid）
+ *       2. 电机自身 PID（speed_pid / position_pid）— 防止模式切换时积分卷绕
+ *       3. 循迹补偿量（Trace_Compensation）— 防止上一模式残留叠加
+ *       4. 弧线/终点检测状态 — 防止跨模式残留
  */
 void Chassis_ResetAction(void)
 {
@@ -460,13 +573,37 @@ void Chassis_ResetAction(void)
 	chassis_action_target_yaw = 0.0f;
 	chassis_action_target_distance = 0.0f;
 
-	// 清除 PID 历史，避免上一次动作的误差和微分项影响下一次动作。
+	// 清除底盘级 PID 历史，避免上一次动作的误差和微分项影响下一次动作。
 	PID_clear(&chassis_line_yaw_pid);
 	PID_clear(&chassis_turn_pid);
+
+
+    /* ---- 清除电机自身 PID 状态 ---- */
+	/* 关键：模式切换（如 TRACE_MODE 的 ANGLE_MODE → IMU_MODE 的 SPEED_MODE）
+	 * 时，电机 speed_pid 内残留的积分/微分/误差历史会导致输出突变。
+	 * 不清除的话，Hw_Motor_Task 里 speed_pid.out 会基于上一模式的旧状态
+	 * 加上新模式的新 Ref，产生不可预期的输出，表现为轮子乱转/振荡。 */
+	PID_clear(&motor_l->speed_pid);
+	PID_clear(&motor_r->speed_pid);
+	PID_clear(&motor_l->position_pid);
+	PID_clear(&motor_r->position_pid);
+
+	/* ---- 清除循迹补偿量 ---- */
+	/* Hw_Motor_Task 中 SPEED_MODE 的实际参考值 = Trace_Compensation + speed_pid.Ref。
+	 * 如果上一模式残留非零 Trace_Compensation，会叠加到新 Ref 上造成偏差。 */
+	DCMotor_SetTraceCompensation(motor_l, 0.0f);
+	DCMotor_SetTraceCompensation(motor_r, 0.0f);
 
 	// 清零速度给定，但不直接失能电机，方便状态机继续接管底盘。
 	DC_Motor_SetRef(motor_l, 0.0f);
 	DC_Motor_SetRef(motor_r, 0.0f);
+
+	/* ---- 清除弧线跟随和终点检测状态 ---- */
+	chassis_arc_start_yaw = 0.0f;
+	chassis_arc_total_distance = 0.0f;
+	chassis_step4_initialized = 0U;
+	chassis_stop_line_detect_count = 0U;
+	chassis_step4_target_yaw = 0.0f;
 }
 
 /**
@@ -695,6 +832,127 @@ static float Chassis_AngleNormalize(float angle)
 		angle += 360.0f;
 	}
 	return angle;
+}
+
+/**
+ * @brief 使用编码器里程计 + IMU yaw 联合控制，沿定半径圆弧前进
+ *
+ * 核心原理（差速轮弧线跟随）：
+ *   对于半径 R 的圆弧，机器人沿弧线前进距离 d 时：
+ *     yaw 变化量 = d / R (弧度) = d / R * 180/π (度)
+ *
+ *   每个控制周期根据当前里程动态计算目标 yaw：
+ *     target_yaw_deg = arc_start_yaw + direction * (current_odom / |R|) * 180/π
+ *
+ *   前进速度用 IMU yaw PID 分解到左右轮，实现"边前进边转弯"。
+ *
+ * 与 Chassis_TurnAngle（原地转向）的本质区别：
+ *   - TurnAngle：线速度 = 0，纯旋转，用 chassis_turn_pid
+ *   - MoveArc：始终有前进速度，yaw 动态追赶，用 chassis_line_yaw_pid
+ *
+ * @param radius_m       圆弧半径 (m)，正数 = 逆时针(CCW)，负数 = 顺时针(CW)
+ * @param total_angle_deg 圆弧总转角 (deg)，如 +180 表示半圆，-90 表示右转四分之一圆
+ * @param speed_mps      前进线速度 (m/s)，取绝对值
+ * @return CHASSIS_ACTION_DONE 表示弧线完成，否则返回 CHASSIS_ACTION_RUNNING
+ */
+uint8_t Chassis_MoveArc(float radius_m, float total_angle_deg, float speed_mps)
+{
+	/* 切线速度只取大小，方向由 radius_m 符号和 total_angle_deg 符号共同决定 */
+	float abs_speed = fabsf(speed_mps);
+	if (abs_speed < 0.001f) { abs_speed = 0.001f; }
+
+	/* 计算弧线总长：arc_length = |R| * |θ| (弧度) */
+	float abs_radius   = fabsf(radius_m);
+	float abs_angle    = fabsf(total_angle_deg);
+	float total_arc_distance = abs_radius * abs_angle * (CHASSIS_PI / 180.0f);
+
+	/* 转向方向：radius > 0 且 angle > 0 → 逆时针 (CCW = +1)
+	 *           radius > 0 且 angle < 0 → 顺时针 (CW  = -1)
+	 * 取两者符号的乘积作为最终转动方向 */
+	int turn_dir = ((radius_m > 0.0f) ? 1 : -1) * ((total_angle_deg > 0.0f) ? 1 : -1);
+
+	/* 转角太小，无需执行 */
+	if (abs_angle <= CHASSIS_TURN_DONE_ERR_DEG || total_arc_distance <= CHASSIS_LINE_DONE_ERR_M)
+	{
+		Chassis_ResetAction();
+		return CHASSIS_ACTION_DONE;
+	}
+
+	/* ---- 首次调用：锁定弧线起点状态 ---- */
+	if ((chassis_action_active == 0U) || (chassis_action_type != CHASSIS_ACTION_ARC))
+	{
+		chassis_action_active      = 1U;
+		chassis_action_type        = CHASSIS_ACTION_ARC;
+		chassis_action_done_count  = 0U;
+		chassis_arc_start_yaw      = Chassis_GetYawDeg();
+		chassis_arc_total_distance = total_arc_distance;
+
+		Chassis_ResetEncoderOdom();
+		PID_clear(&chassis_line_yaw_pid);
+		PID_clear(&chassis_turn_pid);
+
+		/* 清空循迹补偿，弧线完全由 IMU 控制 */
+		DCMotor_SetTraceCompensation(motor_l, 0.0f);
+		DCMotor_SetTraceCompensation(motor_r, 0.0f);
+	}
+
+	/* ---- 每周期：速度环 + yaw 保向 ---- */
+	motor_l->loop_mode = SPEED_MODE;
+	motor_r->loop_mode = SPEED_MODE;
+	motor_l->State = ENABLE;
+	motor_r->State = ENABLE;
+
+	float current_distance = fabsf(Chassis_GetForwardOdom());
+	float remain = chassis_arc_total_distance - current_distance;
+
+	/* ---- 到达终点判定 ---- */
+	if (remain <= CHASSIS_LINE_DONE_ERR_M)
+	{
+		chassis_action_done_count++;
+		DC_Motor_SetRef(motor_l, 0.0f);
+		DC_Motor_SetRef(motor_r, 0.0f);
+		if (chassis_action_done_count >= CHASSIS_LINE_DONE_TICKS)
+		{
+			Chassis_ResetAction();
+			return CHASSIS_ACTION_DONE;
+		}
+		return CHASSIS_ACTION_RUNNING;
+	}
+	chassis_action_done_count = 0U;
+
+	/* ---- 动态目标 yaw：根据已走弧长线性内插 ---- */
+	/* target_yaw = start_yaw + turn_dir * (distance / radius) * (180 / PI) */
+	float target_yaw = chassis_arc_start_yaw
+	                   + (float)turn_dir * current_distance / abs_radius * (180.0f / CHASSIS_PI);
+	target_yaw = Chassis_AngleNormalize(target_yaw);
+
+	/* ---- 速度曲线：起步加速 + 末段减速 ---- */
+	float progress = chassis_arc_total_distance - remain;
+	float base_speed = abs_speed;
+
+	if (progress < CHASSIS_LINE_ACCEL_M)
+	{
+		/* 起步加速段 */
+		base_speed = CHASSIS_LINE_MIN_SPEED
+		             + (abs_speed - CHASSIS_LINE_MIN_SPEED) * progress / CHASSIS_LINE_ACCEL_M;
+	}
+	if (remain < CHASSIS_LINE_SLOWDOWN_M)
+	{
+		/* 末段减速段 */
+		float slowdown = abs_speed * remain / CHASSIS_LINE_SLOWDOWN_M;
+		if (slowdown < CHASSIS_LINE_MIN_SPEED) { slowdown = CHASSIS_LINE_MIN_SPEED; }
+		if (slowdown < base_speed)             { base_speed = slowdown; }
+	}
+
+	/* ---- IMU yaw 误差 → 补偿 ---- */
+	float yaw_error = Chassis_AngleNormalize(target_yaw - Chassis_GetYawDeg());
+	float yaw_compensation = PID_calc(&chassis_line_yaw_pid, 0.0f, yaw_error);
+
+	/* ---- 左右轮速度分配：base_speed ± yaw_compensation ---- */
+	DC_Motor_SetRef(motor_l, base_speed + yaw_compensation);
+	DC_Motor_SetRef(motor_r, base_speed - yaw_compensation);
+
+	return CHASSIS_ACTION_RUNNING;
 }
 
 void Motor_Cmd_CallBack(uint8_t i)

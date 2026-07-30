@@ -12,6 +12,7 @@ void Chassis_get_init_angle(void);
 void Chassis_ResetAction(void);
 uint8_t Chassis_MoveStraight(float distance_m, float speed_mps);
 uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed);
+uint8_t Chassis_MoveArc(float radius_m, float total_angle_deg, float speed_mps);
 
 typedef enum {
 	Chassis_Line = 0,

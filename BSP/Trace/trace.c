@@ -544,3 +544,53 @@ float Trace_task(void)
     PID_calc(&Trace_PID, 0, temp );
     return Trace_PID.out;
 }
+
+
+/**
+ * @brief 获取当前 8 路灰度传感器原始数字量
+ * @return 8 路传感器数字量（bit=0 表示黑线/检测到线）
+ *
+ * @note Digtal 在每次 Trace_task() 调用时更新，调用前需确保 Trace_task()
+ *       已在本周期执行过（当前架构下 Chassis_Trace_Cal → Trace_task 在
+ *       Chassis_ImuModeAction 之前被调用，所以数据是最新的）
+ */
+uint8_t Trace_GetRawSensor(void)
+{
+    return Digtal;
+}
+
+/**
+ * @brief 检测横穿线：检查是否有至少 min_sensors 个连续探头同时踩到黑线
+ *
+ * 遍历 8 路传感器数据，寻找最长的连续 0 比特块。
+ * 若该块长度 ≥ min_sensors，判断为检测到起止线（横穿线）。
+ *
+ * @param min_sensors 最少连续探头数，起止线检测应传 ≥ 3
+ * @return 1 表示检测到横穿线，0 表示未检测到
+ */
+uint8_t Trace_DetectCrossLine(uint8_t min_sensors)
+{
+    uint8_t raw = Digtal;
+
+    /* 全白(0xFF) → 肯定没有横穿线 */
+    if (raw == 0xFF) {
+        return 0U;
+    }
+
+    /* 找最长连续 0 比特块 */
+    uint8_t max_len = 0U;
+    uint8_t cur_len = 0U;
+
+    for (uint8_t i = 0U; i < 8U; i++) {
+        if (!(raw & (1U << i))) {   /* bit=0 → 检测到黑线 */
+            cur_len++;
+            if (cur_len > max_len) {
+                max_len = cur_len;
+            }
+        } else {
+            cur_len = 0U;
+        }
+    }
+
+    return (max_len >= min_sensors) ? 1U : 0U;
+}

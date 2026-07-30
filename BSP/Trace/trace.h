@@ -57,6 +57,18 @@ extern trace_mode_e trace_mode;
  */
 void Trace_Reset(void);
 
+/**
+ * @brief 获取当前 8 路灰度传感器原始数字量
+ * @return 8 路传感器数字量（bit=0 表示黑线/检测到线）
+ */
+uint8_t Trace_GetRawSensor(void);
+
+/**
+ * @brief 检测起止线：至少连续 min_sensors 个探头同时检测到黑线
+ * @param min_sensors 最少连续探头数（≥3 表示起止线）
+ * @return 1 表示检测到横穿线，0 表示未检测到
+ */
+uint8_t Trace_DetectCrossLine(uint8_t min_sensors);
 
 
 

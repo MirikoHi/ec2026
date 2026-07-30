@@ -61,7 +61,7 @@ void RobotCmd_Init(void)
 	// BlueToothUart_Init();
 	
 
-	chassis_cmd_send.Chassis_Mode = TRACE_MODE;  //todo:这里记得改回默认值，调试用
+	chassis_cmd_send.Chassis_Mode = IMU_MODE;  //todo:这里记得改回默认值，调试用
 		pid_init_config_s gimbal_yaw_pid_config={
 		.mode = PID_POSITION,
 		.Kp = 0.003f,
