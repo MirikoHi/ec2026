@@ -110,26 +110,26 @@ static void menu_flush_all_pending(void);
  */
 void MenuInit(void)
 {
-MenuInitConfig_s third_menu_config[1] = {    //三级菜单
-			[0] = {
-			.string={
-				[0] = "普通",
-				[1] = "巡线",
-				[2] = "陀螺仪",
-				[3] = "位置",
-				[4]	= NULL,
-			},
-			.callback={
-				[0] = Chassis_Mode_Switch_Callback,
-				[1] = Chassis_Mode_Switch_Callback,
-				[2] = Chassis_Mode_Switch_Callback,
-				[3] = Chassis_Mode_Switch_Callback,
-			},
-			.next_menu_config={
-			},
-			.pre_idx=1,
-		},
-};
+// MenuInitConfig_s third_menu_config[1] = {    //三级菜单
+// 			[0] = {
+// 			.string={
+// 				[0] = "普通",
+// 				[1] = "巡线",
+// 				[2] = "陀螺仪",
+// 				[3] = "位置",
+// 				[4]	= NULL,
+// 			},
+// 			.callback={
+// 				[0] = Chassis_Mode_Switch_Callback,
+// 				[1] = Chassis_Mode_Switch_Callback,
+// 				[2] = Chassis_Mode_Switch_Callback,
+// 				[3] = Chassis_Mode_Switch_Callback,
+// 			},
+// 			.next_menu_config={
+// 			},
+// 			.pre_idx=1,
+// 		},
+// };
 MenuInitConfig_s second_menu_config[3]	={      //二级菜单
 		[0] = {
 			.string={
@@ -150,18 +150,19 @@ MenuInitConfig_s second_menu_config[3]	={      //二级菜单
 		},
 		[1] = {
 			.string={
-				[0] = "程序控制",
-				[1] = "选择控制模式",
-				[2] = NULL,
-				[3] = NULL,
+				[0] = "普通",
+				[1] = "巡线",
+				[2] = "陀螺仪",
+				[3] = "位置",
 				[4]	= NULL,
 			},
 			.callback={
-				// [0] = Control_Switch_Callback,
-				// [1] = Control_Switch_Callback,
+				[0] = Chassis_Mode_Switch_Callback,
+				[1] = Chassis_Mode_Switch_Callback,
+				[2] = Chassis_Mode_Switch_Callback,
+				[3] = Chassis_Mode_Switch_Callback,
 			},
 			.next_menu_config={
-				[1] = &third_menu_config[0],
 			},
 			.pre_idx=1,
 		},
@@ -220,17 +221,17 @@ MenuInitConfig_s first_menu_config={     //一级菜单
 				[0] = "电机控制",
 				[1] = "控制方式",
 				[2] = "任务",
-				[3] = NULL,
+				[3] = "清除任务",
 				[4]	= NULL,
 				[5] = NULL,
 			},
 			.callback={
+				[3] = Reset_task_callback,
 			},
 			.next_menu_config={
 				[0] = &second_menu_config[0],
 				[1] = &second_menu_config[1],
 				[2] = &second_menu_config[2],
-				[3] = NULL,
 				[4] = NULL,
 			},
 			.pre_idx=0,

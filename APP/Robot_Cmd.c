@@ -35,6 +35,11 @@ Control_mode robotcmd_control_state = MENU_CTL;
 LicheervnanoStatus_t Licheervnano_status = OFFLINE;;   //判断无线通讯状态
 static volatile Licheervnano_Frame LicheeRec_Frame;
 
+/*  OLED显示  */
+/* ── 任务显示 ────────────────────────────────────────────── */
+static uint8_t task_display_id    = 0;     /* 0=无任务, 1=任务一, 2=任务二 */
+static float   task_start_time_s  = 0;     /* 任务开始时刻 (秒) */
+
 // void tjc_control(void);
 void draw_sin(void);
 void Gimbal_Pid_Cal(void);
@@ -112,6 +117,16 @@ void Robot_Cmd(void)
 	// xQueueSend(gimbal_cmd_queue,&gimbal_cmd_send,0U);
 
 	//CANCommSend(chasiss_can_comm, (void *)&chassis_feedback_data);
+
+	/* ── 任务信息 OLED 显示 ── */
+	if (task_display_id > 0) {
+		float elapsed = DWT_GetTimeline_s() - task_start_time_s;
+		OLED_ClearArea(0, 0, 128, 32);                          /* 清空前 4 页 */
+		OLED_ShowString(0, 0, "Task:", OLED_8X16);
+		OLED_ShowNum(56, 0, task_display_id, 1, OLED_8X16);
+		OLED_ShowString(0, 2, "Time:", OLED_8X16);
+		OLED_ShowFloatNum(56, 2, (double)elapsed, 4, 1, OLED_8X16);
+	}
 }
 
 void draw_sin(void)
@@ -129,7 +144,6 @@ void draw_sin(void)
 	// gimbal_cmd_send.aim_y=0.1f*sinf(aim_x/T_x*PI);
 }
 
-
 /**
 	各种底盘模式的回调函数
 **/
@@ -139,7 +153,7 @@ void Chassis_Mode_Switch_Callback(uint8_t i)  //选择底盘控制模式
 	{
 		chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
 	}
-	else if(i == 1)
+	else if(i == 1)   //任务0
 	{
 		chassis_cmd_send.circle_set = 1;
 		chassis_cmd_send.Chassis_Mode = TRACE_MODE;
@@ -156,8 +170,44 @@ void Chassis_Mode_Switch_Callback(uint8_t i)  //选择底盘控制模式
 
 void Task_Callback(uint8_t i)    //选择执行任务
 {
-	if(i==0)
+	if(i==0)  //任务2，巡线走一圈
 	{
-		chassis_cmd_send.task_flag = 1;
+		chassis_cmd_send.task_flag = 2;
+		// chassis_cmd_send.Chassis_Mode = TRACE_MODE;
+		chassis_cmd_send.Chassis_Mode = IMU_MODE;
+		task_display_id   = 2;
+		task_start_time_s = DWT_GetTimeline_s();
+	}
+	else if(i==1)    //任务3，静止状态，使小球在+5——-5间折返
+	{
+		chassis_cmd_send.task_flag = 3;
+		task_display_id   = 3;
+		task_start_time_s = DWT_GetTimeline_s();
+	}
+	else if(i==2)    //任务4，钢球置于中心点走AB线段
+	{
+		chassis_cmd_send.task_flag = 4;
+		task_display_id   = 4;
+		task_start_time_s = DWT_GetTimeline_s();
+	}
+	else if(i==3)    //任务5，钢球置于中心点走一圈
+	{
+		chassis_cmd_send.task_flag = 5;
+		task_display_id   = 5;
+		task_start_time_s = DWT_GetTimeline_s();
+	}
+	else if(i==4)    //任务6，钢球置于指定位置走一圈
+	{
+		chassis_cmd_send.task_flag = 6;
+		task_display_id   = 6;
+		task_start_time_s = DWT_GetTimeline_s();
+	}
+}
+void Reset_task_callback(uint8_t i) {
+	if ( i==3 ) {
+		chassis_cmd_send.task_flag = 0;
+		chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
+		task_display_id = 0;
+		task_start_time_s = 0;
 	}
 }

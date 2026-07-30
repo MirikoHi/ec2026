@@ -177,7 +177,7 @@ void Chassis_Init(void)
 	chassis_param.line_slowdown_m = 0.3f;     /* 减速段 0.3m */
 	chassis_param.line_min_speed_mps = 0.08f; /* 最低速 0.08m/s, 必须 > 0 否则起步死锁 */
 	chassis_param.turn_angle_deg[0] = 90.0f;
-	chassis_param.turn_speed_mps = 0.15f;
+	chassis_param.turn_speed_mps = 0.005f;
 	chassis_param.action_speed_mps = 0.05f;
 	chassis_param.turn_done_err_deg = 5.0f;   /* 转弯完成阈值 5° */
 	chassis_param.turn_done_ticks = 10;
@@ -280,7 +280,7 @@ static void Chassis_ImuModeAction(void)
 			}
 			break;
 		case 1:
-			result = Chassis_SemiCircle(IMU_PATH_RADIUS_M, chassis_param.action_speed_mps, 1);
+			result = Chassis_SemiCircle(IMU_PATH_RADIUS_M, chassis_param.turn_speed_mps, 1);
 			if (result == CHASSIS_ACTION_DONE) {
 				imu_path_cumulative += IMU_PATH_ARC_M;
 				chassis_imu_action_step = 2U;
@@ -294,7 +294,7 @@ static void Chassis_ImuModeAction(void)
 			}
 			break;
 		case 3:
-			result = Chassis_SemiCircle(IMU_PATH_RADIUS_M, chassis_param.action_speed_mps, 1);
+			result = Chassis_SemiCircle(IMU_PATH_RADIUS_M, chassis_param.turn_speed_mps, 1);
 			if (result == CHASSIS_ACTION_DONE) {
 				imu_path_cumulative = 0;  /* 一圈结束, 下一圈从 0 开始 */
 				chassis_imu_action_step = 0U;
@@ -308,58 +308,6 @@ static void Chassis_ImuModeAction(void)
 			break;
 	}
 }
-//
-// static void Chassis_RemoteControl(void)
-// {
-// 	// 遥控模式使用速度环，直接给左右轮差速速度。
-// 	motor_l->loop_mode = SPEED_MODE;
-// 	motor_r->loop_mode = SPEED_MODE;
-// 	// 计算差速轮输出。
-// 	float left_speed = chassis_cmd_receive.remote_forward - chassis_cmd_receive.remote_turn;
-// 	float right_speed = chassis_cmd_receive.remote_forward + chassis_cmd_receive.remote_turn;
-//
-// 	motor_l->State = ENABLE;
-// 	motor_r->State = ENABLE;
-// 	Line_flag = 0;
-// 	Stop_Flag = 0;
-// 	Spin_start_flag = 0;
-// 	Spin_succeed_flag = 0;
-// 	DCMotor_SetTraceCompensation(motor_l, 0.0f);
-// 	DCMotor_SetTraceCompensation(motor_r, 0.0f);
-// 	Chassis_Trace_Cal();
-//
-// 	if (remote_mode_active == 0U)
-// 	{
-// 		PID_clear(&motor_l->position_pid);
-// 		PID_clear(&motor_r->position_pid);
-// 		remote_mode_active = 1U;
-// 	}
-//
-// 	DC_Motor_SetRef(motor_l, left_speed);
-// 	DC_Motor_SetRef(motor_r, right_speed);
-// }
-//
-// static void Chassis_ClearRemoteSpeed(void)
-// {
-// 	if (remote_mode_active == 0U)
-// 	{
-// 		return;
-// 	}
-//
-// 	DC_Motor_SetRef(motor_l, 0.0f);
-// 	DC_Motor_SetRef(motor_r, 0.0f);
-// }
-//
-// static void Chassis_RemoteLostDisable(void)
-// {
-// 	// 无线终端离线时直接关闭电机输出，避免保持最后一次遥控量。
-// 	Chassis_ClearRemoteSpeed();
-// 	DC_Motor_SetRef(motor_l, 0.0f);
-// 	DC_Motor_SetRef(motor_r, 0.0f);
-// 	DCMotor_Cmd(motor_l, DISABLE);
-// 	DCMotor_Cmd(motor_r, DISABLE);
-// }
-
 /**
  * @brief 清除底盘自动动作状态，并将左右轮速度给定清零
  */
@@ -576,12 +524,13 @@ uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed)
  *                └──────────┘
  */
 float yaw_error;
+float turn_compensation;
 static uint8_t Chassis_SemiCircle(float radius_m, float speed_mps, int direction)
 {
 	const float arc_length     = 3.1415926f * radius_m;
 	const float total_yaw_deg  = 180.0f * (float)direction;
 	float abs_speed = fabsf(speed_mps);
-	float turn_compensation;
+
 	float progress, remain, base_speed;
 
 	if (fabsf(radius_m) < 0.001f) return CHASSIS_ACTION_DONE;

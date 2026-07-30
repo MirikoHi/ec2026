@@ -43,10 +43,18 @@ ServoInstance*  servo_yaw;
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
 
-#define SLIDE_TARGET_X         200     /* 目标位置: 画面中心 (640/2) */
-#define SLIDE_SERVO_RANGE      10     /* 最大clock范围 (±520) */
+#define SLIDE_TARGET_X         200     /* 目标位置: 画面中心 */
+#define SLIDE_SERVO_RANGE      10      /* PID 最大输出 (角度单位) */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.001f   /* 速度前馈增益 */
+#define SLIDE_VEL_FF_GAIN      0.001f  /* 速度前馈增益 */
+
+/* ── 步进电机绝对位置控制参数 ── */
+#define STEPPER_ADDR           1           /* 电机地址 */
+#define STEPPER_MAX_RPM        300         /* 最大转速 RPM */
+#define STEPPER_ACC            50          /* 加速度 */
+#define STEPPER_CENTER_CLK     0           /* 滑槽水平时的绝对脉冲位置 */
+#define STEPPER_MAX_CLK        800         /* 最大脉冲偏移量 (±800 ≈ ±90° @3200ppr) */
+#define STEPPER_UPDATE_DIV     4           /* 200Hz / 4 = 50Hz 下发频率 */
 
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
 static float        slide_prev_x = 320;   /* 上一帧 X 位置 */
@@ -110,22 +118,26 @@ static void Slide_Control_Run(void)
     PID_calc(&slide_ball_pid, 0.0f, error);
 
     /* ── 3. 速度前馈 ──
-     * 球向右运动 (v>0) → 需要左倾 (减小角度) 来"接住"球
-     * 球速越大 → 前馈幅度越大 → 舵机提前动作 */
+     * 球向右运动 (v>0) → 需要左倾来"接住"球 → 反方向补偿 */
     float velocity_ff = -slide_velocity * SLIDE_VEL_FF_GAIN;
 
-    /* ── 4. 合成角度 = 中心角度 + PID输出 + 速度前馈 ── */
+    /* ── 4. 合成输出 → 限幅 ── */
+    float output = slide_ball_pid.out + velocity_ff;
+    if (output >  SLIDE_SERVO_RANGE)  output =  SLIDE_SERVO_RANGE;
+    if (output < -SLIDE_SERVO_RANGE)  output = -SLIDE_SERVO_RANGE;
 
-	float output = slide_ball_pid.out + velocity_ff;
+    /* ── 5. 转为电机脉冲 (绝对位置) ──
+     * output ±10 → 脉冲 ±800 (@3200ppr = ±90° 电机转角)
+     * raF=1: 绝对位置模式, 电机内部闭环自动到位 */
+    float scale = (float)STEPPER_MAX_CLK / (float)SLIDE_SERVO_RANGE;
+    int32_t target_clk = STEPPER_CENTER_CLK + (int32_t)(output * scale);
 
-	if (output >   SLIDE_SERVO_RANGE)  output =   SLIDE_SERVO_RANGE;
-	if (output < -(SLIDE_SERVO_RANGE)) output = -(SLIDE_SERVO_RANGE);
-    float stepper_clock = (output);
-	uint8_t dir = stepper_clock >= 0 ? 1 : 0;
-	(dir == 0) ? stepper_clock = -stepper_clock : stepper_clock;
-
-    //ZDT_Emm_Pos_Control(1, dir, 50, 0, (uint32_t)stepper_clock, 1, false);
-	ZDT_Emm_Vel_Control(1, dir, (uint32_t)stepper_clock, 0, false);
+    /* ── 6. 降频发送 (200Hz / 4 = 50Hz), 避免 UART 拥塞 ── */
+    static uint8_t tick = 0;
+    if (++tick >= STEPPER_UPDATE_DIV) {
+        tick = 0;
+        ZDT_Emm_QPos_Control(STEPPER_ADDR, target_clk);
+    }
 }
 
 
@@ -208,8 +220,11 @@ void Gimbal_Init(void)
 	/* 初始化滑槽小球位置闭环 */
 	Slide_Control_Init();
 
-	DWT_Delay(1);
-	ZDT_Emm_Vel_Control(1, 0, (uint32_t)100, 0, false);
+	/* 步进电机: 绝对位置模式参数 (raF=1), 只设置一次 */
+	ZDT_Emm_Set_QPos_Params(STEPPER_ADDR, STEPPER_MAX_RPM, STEPPER_ACC, 1, false);
+
+	/* 回到原点 */
+	ZDT_Emm_QPos_Control(STEPPER_ADDR, STEPPER_CENTER_CLK);
 }
 
 
