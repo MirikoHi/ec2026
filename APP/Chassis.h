@@ -42,6 +42,14 @@ typedef struct
 	uint16_t line_done_ticks;
 	uint16_t reserved0;
 
+	// /* 曲线速度曲线和完成判定参数。 */
+	// float semi_accel_m;
+	// float line_slowdown_m;
+	// float line_min_speed_mps;
+	// float line_done_err_m;
+	// uint16_t line_done_ticks;
+	// uint16_t reserved0;
+
 	/* 转向完成判定和动作默认速度。 */
 	float turn_done_err_deg;
 	uint16_t turn_done_ticks;

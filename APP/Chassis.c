@@ -43,6 +43,17 @@ static float chassis_action_target_yaw = 0.0f;
 static float chassis_action_target_distance = 0.0f;
 static uint8_t chassis_imu_action_step = 0U;
 
+/* ── 路径级梯形加减速 ────────────────────────────────────────── */
+#define IMU_PATH_LINE_M        1.5f
+#define IMU_PATH_RADIUS_M      0.5f
+#define IMU_PATH_ARC_M         1.5707963f          /* π × 0.5 */
+#define IMU_PATH_TOTAL_M       ((IMU_PATH_LINE_M + IMU_PATH_ARC_M) * 2.0f)  /* ≈ 6.142m */
+#define IMU_PATH_ACCEL_M       0.3f                /* 路径起步加速段 */
+#define IMU_PATH_SLOWDOWN_M    0.3f                /* 路径末尾减速段 */
+
+static float imu_path_cumulative = 0;              /* 已完成步骤的累计里程 */
+static float imu_path_step_entry_odom = 0;         /* 当前步骤开始时的全局里程 */
+
 float IMU_data[3] = {0};
 volatile JY901s_IMU_Data_s* JY901s_IMU_Data;
 
@@ -142,11 +153,14 @@ void Chassis_Init(void)
 	chassis_param.line_distance_m[1] = 0.5f;
 	chassis_param.line_done_err_m = 0.1f;
 	chassis_param.line_done_ticks = 20;
-	chassis_param.line_accel_m = 2.0f;
-	chassis_param.line_slowdown_m = 2.0f;
+	chassis_param.line_accel_m = 0.2f;        /* 加速段 0.2m */
+	chassis_param.line_slowdown_m = 0.3f;     /* 减速段 0.3m */
+	chassis_param.line_min_speed_mps = 0.08f; /* 最低速 0.08m/s, 必须 > 0 否则起步死锁 */
 	chassis_param.turn_angle_deg[0] = 90.0f;
-	chassis_param.turn_speed_mps = 0.05f;
-	chassis_param.action_speed_mps = 0.05f;
+	chassis_param.turn_speed_mps = 0.15f;
+	chassis_param.action_speed_mps = 0.15f;
+	chassis_param.turn_done_err_deg = 5.0f;   /* 转弯完成阈值 5° */
+	chassis_param.turn_done_ticks = 10;
 
 	// BMI088 陀螺仪初始化
 	IMU_Mahony_Init();
@@ -177,6 +191,7 @@ void Chassis(void)
 		{
 			Chassis_ResetAction();
 			chassis_imu_action_step = 0U;
+			imu_path_cumulative = 0;  /* 重置路径里程 */
 		}
 		chassis_last_mode = chassis_cmd_receive.Chassis_Mode;
 	}
@@ -187,7 +202,7 @@ void Chassis(void)
 			// 计算并设置巡线补偿量。
 			Chassis_Trace_Cal();
 			// 按设定路径执行巡线动作。
-			Chassis_State_Turn();
+			// Chassis_State_Turn();
 			// 检测直行/转弯是否完成，并更新完成标志。
 			// Stop_Detect();
 			break;
@@ -197,11 +212,8 @@ void Chassis(void)
 		case NORMAL_MODE:
 			// Chassis_Set_Turn();
 			break;
-		case POSITION_MODE:
-			break;
 		case REMOTE_MODE:
 			// Chassis_RemoteControl();
-			//Chassis_ImuModeAction();
 			break;
 		default:
 			break;
@@ -235,31 +247,42 @@ static void Chassis_Trace_Cal(void) {
  */
 static void Chassis_ImuModeAction(void)
 {
+	uint8_t result;
+
 	switch (chassis_imu_action_step)
 	{
 		case 0:
-			/* 第一条直线 1.5m */
-			if (Chassis_MoveStraight(1.5f, chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
+			result = Chassis_MoveStraight(IMU_PATH_LINE_M, chassis_param.action_speed_mps);
+			if (result == CHASSIS_ACTION_DONE) {
+				imu_path_cumulative += IMU_PATH_LINE_M;
 				chassis_imu_action_step = 1U;
+			}
 			break;
 		case 1:
-			/* 第一个半圆 R=0.5m 右转 180° */
-			if (Chassis_SemiCircle(0.5f, chassis_param.action_speed_mps, 1) == CHASSIS_ACTION_DONE)
+			result = Chassis_SemiCircle(IMU_PATH_RADIUS_M, chassis_param.action_speed_mps, 1);
+			if (result == CHASSIS_ACTION_DONE) {
+				imu_path_cumulative += IMU_PATH_ARC_M;
 				chassis_imu_action_step = 2U;
+			}
 			break;
 		case 2:
-			/* 第二条直线 1.5m (反向, 因为 yaw 已转 180°) */
-			if (Chassis_MoveStraight(1.5f, chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
+			result = Chassis_MoveStraight(IMU_PATH_LINE_M, chassis_param.action_speed_mps);
+			if (result == CHASSIS_ACTION_DONE) {
+				imu_path_cumulative += IMU_PATH_LINE_M;
 				chassis_imu_action_step = 3U;
+			}
 			break;
 		case 3:
-			/* 第二个半圆 R=0.5m 右转 180° → 回到起点方向, 封闭路径 */
-			if (Chassis_SemiCircle(0.5f, chassis_param.action_speed_mps, 1) == CHASSIS_ACTION_DONE)
+			result = Chassis_SemiCircle(IMU_PATH_RADIUS_M, chassis_param.action_speed_mps, 1);
+			if (result == CHASSIS_ACTION_DONE) {
+				imu_path_cumulative = 0;  /* 一圈结束, 下一圈从 0 开始 */
 				chassis_imu_action_step = 0U;
+			}
 			break;
 		default:
 			DC_Motor_SetRef(motor_l, 0.0f);
 			DC_Motor_SetRef(motor_r, 0.0f);
+			imu_path_cumulative = 0;
 			chassis_imu_action_step = 0U;
 			break;
 	}
@@ -343,15 +366,17 @@ void Chassis_ResetAction(void)
  * @param speed_mps 速度给定，单位 m/s，只取绝对值，方向由 distance_m 决定
  * @return CHASSIS_ACTION_DONE 表示完成，否则返回 CHASSIS_ACTION_RUNNING
  */
+float base_speed;
+float yaw_compensation;
 uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 {
 	const float abs_distance = fabsf(distance_m);
 	float abs_speed = fabsf(speed_mps);
 	float remain;
 	float progress;
-	float base_speed;
+	;
 	float yaw_error;
-	float yaw_compensation;
+	;
 
 	motor_l->loop_mode = SPEED_MODE;
 	motor_r->loop_mode = SPEED_MODE;
@@ -384,13 +409,12 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 		PID_clear(&chassis_turn_pid);
 	}
 
-
 	remain = chassis_action_target_distance - Chassis_GetForwardOdom();
 	if (fabsf(remain) <= chassis_param.line_done_err_m)
 	{
 		chassis_action_done_count++;
-		// DC_Motor_SetRef(motor_l, 0.0f);
-		// DC_Motor_SetRef(motor_r, 0.0f);
+		DC_Motor_SetRef(motor_l, 0.0f);
+		DC_Motor_SetRef(motor_r, 0.0f);
 		if (chassis_action_done_count >= chassis_param.line_done_ticks)
 		{
 			Chassis_ResetAction();
@@ -406,38 +430,30 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 		progress = 0.0f;
 	}
 
+	/* ── 路径级梯形加减速 ── */
+	float path_progress = imu_path_cumulative + progress;       /* 整条路径已走距离 */
+	float path_remain   = IMU_PATH_TOTAL_M - path_progress;     /* 整条路径剩余距离 */
+
 	base_speed = (remain > 0.0f) ? abs_speed : -abs_speed;
-	if ((chassis_param.line_accel_m > 0.001f) && (progress < chassis_param.line_accel_m))
+
+	/* 起步段加速 */
+	if (path_progress < IMU_PATH_ACCEL_M)
 	{
 		float accel_speed = chassis_param.line_min_speed_mps +
-		                    (abs_speed - chassis_param.line_min_speed_mps) * progress / chassis_param.line_accel_m;
-
-		/*
-		 * 起步前 0.1m 线性加速，避免一进入直线动作就给满速度。
-		 */
+			(abs_speed - chassis_param.line_min_speed_mps) *
+				path_progress / IMU_PATH_ACCEL_M;
 		base_speed = (remain > 0.0f) ? accel_speed : -accel_speed;
 	}
-	if ((chassis_param.line_slowdown_m > 0.001f) && (fabsf(remain) < chassis_param.line_slowdown_m))
+	/* 末尾段减速 */
+	else if (path_remain < IMU_PATH_SLOWDOWN_M)
 	{
-		float slowdown_speed = abs_speed * fabsf(remain) / chassis_param.line_slowdown_m;
-
-		/*
-		 * 直线末段提前按剩余距离线性降速。
-		 * 原逻辑只剩约 2.4cm 才减速，实际表现接近急停。
-		 */
+		float slowdown_speed = abs_speed * path_remain / IMU_PATH_SLOWDOWN_M;
 		if (slowdown_speed < chassis_param.line_min_speed_mps)
-		{
 			slowdown_speed = chassis_param.line_min_speed_mps;
-		}
 		if (slowdown_speed > abs_speed)
-		{
 			slowdown_speed = abs_speed;
-		}
-
 		if (fabsf(slowdown_speed) < fabsf(base_speed))
-		{
 			base_speed = (remain > 0.0f) ? slowdown_speed : -slowdown_speed;
-		}
 	}
 
 	yaw_error = Chassis_AngleNormalize(chassis_action_target_yaw - Chassis_GetYawDeg());
@@ -589,20 +605,23 @@ static uint8_t Chassis_SemiCircle(float radius_m, float speed_mps, int direction
 	}
 	chassis_action_done_count = 0U;
 
-	/* 前进速度 (含加速段和减速段) */
+	/* ── 路径级梯形加减速 ── */
+	float path_progress = imu_path_cumulative + progress;       /* 整条路径已走距离 */
+	float path_remain   = IMU_PATH_TOTAL_M - path_progress;     /* 整条路径剩余距离 */
+
 	base_speed = abs_speed;
-	if ((chassis_param.line_accel_m > 0.001f) &&
-	    (progress < chassis_param.line_accel_m))
+
+	/* 起步段加速 */
+	if (path_progress < IMU_PATH_ACCEL_M)
 	{
 		base_speed = chassis_param.line_min_speed_mps +
 			(abs_speed - chassis_param.line_min_speed_mps) *
-				progress / chassis_param.line_accel_m;
+				path_progress / IMU_PATH_ACCEL_M;
 	}
-	if ((chassis_param.line_slowdown_m > 0.001f) &&
-	    (fabsf(remain) < chassis_param.line_slowdown_m))
+	/* 末尾段减速 */
+	else if (path_remain < IMU_PATH_SLOWDOWN_M)
 	{
-		float sd = abs_speed * fabsf(remain) /
-		           chassis_param.line_slowdown_m;
+		float sd = abs_speed * path_remain / IMU_PATH_SLOWDOWN_M;
 		if (sd < chassis_param.line_min_speed_mps)
 			sd = chassis_param.line_min_speed_mps;
 		if (sd < base_speed) base_speed = sd;
