@@ -216,22 +216,21 @@ uint16_t testtt = 0;
 
 void Gimbal(void)
 {
-	// /* 目标未变，不重复发送 */
-	// if (target_angle_deg == last_target_deg) return;
-	// last_target_deg = target_angle_deg;
-	//
-	// /* 角度 → 脉冲 (3200 脉冲/圈 = 360°, 16细分) */
-	// int32_t pulses = (int32_t)(target_angle_deg * 3200.0f / 360.0f);
-	//
-	// /* 绝对位置模式 (raF=1): dir=0(CW), dir=1(CCW), clk 为无符号脉冲数 */
-	// uint8_t dir = (pulses >= 0) ? 0U : 1U;
-	// uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
-	// ZDT_Emm_Pos_Control(1, dir, 200, 0,
-	// 					pulse_count,
-	// 					1, false);
+	testtt++;
+	if (testtt < 100) {
+		ZDT_Emm_Pos_Control(1, 1, 200, 0,
+					500,
+					1, false);
+	} else if (testtt >= 100) {
+		ZDT_Emm_Pos_Control(1, 0, 200, 0,
+			0,
+			1, false);
+		if (testtt >= 200) testtt = 0;
+	}
+
 
 	//ServeoMotorControl(servo_yaw);
-	Slide_Control_Run();
+	//+Slide_Control_Run();
 }
 
 void Gimbal_Pid_Cal(void)
@@ -249,4 +248,9 @@ void Gimbal_Attitude_Solving(void)
 	gimbal_cmd_receive.pitch = atan2f(aim_y,sqrtf(GIMBAL_LENGTH_TO_CENTER*GIMBAL_LENGTH_TO_CENTER+aim_x*aim_x))*180.0f/PI;
 }
 
-
+void UART3_IRQHandler(void)
+{
+	uint8_t byte = DL_UART_receiveData(STEPPER_MOTOR_INST);
+	ZDT_Emm_RxPushByte(byte);
+	DL_UART_clearInterruptStatus(STEPPER_MOTOR_INST, DL_UART_INTERRUPT_RX);
+}
