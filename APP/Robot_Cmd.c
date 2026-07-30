@@ -46,8 +46,8 @@ void RobotCmd_Init(void)
 	gimbal_cmd_queue = xQueueCreate(4,sizeof(gimbal_cmd_q));
 	BSPLogInit();
 
-	chassis_cmd_send.Chassis_Mode = IMU_MODE;  // 上电默认 IMU 测试模式
-	last_chassis_cmd_send.Chassis_Mode = IMU_MODE;
+	chassis_cmd_send.Chassis_Mode = NORMAL_MODE;  // 上电默认 IMU 测试模式
+	last_chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
 
 	chassis_feedback_data.real_vy = 100;
 	//双板通信can初始化

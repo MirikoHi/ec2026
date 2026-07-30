@@ -44,12 +44,12 @@ static float chassis_action_target_distance = 0.0f;
 static uint8_t chassis_imu_action_step = 0U;
 
 /* ── 路径级梯形加减速 ────────────────────────────────────────── */
-#define IMU_PATH_LINE_M        1.5f
-#define IMU_PATH_RADIUS_M      0.5f
+#define IMU_PATH_LINE_M        0.5f//1.70f
+#define IMU_PATH_RADIUS_M      0.6f
 #define IMU_PATH_ARC_M         1.5707963f          /* π × 0.5 */
-#define IMU_PATH_TOTAL_M       ((IMU_PATH_LINE_M + IMU_PATH_ARC_M) * 2.0f)  /* ≈ 6.142m */
-#define IMU_PATH_ACCEL_M       0.3f                /* 路径起步加速段 */
-#define IMU_PATH_SLOWDOWN_M    0.3f                /* 路径末尾减速段 */
+#define IMU_PATH_TOTAL_M       ((IMU_PATH_LINE_M + IMU_PATH_ARC_M) * 0.01f)  /* ≈ 6.142m */
+#define IMU_PATH_ACCEL_M       0.03f                /* 路径起步加速段 */
+#define IMU_PATH_SLOWDOWN_M    0.03f                /* 路径末尾减速段 */
 
 static float imu_path_cumulative = 0;              /* 已完成步骤的累计里程 */
 static float imu_path_step_entry_odom = 0;         /* 当前步骤开始时的全局里程 */
@@ -149,6 +149,26 @@ void Chassis_Init(void)
 	};
 	motor_r = DCMotor_Init(&motor_r_config);
 
+	pid_init_config_s chassis_line_yaw_pid_config={
+		.mode = PID_POSITION,
+		.Kp = 0.01f,
+		.Kd = 0.0001f,
+		.Ki = 0.0f,
+		.max_out = 40.0f,
+		.max_iout = 1.0f,
+	};
+	PID_init(&chassis_line_yaw_pid,&chassis_line_yaw_pid_config);
+
+	pid_init_config_s chassis_turn_pid_config={
+		.mode = PID_POSITION,
+		.Kp = 0.3f,
+		.Kd = 0.0001f,
+		.Ki = 0.0f,
+		.max_out = 400.0f,
+		.max_iout = 1.0f,
+	};
+	PID_init(&chassis_turn_pid,&chassis_turn_pid_config);
+
 	chassis_param.line_distance_m[0] = 0.5f;
 	chassis_param.line_distance_m[1] = 0.5f;
 	chassis_param.line_done_err_m = 0.1f;
@@ -158,7 +178,7 @@ void Chassis_Init(void)
 	chassis_param.line_min_speed_mps = 0.08f; /* 最低速 0.08m/s, 必须 > 0 否则起步死锁 */
 	chassis_param.turn_angle_deg[0] = 90.0f;
 	chassis_param.turn_speed_mps = 0.15f;
-	chassis_param.action_speed_mps = 0.15f;
+	chassis_param.action_speed_mps = 0.05f;
 	chassis_param.turn_done_err_deg = 5.0f;   /* 转弯完成阈值 5° */
 	chassis_param.turn_done_ticks = 10;
 
@@ -245,9 +265,10 @@ static void Chassis_Trace_Cal(void) {
  *            └────────────┘
  *               直线 1.5m
  */
+uint8_t result=0;
 static void Chassis_ImuModeAction(void)
 {
-	uint8_t result;
+
 
 	switch (chassis_imu_action_step)
 	{
@@ -367,7 +388,7 @@ void Chassis_ResetAction(void)
  * @return CHASSIS_ACTION_DONE 表示完成，否则返回 CHASSIS_ACTION_RUNNING
  */
 float base_speed;
-float yaw_compensation;
+float yaw_compensation=0;
 uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 {
 	const float abs_distance = fabsf(distance_m);
@@ -459,8 +480,8 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 	yaw_error = Chassis_AngleNormalize(chassis_action_target_yaw - Chassis_GetYawDeg());
 	yaw_compensation = PID_calc(&chassis_line_yaw_pid, 0.0f, yaw_error);
 
-	DC_Motor_SetRef(motor_l, base_speed + yaw_compensation);
-	DC_Motor_SetRef(motor_r, base_speed - yaw_compensation);
+	DC_Motor_SetRef(motor_l, base_speed - 3.0f*yaw_compensation);
+	DC_Motor_SetRef(motor_r, base_speed + 3.0f*yaw_compensation);
 
 	return CHASSIS_ACTION_RUNNING;
 }
@@ -554,16 +575,16 @@ uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed)
  *                │ 直线1.5m │
  *                └──────────┘
  */
-
+float yaw_error;
 static uint8_t Chassis_SemiCircle(float radius_m, float speed_mps, int direction)
 {
 	const float arc_length     = 3.1415926f * radius_m;
 	const float total_yaw_deg  = 180.0f * (float)direction;
 	float abs_speed = fabsf(speed_mps);
-	float yaw_error, turn_compensation;
+	float turn_compensation;
 	float progress, remain, base_speed;
 
-	if (fabsf(radius_m) < 0.01f) return CHASSIS_ACTION_DONE;
+	if (fabsf(radius_m) < 0.001f) return CHASSIS_ACTION_DONE;
 
 	/* 首次调用: 锁定目标距离和目标 yaw */
 	if ((chassis_action_active == 0U) || (chassis_action_type != 3U))
@@ -636,7 +657,7 @@ static uint8_t Chassis_SemiCircle(float radius_m, float speed_mps, int direction
 	yaw_error = Chassis_AngleNormalize(expected_yaw - Chassis_GetYawDeg());
 
 	/* 转向 PID, 限幅防止翻车 */
-	float turn_limit = abs_speed * 0.6f;
+	float turn_limit = abs_speed * 6.6f;
 	if (turn_limit < 0.1f) turn_limit = 0.1f;
 	chassis_turn_pid.max_out = turn_limit;
 	turn_compensation = PID_calc(&chassis_turn_pid, 0.0f, yaw_error);
