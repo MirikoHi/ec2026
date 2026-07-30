@@ -70,4 +70,5 @@ static float Chassis_AngleNormalize(float angle);
 static float Chassis_LimitAbs(float value, float limit);
 void Chassis_Set_Line(float position);
 static void Chassis_Test_Line(void);
+static uint8_t Chassis_SemiCircle(float radius_m, float speed_mps, int direction);
 #endif

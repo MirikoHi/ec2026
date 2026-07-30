@@ -71,7 +71,7 @@ void Chassis_Init(void)
 			.B_PORT = ENCODER_PORT,
 			.B_pin = ENCODER_ENC_B2_PIN,
 		},
-		.loop_mode = ANGLE_MODE,
+		.loop_mode = SPEED_MODE,
 		.speed_pid_config = {
 			.mode = PID_POSITION,
 			.Kp = 2000.0f,
@@ -113,7 +113,7 @@ void Chassis_Init(void)
 			.B_PORT = ENCODER_PORT,
 			.B_pin = ENCODER_ENC_B1_PIN,
 		},
-		.loop_mode = ANGLE_MODE,
+		.loop_mode = SPEED_MODE,
 		.speed_pid_config = {
 			.mode = PID_POSITION,
 			.Kp = 2000.0f,
@@ -140,9 +140,13 @@ void Chassis_Init(void)
 
 	chassis_param.line_distance_m[0] = 0.5f;
 	chassis_param.line_distance_m[1] = 0.5f;
+	chassis_param.line_done_err_m = 0.1f;
+	chassis_param.line_done_ticks = 20;
+	chassis_param.line_accel_m = 2.0f;
+	chassis_param.line_slowdown_m = 2.0f;
 	chassis_param.turn_angle_deg[0] = 90.0f;
-	chassis_param.turn_speed_mps = 0.5f;
-	chassis_param.action_speed_mps = 0.5f;
+	chassis_param.turn_speed_mps = 0.05f;
+	chassis_param.action_speed_mps = 0.05f;
 
 	// BMI088 陀螺仪初始化
 	IMU_Mahony_Init();
@@ -176,32 +180,31 @@ void Chassis(void)
 		}
 		chassis_last_mode = chassis_cmd_receive.Chassis_Mode;
 	}
-	if (robotcmd_control_state) {
-		switch(chassis_cmd_receive.Chassis_Mode)
-		{
-			case TRACE_MODE:
-				// 计算并设置巡线补偿量。
-				Chassis_Trace_Cal();
-				// 按设定路径执行巡线动作。
-				Chassis_State_Turn();
-				// 检测直行/转弯是否完成，并更新完成标志。
-				Stop_Detect();
-				break;
-			case IMU_MODE:
-				Chassis_ImuModeAction();
-				break;
-			case NORMAL_MODE:
-				// Chassis_Set_Turn();
-				break;
-			case POSITION_MODE:
-				break;
-			case REMOTE_MODE:
-				Chassis_RemoteControl();
-				//Chassis_ImuModeAction();
-				break;
-			default:
-				break;
-		}
+
+	switch(chassis_cmd_receive.Chassis_Mode)
+	{
+		case TRACE_MODE:
+			// 计算并设置巡线补偿量。
+			Chassis_Trace_Cal();
+			// 按设定路径执行巡线动作。
+			Chassis_State_Turn();
+			// 检测直行/转弯是否完成，并更新完成标志。
+			// Stop_Detect();
+			break;
+		case IMU_MODE:
+			Chassis_ImuModeAction();
+			break;
+		case NORMAL_MODE:
+			// Chassis_Set_Turn();
+			break;
+		case POSITION_MODE:
+			break;
+		case REMOTE_MODE:
+			// Chassis_RemoteControl();
+			//Chassis_ImuModeAction();
+			break;
+		default:
+			break;
 	}
 }
 
@@ -210,184 +213,108 @@ void Chassis(void)
  */
 static void Chassis_Trace_Cal(void) {
 	trace_compensation=Trace_task();
-	DCMotor_SetTraceCompensation(motor_l,-trace_compensation);
-	DCMotor_SetTraceCompensation(motor_r,trace_compensation);
+	DCMotor_SetTraceCompensation(motor_l,-2*trace_compensation);
+	DCMotor_SetTraceCompensation(motor_r,2*trace_compensation);
 }
 /**
  * @brief IMU_MODE 下的测试动作：按边长 0.2m 的正方形循环行走
+ */
+/**
+ * @brief IMU_MODE 下的测试动作：药丸形(体育场形)封闭路径
+ *
+ *  路径: 直线1.5m → 半圆R=0.5m右转 → 直线1.5m → 半圆R=0.5m右转 → 循环
+ *
+ *               直线 1.5m
+ *            ┌────────────┐
+ *           ↗              ↘
+ *   半圆 R=0.5m          半圆 R=0.5m
+ *   右转180°             右转180°
+ *           ↖              ↙
+ *            └────────────┘
+ *               直线 1.5m
  */
 static void Chassis_ImuModeAction(void)
 {
 	switch (chassis_imu_action_step)
 	{
 		case 0:
-			// 第一条边：使用 IMU yaw 做方向保持，直行 1.0m。
-			if (Chassis_MoveStraight(chassis_param.line_distance_m[0], chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
-			{
+			/* 第一条直线 1.5m */
+			if (Chassis_MoveStraight(1.5f, chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
 				chassis_imu_action_step = 1U;
-			}
-			else {
-				if (Chassis_GetForwardOdom()>0.7f)//大于0.7米时不再循迹
-				{
-					Trace_ResetLineError();
-					DCMotor_SetTraceCompensation(motor_l,0);
-					DCMotor_SetTraceCompensation(motor_r,0);
-				}
-				else {
-					Chassis_Trace_Cal();//小于0.7继续循迹
-					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
-						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
-					}
-				}
-			}
 			break;
 		case 1:
-			// 第一次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(chassis_param.turn_angle_deg[0], chassis_param.turn_speed_mps) == CHASSIS_ACTION_DONE)
-			{
+			/* 第一个半圆 R=0.5m 右转 180° */
+			if (Chassis_SemiCircle(0.5f, chassis_param.action_speed_mps, 1) == CHASSIS_ACTION_DONE)
 				chassis_imu_action_step = 2U;
-			}
 			break;
 		case 2:
-			// 第二条边：直行 1.0m。
-			if (Chassis_MoveStraight(chassis_param.line_distance_m[1], chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
-			{
+			/* 第二条直线 1.5m (反向, 因为 yaw 已转 180°) */
+			if (Chassis_MoveStraight(1.5f, chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
 				chassis_imu_action_step = 3U;
-			}
-			else {
-				if (Chassis_GetForwardOdom()>0.7f) {
-					Trace_ResetLineError();
-					DCMotor_SetTraceCompensation(motor_l,0);
-					DCMotor_SetTraceCompensation(motor_r,0);
-				}
-				else {
-					Chassis_Trace_Cal();//小于0.7继续循迹
-					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
-						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
-					}
-				}
-			}
 			break;
 		case 3:
-			// 第二次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(chassis_param.turn_angle_deg[1], chassis_param.turn_speed_mps) == CHASSIS_ACTION_DONE)
-			{
-				chassis_imu_action_step = 4U;
-			}
-			break;
-		case 4:
-			// 第三条边：直行 1.0m。
-			if (Chassis_MoveStraight(chassis_param.line_distance_m[2], chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
-			{
-				chassis_imu_action_step = 5U;
-			}
-			else {
-				if (Chassis_GetForwardOdom()>0.7f) {
-					Trace_ResetLineError();
-					DCMotor_SetTraceCompensation(motor_l,0);
-					DCMotor_SetTraceCompensation(motor_r,0);
-				}
-				else {
-					Chassis_Trace_Cal();//小于0.7继续循迹
-					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
-						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
-					}
-				}
-			}
-			break;
-		case 5:
-			// 第三次转角：原地转向 90 度。
-			if (Chassis_TurnAngle(chassis_param.turn_angle_deg[2], chassis_param.turn_speed_mps) == CHASSIS_ACTION_DONE)
-			{
-				chassis_imu_action_step = 6U;
-			}
-			break;
-		case 6:
-			// 第四条边：直行 1.0m。
-			if (Chassis_MoveStraight(chassis_param.line_distance_m[3], chassis_param.action_speed_mps) == CHASSIS_ACTION_DONE)
-			{
-				chassis_imu_action_step = 7U;
-			}
-			else {
-				if (Chassis_GetForwardOdom()>0.7f) {
-					Trace_ResetLineError();
-					DCMotor_SetTraceCompensation(motor_l,0);
-					DCMotor_SetTraceCompensation(motor_r,0);
-				}
-				else {
-					Chassis_Trace_Cal();//小于0.7继续循迹
-					if(Chassis_GetForwardOdom()>0.4f&&Chassis_GetForwardOdom()<0.5f) {
-						chassis_action_target_yaw = Chassis_GetYawDeg();//在0.4米到0.5米之间记录yaw角，作为循迹的目标角度
-					}
-				}
-			}
-			break;
-		case 7:
-			// 第四次转角完成后回到第一条边，形成正方形循环。
-			if (Chassis_TurnAngle(chassis_param.turn_angle_deg[3], chassis_param.turn_speed_mps) == CHASSIS_ACTION_DONE)
-			{
+			/* 第二个半圆 R=0.5m 右转 180° → 回到起点方向, 封闭路径 */
+			if (Chassis_SemiCircle(0.5f, chassis_param.action_speed_mps, 1) == CHASSIS_ACTION_DONE)
 				chassis_imu_action_step = 0U;
-			}
 			break;
 		default:
-			// 异常状态下复位到第一条边。
 			DC_Motor_SetRef(motor_l, 0.0f);
 			DC_Motor_SetRef(motor_r, 0.0f);
 			chassis_imu_action_step = 0U;
 			break;
 	}
 }
-
-static void Chassis_RemoteControl(void)
-{
-	// 遥控模式使用速度环，直接给左右轮差速速度。
-	motor_l->loop_mode = SPEED_MODE;
-	motor_r->loop_mode = SPEED_MODE;
-	// 计算差速轮输出。
-	float left_speed = chassis_cmd_receive.remote_forward - chassis_cmd_receive.remote_turn;
-	float right_speed = chassis_cmd_receive.remote_forward + chassis_cmd_receive.remote_turn;
-
-	motor_l->State = ENABLE;
-	motor_r->State = ENABLE;
-	Line_flag = 0;
-	Stop_Flag = 0;
-	Spin_start_flag = 0;
-	Spin_succeed_flag = 0;
-	DCMotor_SetTraceCompensation(motor_l, 0.0f);
-	DCMotor_SetTraceCompensation(motor_r, 0.0f);
-	Chassis_Trace_Cal();
-
-	if (remote_mode_active == 0U)
-	{
-		PID_clear(&motor_l->position_pid);
-		PID_clear(&motor_r->position_pid);
-		remote_mode_active = 1U;
-	}
-
-	DC_Motor_SetRef(motor_l, left_speed);
-	DC_Motor_SetRef(motor_r, right_speed);
-}
-
-static void Chassis_ClearRemoteSpeed(void)
-{
-	if (remote_mode_active == 0U)
-	{
-		return;
-	}
-
-	DC_Motor_SetRef(motor_l, 0.0f);
-	DC_Motor_SetRef(motor_r, 0.0f);
-}
-
-static void Chassis_RemoteLostDisable(void)
-{
-	// 无线终端离线时直接关闭电机输出，避免保持最后一次遥控量。
-	Chassis_ClearRemoteSpeed();
-	DC_Motor_SetRef(motor_l, 0.0f);
-	DC_Motor_SetRef(motor_r, 0.0f);
-	DCMotor_Cmd(motor_l, DISABLE);
-	DCMotor_Cmd(motor_r, DISABLE);
-}
+//
+// static void Chassis_RemoteControl(void)
+// {
+// 	// 遥控模式使用速度环，直接给左右轮差速速度。
+// 	motor_l->loop_mode = SPEED_MODE;
+// 	motor_r->loop_mode = SPEED_MODE;
+// 	// 计算差速轮输出。
+// 	float left_speed = chassis_cmd_receive.remote_forward - chassis_cmd_receive.remote_turn;
+// 	float right_speed = chassis_cmd_receive.remote_forward + chassis_cmd_receive.remote_turn;
+//
+// 	motor_l->State = ENABLE;
+// 	motor_r->State = ENABLE;
+// 	Line_flag = 0;
+// 	Stop_Flag = 0;
+// 	Spin_start_flag = 0;
+// 	Spin_succeed_flag = 0;
+// 	DCMotor_SetTraceCompensation(motor_l, 0.0f);
+// 	DCMotor_SetTraceCompensation(motor_r, 0.0f);
+// 	Chassis_Trace_Cal();
+//
+// 	if (remote_mode_active == 0U)
+// 	{
+// 		PID_clear(&motor_l->position_pid);
+// 		PID_clear(&motor_r->position_pid);
+// 		remote_mode_active = 1U;
+// 	}
+//
+// 	DC_Motor_SetRef(motor_l, left_speed);
+// 	DC_Motor_SetRef(motor_r, right_speed);
+// }
+//
+// static void Chassis_ClearRemoteSpeed(void)
+// {
+// 	if (remote_mode_active == 0U)
+// 	{
+// 		return;
+// 	}
+//
+// 	DC_Motor_SetRef(motor_l, 0.0f);
+// 	DC_Motor_SetRef(motor_r, 0.0f);
+// }
+//
+// static void Chassis_RemoteLostDisable(void)
+// {
+// 	// 无线终端离线时直接关闭电机输出，避免保持最后一次遥控量。
+// 	Chassis_ClearRemoteSpeed();
+// 	DC_Motor_SetRef(motor_l, 0.0f);
+// 	DC_Motor_SetRef(motor_r, 0.0f);
+// 	DCMotor_Cmd(motor_l, DISABLE);
+// 	DCMotor_Cmd(motor_r, DISABLE);
+// }
 
 /**
  * @brief 清除底盘自动动作状态，并将左右轮速度给定清零
@@ -411,7 +338,7 @@ void Chassis_ResetAction(void)
 }
 
 /**
- * @brief 按启动瞬间的 ICM42688 yaw 保持方向，直行指定距离
+ * @brief 按启动瞬间的  IMU yaw 保持方向，直行指定距离
  * @param distance_m 目标距离，单位 m，正数前进，负数后退
  * @param speed_mps 速度给定，单位 m/s，只取绝对值，方向由 distance_m 决定
  * @return CHASSIS_ACTION_DONE 表示完成，否则返回 CHASSIS_ACTION_RUNNING
@@ -462,8 +389,8 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps)
 	if (fabsf(remain) <= chassis_param.line_done_err_m)
 	{
 		chassis_action_done_count++;
-		DC_Motor_SetRef(motor_l, 0.0f);
-		DC_Motor_SetRef(motor_r, 0.0f);
+		// DC_Motor_SetRef(motor_l, 0.0f);
+		// DC_Motor_SetRef(motor_r, 0.0f);
 		if (chassis_action_done_count >= chassis_param.line_done_ticks)
 		{
 			Chassis_ResetAction();
@@ -583,6 +510,120 @@ uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed)
 
 	DC_Motor_SetRef(motor_l, turn_speed);
 	DC_Motor_SetRef(motor_r, -turn_speed);
+
+	return CHASSIS_ACTION_RUNNING;
+}
+
+/**
+ * @brief 走半圆曲线: 前进的同时连续转弯 180°, 轨迹为半径 R 的半圆
+ * @param radius_m   半圆半径, 单位 m
+ * @param speed_mps  前进线速度, 单位 m/s
+ * @param direction  转向方向: +1 = 右转(顺时针), -1 = 左转(逆时针)
+ * @return CHASSIS_ACTION_DONE 完成, 否则 CHASSIS_ACTION_RUNNING
+ *
+ * 工作原理:
+ *   1. 弧长 = π × R, yaw 变化 = 180°
+ *   2. 根据已走距离, 线性插值期望 yaw
+ *   3. 转向 PID 跟踪期望 yaw, 产生差速
+ *   4. 前进距离走完 + yaw 到位 → 完成
+ *
+ *                ┌──────────┐
+ *                │ 直线1.5m │
+ *                └──────────┘
+ *               ↗           ↘
+ *   半圆 R=0.5m              半圆 R=0.5m
+ *   右转 180°                右转 180°
+ *               ↖           ↙
+ *                ┌──────────┐
+ *                │ 直线1.5m │
+ *                └──────────┘
+ */
+
+static uint8_t Chassis_SemiCircle(float radius_m, float speed_mps, int direction)
+{
+	const float arc_length     = 3.1415926f * radius_m;
+	const float total_yaw_deg  = 180.0f * (float)direction;
+	float abs_speed = fabsf(speed_mps);
+	float yaw_error, turn_compensation;
+	float progress, remain, base_speed;
+
+	if (fabsf(radius_m) < 0.01f) return CHASSIS_ACTION_DONE;
+
+	/* 首次调用: 锁定目标距离和目标 yaw */
+	if ((chassis_action_active == 0U) || (chassis_action_type != 3U))
+	{
+		chassis_action_active = 1U;
+		chassis_action_type   = 3U;  /* type 3 = 半圆 */
+		chassis_action_done_count = 0U;
+		chassis_action_target_distance = Chassis_GetForwardOdom() + arc_length;
+		chassis_action_target_yaw = Chassis_AngleNormalize(
+			Chassis_GetYawDeg() + total_yaw_deg);
+
+		Chassis_ResetEncoderOdom();
+		PID_clear(&chassis_turn_pid);
+	}
+
+	motor_l->loop_mode = SPEED_MODE;
+	motor_r->loop_mode = SPEED_MODE;
+	motor_l->State = ENABLE;
+	motor_r->State = ENABLE;
+
+	progress = Chassis_GetForwardOdom();
+	remain   = chassis_action_target_distance - progress;
+	yaw_error = Chassis_AngleNormalize(
+		chassis_action_target_yaw - Chassis_GetYawDeg());
+
+	/* 完成判定: 距离走完 + yaw 偏差小于阈值 */
+	if (fabsf(remain) <= chassis_param.line_done_err_m &&
+	    fabsf(yaw_error) <= chassis_param.turn_done_err_deg)
+	{
+		chassis_action_done_count++;
+		DC_Motor_SetRef(motor_l, 0.0f);
+		DC_Motor_SetRef(motor_r, 0.0f);
+		if (chassis_action_done_count >= chassis_param.line_done_ticks)
+		{
+			Chassis_ResetAction();
+			return CHASSIS_ACTION_DONE;
+		}
+		return CHASSIS_ACTION_RUNNING;
+	}
+	chassis_action_done_count = 0U;
+
+	/* 前进速度 (含加速段和减速段) */
+	base_speed = abs_speed;
+	if ((chassis_param.line_accel_m > 0.001f) &&
+	    (progress < chassis_param.line_accel_m))
+	{
+		base_speed = chassis_param.line_min_speed_mps +
+			(abs_speed - chassis_param.line_min_speed_mps) *
+				progress / chassis_param.line_accel_m;
+	}
+	if ((chassis_param.line_slowdown_m > 0.001f) &&
+	    (fabsf(remain) < chassis_param.line_slowdown_m))
+	{
+		float sd = abs_speed * fabsf(remain) /
+		           chassis_param.line_slowdown_m;
+		if (sd < chassis_param.line_min_speed_mps)
+			sd = chassis_param.line_min_speed_mps;
+		if (sd < base_speed) base_speed = sd;
+	}
+
+	/* 线性插值期望 yaw: progress/arc_length → 0%~100% → yaw 从 0 到 180° */
+	float ratio = (arc_length > 0.001f) ? (progress / arc_length) : 0.0f;
+	if (ratio > 1.0f) ratio = 1.0f;
+	float expected_yaw = Chassis_AngleNormalize(
+		Chassis_AngleNormalize(chassis_action_target_yaw - total_yaw_deg) +
+		total_yaw_deg * ratio);
+	yaw_error = Chassis_AngleNormalize(expected_yaw - Chassis_GetYawDeg());
+
+	/* 转向 PID, 限幅防止翻车 */
+	float turn_limit = abs_speed * 0.6f;
+	if (turn_limit < 0.1f) turn_limit = 0.1f;
+	chassis_turn_pid.max_out = turn_limit;
+	turn_compensation = PID_calc(&chassis_turn_pid, 0.0f, yaw_error);
+
+	DC_Motor_SetRef(motor_l, base_speed + turn_compensation);
+	DC_Motor_SetRef(motor_r, base_speed - turn_compensation);
 
 	return CHASSIS_ACTION_RUNNING;
 }
@@ -709,10 +750,10 @@ void Chassis_Set_Line(float position)
 	Spin_succeed_flag = 0;
 	motor_l->encoder->total_count = 0;
 	motor_r->encoder->total_count = 0;
-	motor_l->position_pid.max_out = 0.03;
-	motor_l->position_pid.max_iout = 0.0;
-	motor_r->position_pid.max_out = 0.03;
-	motor_r->position_pid.max_iout = 0.0;
+	motor_l->position_pid.max_out = 0.03f;
+	motor_l->position_pid.max_iout = 0.0f;
+	motor_r->position_pid.max_out = 0.03f;
+	motor_r->position_pid.max_iout = 0.0f;
 
 	DC_Motor_SetRef(motor_l, position);
 	DC_Motor_SetRef(motor_r, position);
@@ -721,82 +762,84 @@ void Chassis_Set_Line(float position)
 void Chassis_State_Turn(void)
 {
 
-	static uint8_t quan=0;
-	switch(state)
-	{
-		case 0:
-			if(quan < chassis_cmd_receive.circle_set)
-			{
-				state ++;
-				Chassis_Set_Line(0.08);
-			}
-		break;
-		case 1:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 2:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.082);
-				state ++;
-			}
-		break;
-		case 3:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 4:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.082);
-				state ++;
-			}
-		break;
-			case 5:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-			case 6:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.082);
-				state ++;
-			}
-		break;
-			case 7:
-			if(Stop_Flag)
-			{
-				Chassis_Set_Turn();
-				state ++;
-			}
-		break;
-		case 8:
-			if(Spin_succeed_flag)
-			{
-				Chassis_Set_Line(0.01);
-				state ++;
-			}
-		break;
-		case 9:
-			if(Stop_Flag)
-			{
-				quan ++;
-				state = 0;
-			}
-		break;
-		default:
-			break;
-	}
+	// static uint8_t quan=0;
+	DC_Motor_SetRef(motor_l, 0.05f);
+	DC_Motor_SetRef(motor_r, 0.05f);
+	// switch(state)
+	// {
+	// 	case 0:
+	// 		if(quan < chassis_cmd_receive.circle_set)
+	// 		{
+	// 			state ++;
+	// 			Chassis_Set_Line(0.08);
+	// 		}
+	// 	break;
+	// 	case 1:
+	// 		if(Stop_Flag)
+	// 		{
+	// 			Chassis_Set_Turn();
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 	case 2:
+	// 		if(Spin_succeed_flag)
+	// 		{
+	// 			Chassis_Set_Line(0.082);
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 	case 3:
+	// 		if(Stop_Flag)
+	// 		{
+	// 			Chassis_Set_Turn();
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 	case 4:
+	// 		if(Spin_succeed_flag)
+	// 		{
+	// 			Chassis_Set_Line(0.082);
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 		case 5:
+	// 		if(Stop_Flag)
+	// 		{
+	// 			Chassis_Set_Turn();
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 		case 6:
+	// 		if(Spin_succeed_flag)
+	// 		{
+	// 			Chassis_Set_Line(0.082);
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 		case 7:
+	// 		if(Stop_Flag)
+	// 		{
+	// 			Chassis_Set_Turn();
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 	case 8:
+	// 		if(Spin_succeed_flag)
+	// 		{
+	// 			Chassis_Set_Line(0.01);
+	// 			state ++;
+	// 		}
+	// 	break;
+	// 	case 9:
+	// 		if(Stop_Flag)
+	// 		{
+	// 			quan ++;
+	// 			state = 0;
+	// 		}
+	// 	break;
+	// 	default:
+	// 		break;
+	// }
 }
 static uint8_t testtt;
 void Motor_Cmd_CallBack(uint8_t i)

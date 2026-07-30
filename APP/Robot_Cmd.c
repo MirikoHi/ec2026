@@ -72,12 +72,6 @@ void Robot_Cmd(void)
 
 	if (Licheervnano_status == ONLINE) {
 		switch (LicheeRec_Frame.cmdid) {
-			case 0:  // 上位机下线
-				chassis_cmd_send.remote_lost = 1;
-				last_chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
-				chassis_cmd_send.remote_forward = 0.0f;
-				robotcmd_control_state = MENU_CTL;
-				break;
 			case 1:  // 上位机上线
 				chassis_cmd_send.remote_lost = 0;
 				robotcmd_control_state = REMOTE_CTL;
@@ -105,7 +99,10 @@ void Robot_Cmd(void)
 		}
 	}
 	else {
-
+		chassis_cmd_send.remote_lost = 1;
+		last_chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
+		chassis_cmd_send.remote_forward = 0.0f;
+		robotcmd_control_state = MENU_CTL;
 	}
 
 	// draw_sin();
