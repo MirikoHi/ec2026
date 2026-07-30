@@ -88,6 +88,8 @@ static uint8_t chassis_finish_beep_count = 0U;        /* 成功提示已经完�
 static uint8_t chassis_finish_beep_level = 0U;        /* 当前蜂鸣器输出状态：0关闭，1打开 */
 static float chassis_finish_beep_change_time = 0.0f;  /* 下一次切换蜂鸣器状态的时间戳(s) */
 
+static uint8_t chassis_task3_init_done = 0U;          /* 任务3滚球的初始状态机是否已经完成初始化 */
+
 float IMU_data[3] = {0};
 volatile JY901s_IMU_Data_s* JY901s_IMU_Data;
 
@@ -265,6 +267,7 @@ void Chassis(void)
 	{
 		chassis_last_task_start_seq = chassis_cmd_receive.task_start_seq;
 		chassis_emergency_stop_requested = 0U;
+		chassis_task3_init_done = 0U;
 		Chassis_ResetAction();
 		chassis_imu_action_step = 0U;
 	}
@@ -326,14 +329,31 @@ void Chassis(void)
 
 			break;
 		case POSITION_MODE:
-			DCMotor_SetTraceCompensation(motor_l, 0.0f);
-			DCMotor_SetTraceCompensation(motor_r, 0.0f);
-			motor_l->loop_mode = SPEED_MODE;
-			motor_r->loop_mode = SPEED_MODE;
-			DC_Motor_SetRef(motor_l, 0.0f);
-			DC_Motor_SetRef(motor_r, 0.0f);
-			DCMotor_Cmd(motor_l, DISABLE);
-			DCMotor_Cmd(motor_r, DISABLE);
+			if (chassis_cmd_receive.competition_task == H_TASK_3_STATIC_BALL){
+				DCMotor_SetTraceCompensation(motor_l, 0.0f);
+				DCMotor_SetTraceCompensation(motor_r, 0.0f);
+				motor_l->loop_mode = SPEED_MODE;
+				motor_r->loop_mode = SPEED_MODE;
+				DC_Motor_SetRef(motor_l, 0.0f);
+				DC_Motor_SetRef(motor_r, 0.0f);
+				DCMotor_Cmd(motor_l, DISABLE);
+				DCMotor_Cmd(motor_r, DISABLE);
+
+				// 完成任务三后	K230 发送 chassis_emergency_stop_requested = 1
+				if (chassis_emergency_stop_requested != 0U)
+				{
+					chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
+					chassis_stadium_timer_running = 0U;
+				}
+				if (chassis_task3_init_done == 0U)
+				{
+					chassis_task3_init_done = 1U;
+					chassis_stadium_start_time_s = DWT_GetTimeline_s();
+					chassis_stadium_elapsed_s = 0.0f;
+					chassis_stadium_timer_running = 1U;
+				}
+				return;
+			}
 			break;
 		case REMOTE_MODE:
 			Chassis_RemoteControl();
