@@ -77,7 +77,7 @@ static void Slide_Control_Init(void)
         .mode    = PID_POSITION,
         .Kp      = 0.085f,     /* 比例: 每像素误差产生多少度倾角 */
         .Kd      = 0.04f,     /* 微分: 抑制震荡 */
-        .Ki      = 0.01f,     /* 积分: 消除静差 */
+        .Ki      = 0.02f,     /* 积分: 消除静差 */
         .max_out = SLIDE_SERVO_RANGE,
         .max_iout = 10.0f,
     };
