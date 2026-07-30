@@ -47,18 +47,18 @@ ServoInstance*  servo_yaw;
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
 
-float SLIDE_TARGET_X   =  120.00f ;    /* 目标位置: 画面中心 (640/2) */
+float SLIDE_TARGET_X   =  310.00f ;    /* 目标位置: 画面中心 (640/2) */
 uint32_t motor_zero_point =  0;
 #define SLIDE_SERVO_RANGE      60     /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.3f   /* 速度前馈增益 */
+#define SLIDE_VEL_FF_GAIN      0.25f   /* 速度前馈增益 */
 #define SLIDE_X_LPF_ALPHA      0.25f   /* X坐标低通滤波系数，越小越平滑 */
 
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
-	.Kp      = 0.09f,     /* 比例: 每像素误差产生多少度倾角 */
-	.Kd      = 0.001f,     /* 微分: 抑制震荡 */
-	.Ki      = 0.02f,     /* 积分: 消除静差 */
+	.Kp      = 0.088f,     /* 比例: 每像素误差产生多少度倾角 */
+	.Kd      = 0.05f,     /* 微分: 抑制震荡 */
+	.Ki      = 0.0055f,     /* 积分: 消除静差 */
 	.max_out = SLIDE_SERVO_RANGE,
 	.max_iout = 30.0f,
 };
@@ -153,7 +153,7 @@ static void Slide_Control_Run(void)
 	uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
 	uint8_t dir = pulses >= 0 ? 1 : 0;
 
-    ZDT_Emm_Pos_Control(1, dir, 10, 0, (uint32_t)pulse_count, 1, false);
+    ZDT_Emm_Pos_Control(1, dir, 2000, 254, (uint32_t)pulse_count, 1, false);
 }
 
 
@@ -185,7 +185,7 @@ void Gimbal_Init(void)
 	Slide_Control_Init();
 
 	DWT_Delay(1);
-	ZDT_Emm_Pos_Control(1, 1, 10, 0, 0, 1, false);
+	ZDT_Emm_Pos_Control(1, 1, 2000, 250, 0, 1, false);
 }
 
 
