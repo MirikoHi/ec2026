@@ -75,35 +75,17 @@ void RobotCmd_Init(void)
 void Robot_Cmd(void) {
 	xQueueReceive(trace_fetch_data_queue, &trace_fetch_data, 1);
 	LicheeRec_Frame = LicheeRec_GetFrame();
-	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_Frame.cmdid,LicheeRec_Frame.data);
+	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_Frame.slider_length_cm,
+	                                                LicheeRec_Frame.relative_position);
 
 	if (Licheervnano_status == ONLINE) {
-		switch (LicheeRec_Frame.cmdid) {
-			case 1:  // 上位机上线
-				chassis_cmd_send.remote_lost = 0;
-				robotcmd_control_state = REMOTE_CTL;
-				chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
-				last_chassis_cmd_send.Chassis_Mode = chassis_cmd_send.Chassis_Mode;
-				break;
-			case 2:
-				chassis_cmd_send.remote_forward = LicheeRec_Frame.data;
-				break;
-			case 3:
-				chassis_cmd_send.remote_forward = -LicheeRec_Frame.data;
-				break;
-			case 5:  // 心跳时，延续底盘模式
-				chassis_cmd_send.Chassis_Mode = last_chassis_cmd_send.Chassis_Mode;
-				break;
-			case 6:  // 遥控控制模式
-				chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
-				last_chassis_cmd_send.Chassis_Mode = chassis_cmd_send.Chassis_Mode;
-				break;
-			case 7:  // IMU控制模式
-				chassis_cmd_send.Chassis_Mode = IMU_MODE;
-				break;
-			default:
-				break;
-		}
+		chassis_cmd_send.remote_lost = 0;
+		robotcmd_control_state = REMOTE_CTL;
+		chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
+		last_chassis_cmd_send.Chassis_Mode = chassis_cmd_send.Chassis_Mode;
+
+		/* 使用滑槽长度和相对位置进行遥控控制 */
+		chassis_cmd_send.remote_forward = LicheeRec_Frame.relative_position;
 	}
 	else {
 		chassis_cmd_send.remote_lost = 1;
