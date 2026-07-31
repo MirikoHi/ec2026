@@ -1,4 +1,6 @@
 #include "Gimbal.h"
+
+#include "Chassis.h"
 #include "ZDT_Motor.h"
 #include "ZDT_Emm.h"
 #include "Robot_cmd.h"
