@@ -51,17 +51,17 @@ extern Chassis_Move_State_e car_stop;
 
 static float slide_target_x   =  250.00f ;    /* 目标位置: 画面中心 (640/2) */
 uint32_t motor_zero_point =  0;
-#define SLIDE_SERVO_RANGE      100     /* 最大角度范围，需保证一次循环能转完 */
+#define SLIDE_SERVO_RANGE      60    /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.3f   /* 速度前馈增益 */
-#define SLIDE_X_LPF_ALPHA      0.25f   /* X坐标低通滤波系数，越小越平滑 */
+#define SLIDE_VEL_FF_GAIN      0.5f   /* 速度前馈增益 */
+#define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
 #define SLIDE_ACC_GAIN         50.00f
 
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
-	.Kp      = 0.088f,     /* 比例: 每像素误差产生多少度倾角 */
-	.Kd      = 0.0085f,     /* 微分: 抑制震荡 */
-	.Ki      = 0.05f,     /* 积分: 消除静差 */
+	.Kp      = 0.123f,     /* 比例: 每像素误差产生多少度倾角 */
+	.Kd      = 0.0123f,     /* 微分: 抑制震荡 */
+	.Ki      = 0.00156f,     /* 积分: 消除静差 */
 	.max_out = SLIDE_SERVO_RANGE,
 	.max_iout = 30.0f,
 };
@@ -198,7 +198,7 @@ void Gimbal_Init(void)
 	Slide_Control_Init();
 
 	DWT_Delay(1);
-	ZDT_Emm_Pos_Control(1, 1, 2000, 250, 0, 1, false);
+	ZDT_Emm_Pos_Control(1, 1, 2000, 253, 0, 1, false);
 }
 
 static uint8_t change_flag1 = 0;
