@@ -727,14 +727,14 @@ static MenuInstance* single_menu_init(MenuInitConfig_s *config,MenuInstance *pre
  * @note   该函数应由 FreeRTOS 任务周期调用，典型调度周期为 10~20ms
  * @note   按键索引映射：0=前进, 1=向下, 2=向上, 3=后退（由 Key_Check 参数决定）
  */
-void menu_task(void)
-{
+void menu_task(void) {
 	uint8_t item_count;
 	uint8_t selected_idx;
 
 	/* ── 底盘模式已选中 → 隐藏菜单, 绘制任务信息, 仅响应后退键 ── */
 	if (chassis_mode_selected) {
-		if (Key_Check(1, KEY_SINGLE)) {   /* 按键 2 (后退) 返回菜单 */
+		if (Key_Check(3, KEY_SINGLE)) {   /* 按键 2 (后退) 返回菜单 */
+			Reset_task();
 			chassis_mode_selected = false;
 			menu_redraw();
 			return;
@@ -778,76 +778,77 @@ void menu_task(void)
 			}
 			now_menu = now_menu->next_menu[selected_idx];
 			menu_set_selection(0U);
-			menu_redraw();
+			if (!chassis_mode_selected) { menu_redraw(); }
 		}
 		else if(now_menu->callback[selected_idx])//如果是最后一级且存在回调函数就调用回调函数
 		{
 			now_menu->callback[selected_idx](selected_idx);
-			menu_redraw();
-		}
+			if (!chassis_mode_selected) { menu_redraw(); }
 		
+		}
 	}
 	else if(Key_Check(3,KEY_SINGLE))//后退
-	{
-		if(now_menu->pre_menu==NULL)//第一级不做处理
 		{
-			
-		}
-		else
-		{
-			uint8_t previous_idx = now_menu->pre_idx;
-			now_menu = now_menu->pre_menu;
-			menu_set_selection(previous_idx);
-			menu_redraw();
-		}
-	}
-	else if(Key_Check(2,KEY_SINGLE|KEY_REPEAT))//向上
-	{
-		if(row_idx>0)
-		{
-			uint8_t old_row = row_idx;
-			row_idx--;
-			menu_switch_highlight(old_row, upper_limit_row_idx, row_idx, upper_limit_row_idx);
-		}
-		else if(row_idx==0)
-		{
-			if(upper_limit_row_idx>0)
+			if(now_menu->pre_menu==NULL)//第一级不做处理
 			{
-				lower_limit_row_idx--;
-				upper_limit_row_idx--;
+
+			}
+			else
+			{
+				uint8_t previous_idx = now_menu->pre_idx;
+				now_menu = now_menu->pre_menu;
+				menu_set_selection(previous_idx);
 				menu_redraw();
 			}
-			else if(item_count > 0U)
-			{
-				uint8_t start_row = row_idx;
-				menu_set_selection((uint8_t)(item_count - 1U));
-				menu_redraw_with_animation(start_row);
-			}
 		}
-	}
-	else if(Key_Check(1,KEY_SINGLE|KEY_REPEAT))//向下
-	{
-		if(row_idx<row_max_idx)
+		else if(Key_Check(2,KEY_SINGLE|KEY_REPEAT))//向上
 		{
-			uint8_t old_row = row_idx;
-			row_idx++;
-			menu_switch_highlight(old_row, upper_limit_row_idx, row_idx, upper_limit_row_idx);
+			if(row_idx>0)
+			{
+				uint8_t old_row = row_idx;
+				row_idx--;
+				menu_switch_highlight(old_row, upper_limit_row_idx, row_idx, upper_limit_row_idx);
+			}
+			else if(row_idx==0)
+			{
+				if(upper_limit_row_idx>0)
+				{
+					lower_limit_row_idx--;
+					upper_limit_row_idx--;
+					menu_redraw();
+				}
+				else if(item_count > 0U)
+				{
+					uint8_t start_row = row_idx;
+					menu_set_selection((uint8_t)(item_count - 1U));
+					menu_redraw_with_animation(start_row);
+				}
+			}
 		}
-		else if(row_idx==row_max_idx)
+		else if(Key_Check(1,KEY_SINGLE|KEY_REPEAT))//向下
 		{
-			if((lower_limit_row_idx<(MAX_MENU_NUM-1))&&(now_menu->string[lower_limit_row_idx+1]!=NULL))
+			if(row_idx<row_max_idx)
 			{
-				lower_limit_row_idx++;
-				upper_limit_row_idx++;
-				menu_redraw();
+				uint8_t old_row = row_idx;
+				row_idx++;
+				menu_switch_highlight(old_row, upper_limit_row_idx, row_idx, upper_limit_row_idx);
 			}
-			else if(item_count > 0U)
+			else if(row_idx==row_max_idx)
 			{
-				uint8_t start_row = row_idx;
-				menu_set_selection(0U);
-				menu_redraw_with_animation(start_row);
+				if((lower_limit_row_idx<(MAX_MENU_NUM-1))&&(now_menu->string[lower_limit_row_idx+1]!=NULL))
+				{
+					lower_limit_row_idx++;
+					upper_limit_row_idx++;
+					menu_redraw();
+				}
+				else if(item_count > 0U)
+				{
+					uint8_t start_row = row_idx;
+					menu_set_selection(0U);
+					menu_redraw_with_animation(start_row);
+				}
 			}
 		}
-	}
-	menu_process_refresh_step();
+		menu_process_refresh_step();
 }
+

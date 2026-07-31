@@ -169,7 +169,9 @@ static void Slide_Control_Run(void)
 	uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
 	uint8_t dir = pulses >= 0 ? 1 : 0;
 
-    ZDT_Emm_Pos_Control(1, dir, 20, 0, (uint32_t)pulse_count, 1, false);
+	uint8_t speed = pulse_count >= 100 ? 30 : 20;
+
+    ZDT_Emm_Pos_Control(1, dir, speed, 0, (uint32_t)pulse_count, 1, false);
 }
 
 
@@ -226,11 +228,12 @@ void Gimbal(void)
 		}
 		if (count1 > 60 && change_flag1) {
 			count1 = 0;
-			slide_target_x = 432;
+			slide_target_x = 440;
 			change_flag2 = 1;
 		}
 		if (count2 > 90  && change_flag2) {
 			car_stop = 1;
+			count2 = 0;
 		}
 	}
 	else if (gimbal_cmd_receive.task_flag == 0) {  //不在执行任务三时将小球归中
