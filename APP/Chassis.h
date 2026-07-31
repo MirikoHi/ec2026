@@ -20,6 +20,7 @@
 #define CHASSIS_ARC_ANGLE_DEG 180.0f									/* 半圆理论转角，单位deg。 */
 #define CHASSIS_FINAL_APPROACH_SPEED 0.08f								/* 漏检时搜索A线的低速，单位m/s。 */
 #define CHASSIS_FINAL_MAX_DIST_M 0.50f									/* 漏检保护最多额外前进距离，单位m。 */
+#define CHASSIS_TASK4_STOP_ARC_M 0.40f									/* 任务4通过B点后沿半圆继续行驶的弧长，单位m；从B点起算。 */
 #define CHASSIS_START_LINE_SENSORS 4U									/* 判定横向A线所需的连续黑色探头数。 */
 #define CHASSIS_LINE_DETECT_DEBOUNCE 3U									/* 横线连续确认周期数。 */
 #define CHASSIS_PI 3.14159265f											/* 圆周率，用于弧长和航向换算。 */
@@ -45,7 +46,7 @@ typedef enum {
     CHASSIS_STADIUM_ARC_1,          /* B到C半圆。 */
     CHASSIS_STADIUM_STRAIGHT_2,     /* C到D直线。 */
     CHASSIS_STADIUM_ARC_2,          /* D到A半圆。 */
-    CHASSIS_STADIUM_FINISH_BRAKE,   /* 圆弧结束后的终点搜索。 */
+    CHASSIS_STADIUM_FINISH_BRAKE,   /* 任务4：通过B点后沿半圆减速停车。 */
     CHASSIS_STADIUM_STOP            /* 停车并保持零速度。 */
 } Chassis_Stadium_Step_e;
 #define CHASSIS_LENGTH_TO_CENTER 0.166 //PAW3395到车体中心的距离,单位m //PAW3395���������ľ���,��λm

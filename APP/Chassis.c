@@ -330,33 +330,6 @@ void Chassis(void)
 
 			break;
 		case POSITION_MODE:
-#if 0 /* 任务三已由 Gimbal 代替（K230 task_flag 发送 + 0xAE 结束计时），本 case 无需实现 */
-			if (chassis_cmd_receive.competition_task == H_TASK_3_STATIC_BALL){
-				DCMotor_SetTraceCompensation(motor_l, 0.0f);
-				DCMotor_SetTraceCompensation(motor_r, 0.0f);
-				motor_l->loop_mode = SPEED_MODE;
-				motor_r->loop_mode = SPEED_MODE;
-				DC_Motor_SetRef(motor_l, 0.0f);
-				DC_Motor_SetRef(motor_r, 0.0f);
-				DCMotor_Cmd(motor_l, DISABLE);
-				DCMotor_Cmd(motor_r, DISABLE);
-
-				// 完成任务三后	K230 发送 chassis_emergency_stop_requested = 1
-				if (chassis_emergency_stop_requested != 0U)
-				{
-					chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
-					chassis_stadium_timer_running = 0U;
-				}
-				if (chassis_task3_init_done == 0U)
-				{
-					chassis_task3_init_done = 1U;
-					chassis_stadium_start_time_s = DWT_GetTimeline_s();
-					chassis_stadium_elapsed_s = 0.0f;
-					chassis_stadium_timer_running = 1U;
-				}
-				return;
-			}
-#endif
 			break;
 		case REMOTE_MODE:
 			Chassis_RemoteControl();
@@ -741,7 +714,6 @@ static void Chassis_StadiumControl(void)
 				if ((chassis_stadium_step == CHASSIS_STADIUM_STRAIGHT_1) &&
 				    (chassis_stadium_task == H_TASK_4_AB_BALL))
 				{
-					chassis_stadium_finish_line_latched = 1U;
 					Chassis_StadiumEnterStep(CHASSIS_STADIUM_FINISH_BRAKE);
 				}
 				else
@@ -862,17 +834,41 @@ static void Chassis_StadiumControl(void)
 
 		case CHASSIS_STADIUM_FINISH_BRAKE:
 		{
-			/* 该状态仅兼容旧任务；新跑道逻辑不再搜索，进入即停车并持续报警。 */
-			Chassis_StadiumStartFinishBeep(0U);
-			chassis_stadium_speed_cmd = 0.0f;
-			chassis_stadium_accel_cmd = 0.0f;
-			chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
-			chassis_stadium_timer_running = 0U;
-			DCMotor_SetTraceCompensation(motor_l, 0.0f);
-			DCMotor_SetTraceCompensation(motor_r, 0.0f);
-			DC_Motor_SetRef(motor_l, 0.0f);
-			DC_Motor_SetRef(motor_r, 0.0f);
-			Chassis_StadiumEnterStep(CHASSIS_STADIUM_STOP);
+			/* 任务4专用：通过B点后沿半圆继续行驶，按平方根减速曲线逐渐减速停车。
+			 * 停车弧长从B点起算：切弧发生在探头到达B（轴线距B还有CHASSIS_TRACE_FORWARD_OFFSET_M），
+			 * 因此段内停车点 = 探头前置距离 + 任务要求的B点后弧长。 */
+			float stop_segment = CHASSIS_TRACE_FORWARD_OFFSET_M + CHASSIS_TASK4_STOP_ARC_M;
+			float remaining = stop_segment - segment_distance;
+			float target_speed;
+
+			/* 最后4 cm直接撤销速度给定，避免速度规划器的惯性拖过停车点。 */
+			if (remaining <= 0.04f)
+			{
+				DCMotor_SetTraceCompensation(motor_l, 0.0f);
+				DCMotor_SetTraceCompensation(motor_r, 0.0f);
+				DC_Motor_SetRef(motor_l, 0.0f);
+				DC_Motor_SetRef(motor_r, 0.0f);
+				chassis_stadium_speed_cmd = 0.0f;
+				chassis_stadium_accel_cmd = 0.0f;
+				chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
+				chassis_stadium_timer_running = 0U;
+				Chassis_StadiumStartFinishBeep(1U);
+				Chassis_StadiumEnterStep(CHASSIS_STADIUM_STOP);
+				break;
+			}
+
+			/* 平方根减速曲线；0.65系数给jerk限制和实车惯性留余量，最低速度克服低速静摩擦。 */
+			target_speed = 0.65f * sqrtf(2.0f * CHASSIS_STADIUM_MAX_DECEL * remaining);
+			if (target_speed > arc_speed) target_speed = arc_speed;
+			if (target_speed < CHASSIS_FAST_FINISH_SPEED) target_speed = CHASSIS_FAST_FINISH_SPEED;
+
+			/* 经jerk限制后的实际中心速度指令，航向沿B→C半圆继续变化。 */
+			center_speed = Chassis_StadiumUpdateSpeed(target_speed);
+			float arc_angle = segment_distance / CHASSIS_ARC_RADIUS_M * (180.0f / CHASSIS_PI);
+			if (arc_angle > CHASSIS_ARC_ANGLE_DEG) arc_angle = CHASSIS_ARC_ANGLE_DEG;
+			target_yaw = Chassis_AngleNormalize(chassis_stadium_initial_yaw +
+			                                    CHASSIS_CLOCKWISE_YAW_SIGN * arc_angle);
+			Chassis_StadiumSetDrive(center_speed, 1.0f / CHASSIS_ARC_DRIVE_RADIUS_M, target_yaw);
 			break;
 		}
 
