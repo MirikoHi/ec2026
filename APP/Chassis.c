@@ -233,7 +233,7 @@ void Chassis(void)
 			imu_path_cumulative = motor_l->position_measure +  motor_r->position_measure;  //行驶里程
 
 			float current_speed = (motor_l->speed_measure + motor_r->speed_measure) / 2.0f;
-			float remain = 11.4678f - imu_path_cumulative;  //剩余里程
+			float remain = 11.6678f - imu_path_cumulative;  //剩余里程
 			float base_speed = 0.0f;  //行驶速度
 			switch (chassis_cmd_receive.task_flag) {
 				case 2:  //任务二
@@ -243,27 +243,27 @@ void Chassis(void)
 					//起步加速阶段
 					if (acc_count_change_flag == 0) {
 						acc_count++;
-						base_speed = 0.0005f * acc_count;
+						base_speed = 0.000125f * acc_count;
 					}
-					if (acc_count > 160) {
+					if (acc_count > 480) {
 						acc_count_change_flag = 1;
 						// acc_count = 0;
-						base_speed = 0.08f;
+						base_speed = 0.06f;
 					}
 					//匀速行驶阶段
 					if (fabsf(imu_path_cumulative) >= 5.2f && fabsf(remain) >= 0.8f) {
-						base_speed = 0.08f;
+						base_speed = 0.06f;
 					}
 					//缓停，停车段
-					if (fabsf(remain) < 0.8 ){
+					if (fabsf(remain) < 1.2 ){
 						// 停止线 → 停车或执行下一动作
-						base_speed = 0.1f*fabsf(remain);
+						base_speed = 0.05f*fabsf(remain);
 						if (Gray_Is_StopLine(gray_data) && fabsf(remain) < 0.01f) {
 							car_stop = 1;
 							base_speed = 0.0f;
 						}
 					}
-					base_speed = (base_speed > 0.08f) ? 0.08f : base_speed;
+					base_speed = (base_speed > 0.06f) ? 0.06f : base_speed;
 					Chassis_Trace_Cal(base_speed);
 					break;
 				default:
