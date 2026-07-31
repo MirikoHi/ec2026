@@ -10,6 +10,7 @@ void Chassis_Init(void);
 
 DCMotorInstance *get_motor_l_instance();
 DCMotorInstance *get_motor_r_instance();
+
 void Motor_Cmd_CallBack(uint8_t i);
 
 void Chassis_get_init_angle(void);
@@ -21,6 +22,13 @@ typedef enum {
 	Chassis_running,
 	Chassis_Stop,
 }Chassis_Move_State_e;
+
+typedef enum {
+	Chassis_IDLE,
+	Chassis_Launching,
+	Chassis_Moving,
+	Chassis_Stoping,
+} Chassis_State_Flag_To_Gimbal_e;
 
 /* 当前比赛动作预留 4 段直线和 4 次转弯，后续扩展需要同步提升版本号。 */
 #define FLASH_PARAM_LINE_SEGMENT_COUNT  4U
@@ -81,4 +89,7 @@ static float Chassis_LimitAbs(float value, float limit);
 void Chassis_Set_Line(float position);
 static void Chassis_Test_Line(void);
 static uint8_t Chassis_SemiCircle(float radius_m, float speed_mps, int direction);
+
+Chassis_State_Flag_To_Gimbal_e get_chassis_current_state(void);
+
 #endif

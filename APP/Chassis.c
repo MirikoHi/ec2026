@@ -61,6 +61,11 @@ float IMU_data[3] = {0};
 extern State robotcmd_control_state;
 Chassis_Move_State_e car_stop=0;
 
+Chassis_State_Flag_To_Gimbal_e Chassis_current_state = Chassis_IDLE;
+Chassis_State_Flag_To_Gimbal_e get_chassis_current_state(void) {
+	return Chassis_current_state;
+}
+
 DCMotorInstance *get_motor_l_instance() {
 	return motor_l;
 }
@@ -269,12 +274,14 @@ void Chassis(void)
 					break;
 				case 5:  //任务5，钢球置于中心点走一圈
 					//起步加速阶段
-					if (!acc_count_change_flag1) {
+					if (acc_count_change_flag == 0) {
+						Chassis_current_state = Chassis_Launching;
 						acc_count++;
 						base_speed = 0.000125f * acc_count;
 					}
 					if (acc_count > 480) {
-						acc_count_change_flag1 = 1;
+						Chassis_current_state = Chassis_Moving;
+						acc_count_change_flag = 1;
 						// acc_count = 0;
 						base_speed = 0.06f;
 					}
@@ -292,10 +299,14 @@ void Chassis(void)
 						}
 						if (base_speed < 0.0f){
 							base_speed = 0.0f;
+						Chassis_current_state = Chassis_Stoping;
+						// 停止线 → 停车或执行下一动作
+						base_speed = 0.05f*fabsf(remain);
 						if (Gray_Is_StopLine(gray_data) && fabsf(remain) < 0.01f) {
 							car_stop = 1;
 							base_speed = 0.0f;
 							acc_count = 0;
+							Chassis_current_state = Chassis_IDLE;
 						}
 					}
 					base_speed = (base_speed > 0.06f) ? 0.06f : base_speed;
