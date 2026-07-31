@@ -200,7 +200,8 @@ void Chassis_Init(void)
  * @brief 底盘主任务，根据菜单模式执行对应动作
  */
 uint16_t acc_count = 0;
-uint8_t acc_count_change_flag = 0;
+uint8_t acc_count_change_flag1 = 0;
+uint8_t acc_count_change_flag2 = 0;
 void Chassis(void)
 {
 	// 接收 Robot_Cmd 发来的底盘控制命令。
@@ -239,28 +240,62 @@ void Chassis(void)
 				case 2:  //任务二
 					Chassis_Trace_Cal(0.1f);
 					break;
+				case 4:  //任务4，钢球置于中心点走AB线段
+					//起步加速阶段
+					if (acc_count_change_flag1 == 0) {
+						acc_count++;
+						base_speed = 0.000091f * acc_count;
+					}
+					if (acc_count > 440) {
+						acc_count_change_flag1 = 1;
+						// acc_count = 0;
+						base_speed = 0.04f;
+					}
+					//匀速行驶阶段
+					if (fabsf(imu_path_cumulative) >= 3.2f && fabsf(remain) >= 1.2f) {
+						base_speed = 0.04f;
+					}
+					//缓停，停车段
+					if (fabsf(remain) < 1.2f ){
+						// 停止线 → 停车或执行下一动作
+						base_speed = 0.03333f*fabsf(remain);
+						if (Gray_Is_StopLine(gray_data) && fabsf(remain) < 0.005f) {
+							car_stop = 1;
+							base_speed = 0.0f;
+						}
+					}
+					base_speed = (base_speed > 0.04f) ? 0.04f : base_speed;
+					Chassis_Trace_Cal(base_speed);
+					break;
 				case 5:  //任务5，钢球置于中心点走一圈
 					//起步加速阶段
-					if (acc_count_change_flag == 0) {
+					if (!acc_count_change_flag1) {
 						acc_count++;
 						base_speed = 0.000125f * acc_count;
 					}
 					if (acc_count > 480) {
-						acc_count_change_flag = 1;
+						acc_count_change_flag1 = 1;
 						// acc_count = 0;
 						base_speed = 0.06f;
 					}
 					//匀速行驶阶段
-					if (fabsf(imu_path_cumulative) >= 5.2f && fabsf(remain) >= 0.8f) {
+					if (fabsf(imu_path_cumulative) >= 5.2f && fabsf(remain) >= 1.2f) {
 						base_speed = 0.06f;
+						acc_count = 0;
 					}
 					//缓停，停车段
 					if (fabsf(remain) < 1.2 ){
-						// 停止线 → 停车或执行下一动作
-						base_speed = 0.05f*fabsf(remain);
+						// 停止线 → 停车或执行下一动作\
+						if (!acc_count_change_flag1) {
+							acc_count++;
+							base_speed = 0.06f - 0.000125f * acc_count;
+						}
+						if (base_speed < 0.0f){
+							base_speed = 0.0f;
 						if (Gray_Is_StopLine(gray_data) && fabsf(remain) < 0.01f) {
 							car_stop = 1;
 							base_speed = 0.0f;
+							acc_count = 0;
 						}
 					}
 					base_speed = (base_speed > 0.06f) ? 0.06f : base_speed;
