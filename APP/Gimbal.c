@@ -173,74 +173,15 @@ BallControlTelemetry_t BallControl_GetTelemetry(void)
 #endif
 /* ============ ballcontrol 注释保留结束 ============ */
 
-/* ===== RTOS 消息队列内容（保留） ===== */
+/* ===== RTOS 消息队列内容 ===== */
 static gimbal_cmd_q gimbal_cmd_receive;
-static uint8_t last_task;
-static uint8_t last_task_start_seq;
-
-/* ===== 任务三 K230 计时状态 ===== */
-static float gimbal_run_start_s;
-static float gimbal_run_elapsed_s;
-static uint8_t gimbal_timer_running;
-static volatile uint8_t gimbal_emergency_stop_requested = 0U; /* KEY4 等异步来源置1，请求立即停止计时 */
 
 void Gimbal_Init(void)
 {
     memset(&gimbal_cmd_receive, 0, sizeof(gimbal_cmd_receive));
-    last_task = 0U;
-    last_task_start_seq = 0U;
-    gimbal_timer_running = 0U;
-    gimbal_run_elapsed_s = 0.0f;
-    gimbal_run_start_s = DWT_GetTimeline_s();
-    gimbal_emergency_stop_requested = 0U;
 }
 
 void Gimbal(void)
 {
     (void)xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 0U);
-
-    /* 任务或启动序号变化 */
-    if ((gimbal_cmd_receive.task_flag != last_task) ||
-        (gimbal_cmd_receive.task_start_seq != last_task_start_seq))
-    {
-        last_task = gimbal_cmd_receive.task_flag;
-        last_task_start_seq = gimbal_cmd_receive.task_start_seq;
-        gimbal_emergency_stop_requested = 0U;   /* 新任务复位急停标志 */
-
-        /* 仅任务三：向K230发送task_flag并开始计时 */
-        if (gimbal_cmd_receive.task_flag == H_TASK_3_STATIC_BALL)
-        {
-            K230_ClearEndSignal();              /* 清掉上一任务残留结束信号 */
-            K230_TransmitData(gimbal_cmd_receive.task_flag);
-            gimbal_run_start_s = DWT_GetTimeline_s();
-            gimbal_run_elapsed_s = 0.0f;
-            gimbal_timer_running = 1U;
-        }
-    }
-
-    /* 仅任务三：K230 结束字节 0xAE 到达 或 KEY 急停 -> 停止计时 */
-    if ((last_task == H_TASK_3_STATIC_BALL) &&
-        (gimbal_timer_running != 0U) &&
-        ((K230_IsEndSignal() != 0U) || (gimbal_emergency_stop_requested != 0U)))
-    {
-        gimbal_run_elapsed_s = DWT_GetTimeline_s() - gimbal_run_start_s;
-        gimbal_timer_running = 0U;
-    }
-}
-
-/** KEY4 等异步来源调用，请求立即停止任务三计时（仿 Chassis_RequestEmergencyStop）。 */
-void Gimbal_RequestEmergencyStop(void)
-{
-    gimbal_emergency_stop_requested = 1U;
-}
-
-/* 仿 Chassis_GetRunTimeSeconds：计时中返回实时值，停止后返回冻结值 */
-float Gimbal_GetRunTimeSeconds(void)
-{
-    return gimbal_timer_running ? (DWT_GetTimeline_s() - gimbal_run_start_s) : gimbal_run_elapsed_s;
-}
-
-uint8_t Gimbal_IsRunTimerActive(void)
-{
-    return gimbal_timer_running;
 }

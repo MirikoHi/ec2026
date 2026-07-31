@@ -11,13 +11,6 @@ typedef struct __attribute__((packed)) {
 
 void K230_Init(void);
 void K230_ReceiveData(uint8_t RxData);
-void K230_TransmitData(uint8_t Data);
-
-/** 查询 K230 是否已发出任务完成结束字节 0xAE（粘滞标志）。 */
-uint8_t K230_IsEndSignal(void);
-
-/** 清除 K230 结束字节标志（新任务开始时调用）。 */
-void K230_ClearEndSignal(void);
 
 extern K230_Data_t K230_data;
 

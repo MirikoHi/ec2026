@@ -49,16 +49,7 @@ BallControlTelemetry_t BallControl_GetTelemetry(void);
 /** 初始化 Gimbal 任务状态。 */
 void Gimbal_Init(void);
 
-/** 200 Hz 周期函数：接收任务命令，任务三时向 K230 发送 task_flag 并计时。 */
+/** 200 Hz 周期函数：接收并处理任务命令。 */
 void Gimbal(void);
-
-/** 返回任务三运行时长（秒）：计时中返回实时值，收到 K230 结束字节 0xAE 后返回冻结值。 */
-float Gimbal_GetRunTimeSeconds(void);
-
-/** 任务三计时是否进行中。 */
-uint8_t Gimbal_IsRunTimerActive(void);
-
-/** KEY4 等异步来源调用，请求立即停止任务三计时。 */
-void Gimbal_RequestEmergencyStop(void);
 
 #endif /* _GIMBAL_H_ */

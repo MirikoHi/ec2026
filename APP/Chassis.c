@@ -14,7 +14,6 @@
 #include "bsp_log.h"
 #include "bsp_beep.h"
 #include "../BSP/Motor/Servo.h"
-#include "K230.h"
 
 static DCMotorInstance *motor_l,*motor_r;
 
@@ -661,7 +660,6 @@ static void Chassis_StadiumControl(void)
 		chassis_stadium_accel_cmd = 0.0f;
 		/* 保存当前任务类型，统一决定本圈速度参数。 */
 		chassis_stadium_task = chassis_cmd_receive.competition_task;
-		K230_TransmitData((uint8_t)chassis_stadium_task);
 		/* 保存A点的绝对航向，后续各段均由它推导，避免逐段累计角度误差。 */
 		chassis_stadium_initial_yaw = Chassis_GetYawDeg();
 		chassis_stadium_start_time_s = DWT_GetTimeline_s();
