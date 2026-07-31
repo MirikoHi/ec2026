@@ -200,7 +200,7 @@ void Gimbal_Init(void)
 	Slide_Control_Init();
 
 	DWT_Delay(1);
-	ZDT_Emm_Pos_Control(1, 1, 2000, 253, 0, 1, false);
+	ZDT_Emm_Pos_Control(1, 1, 2000, 250, 0, 1, false);
 }
 
 static uint8_t change_flag1 = 0;
