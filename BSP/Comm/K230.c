@@ -117,6 +117,17 @@ void K230_ReceiveData(uint8_t RxData)
     }
 }
 
+/**
+ * @brief      发送1字节数据到K230
+ * @param      Data  待发送的字节
+ * @retval     无
+ */
+void K230_TransmitData(uint8_t Data)
+{
+    while (DL_UART_isTXFIFOFull(K230_INST)); // 等待发送FIFO有空位，避免覆盖未发数据
+    DL_UART_transmitData(K230_INST, Data);
+}
+
 uint8_t K230_GetSnapshot(K230_Data_t *data, uint32_t *frame_id)
 {
     uint32_t before;

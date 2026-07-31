@@ -11,6 +11,7 @@ typedef struct __attribute__((packed)) {
 
 void K230_Init(void);
 void K230_ReceiveData(uint8_t RxData);
+void K230_TransmitData(uint8_t Data);
 
 extern K230_Data_t K230_data;
 
