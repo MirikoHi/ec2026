@@ -126,9 +126,9 @@
 // 是否打开栈水位监控功能 ： 1开启 0关闭   todo：在实际运行的时候看栈水位，优化大小节省sram空间
 #define ENABLE_STACK_MONITOR       1
 
-#define KEY_TASK_STACK_DEPTH       84
-#define MENU_TASK_STACK_DEPTH      256
-#define ROBOTCMD_TASK_STACK_DEPTH  192
+#define KEY_TASK_STACK_DEPTH       160
+#define MENU_TASK_STACK_DEPTH      512
+#define ROBOTCMD_TASK_STACK_DEPTH  256
 #define CHASSIS_TASK_STACK_DEPTH   256
 #define GIMBAL_TASK_STACK_DEPTH    192
 #define MOTOR_TASK_STACK_DEPTH	   320

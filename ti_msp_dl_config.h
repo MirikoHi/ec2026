@@ -225,18 +225,18 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define STEPPER_MOTOR_IBRD_40_MHZ_115200_BAUD                               (21)
 #define STEPPER_MOTOR_FBRD_40_MHZ_115200_BAUD                               (45)
 /* Defines for K230 */
-#define K230_INST                                                          UART2
+#define K230_INST                                                          UART7
 #define K230_INST_FREQUENCY                                             40000000
-#define K230_INST_IRQHandler                                    UART2_IRQHandler
-#define K230_INST_INT_IRQN                                        UART2_INT_IRQn
+#define K230_INST_IRQHandler                                    UART7_IRQHandler
+#define K230_INST_INT_IRQN                                        UART7_INT_IRQn
 #define GPIO_K230_RX_PORT                                                  GPIOB
 #define GPIO_K230_TX_PORT                                                  GPIOB
 #define GPIO_K230_RX_PIN                                          DL_GPIO_PIN_16
 #define GPIO_K230_TX_PIN                                          DL_GPIO_PIN_15
 #define GPIO_K230_IOMUX_RX                                       (IOMUX_PINCM33)
 #define GPIO_K230_IOMUX_TX                                       (IOMUX_PINCM32)
-#define GPIO_K230_IOMUX_RX_FUNC                        IOMUX_PINCM33_PF_UART2_RX
-#define GPIO_K230_IOMUX_TX_FUNC                        IOMUX_PINCM32_PF_UART2_TX
+#define GPIO_K230_IOMUX_RX_FUNC                        IOMUX_PINCM33_PF_UART7_RX
+#define GPIO_K230_IOMUX_TX_FUNC                        IOMUX_PINCM32_PF_UART7_TX
 #define K230_BAUD_RATE                                                  (115200)
 #define K230_IBRD_40_MHZ_115200_BAUD                                        (21)
 #define K230_FBRD_40_MHZ_115200_BAUD                                        (45)
