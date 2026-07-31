@@ -72,8 +72,7 @@ void RobotCmd_Init(void)
 /**
  * @brief 核心cmd任务，向云台和底盘发送命令，在RTOS中以200Hz运行
  */
-void Robot_Cmd(void)
-{
+void Robot_Cmd(void) {
 	xQueueReceive(trace_fetch_data_queue, &trace_fetch_data, 1);
 	LicheeRec_Frame = LicheeRec_GetFrame();
 	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_Frame.cmdid,LicheeRec_Frame.data);
@@ -136,12 +135,12 @@ void Robot_Cmd(void)
 			OLED_ShowFloatNum(56, 2, (double)elapsed, 3, 3, OLED_8X16);
 			OLED_Update();             /* 关键: 将帧缓冲通过 I2C 刷到 OLED 硬件 */
 		}
-	/* 计时更新 (Robot_Cmd 200Hz 中仅更新变量, 不碰 OLED I2C) */
-	if (chassis_mode_selected && task_display_id > 0 && !car_stop) {
-		elapsed = DWT_GetTimeline_s() - task_start_time_s;
+		/* 计时更新 (Robot_Cmd 200Hz 中仅更新变量, 不碰 OLED I2C) */
+		if (chassis_mode_selected && task_display_id > 0 && !car_stop) {
+			elapsed = DWT_GetTimeline_s() - task_start_time_s;
+		}
 	}
 }
-
 void draw_sin(void)
 {
 	static float start_time = 0;
