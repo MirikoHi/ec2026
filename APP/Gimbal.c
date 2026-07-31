@@ -50,7 +50,7 @@ extern Chassis_Move_State_e car_stop;
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
 
-static float slide_target_x   =  312.00f ;    /* 目标位置: 画面中心 (640/2) */
+static float slide_target_x = 312.00f; /* 目标位置: 画面中心 (640/2) */
 uint32_t motor_zero_point =  0;
 #define SLIDE_SERVO_RANGE      50    /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
@@ -202,6 +202,10 @@ void Gimbal_Init(void)
 	ZDT_Emm_Pos_Control(1, 1, 2000, 253, 0, 1, false);
 }
 
+void Slider_Set_Pos_Pixel(const uint16_t pix_pos) {
+	slide_target_x = (float)pix_pos;
+}
+
 static uint8_t change_flag1 = 0;
 static uint8_t change_flag2 = 0;
 static uint8_t count1 = 0;
@@ -213,7 +217,7 @@ void Gimbal(void)
 	Slide_Control_Run();
 	if (gimbal_cmd_receive.task_flag == 3) {
 		if (!change_flag1) {
-			slide_target_x = 180;
+			Slider_Set_Pos_Pixel(180);
 			change_flag1 = 1;
 		}
 		if (fabsf(x_raw - slide_target_x) < 30) {
@@ -224,7 +228,7 @@ void Gimbal(void)
 		}
 		if (count1 > 60 && change_flag1) {
 			count1 = 0;
-			slide_target_x = 432;
+			Slider_Set_Pos_Pixel(432);
 			change_flag2 = 1;
 		}
 		if (count2 > 90  && change_flag2) {
@@ -232,7 +236,7 @@ void Gimbal(void)
 		}
 	}
 	else if (gimbal_cmd_receive.task_flag == 0) {  //不在执行任务三时将小球归中
-		slide_target_x = 312;
+		Slider_Set_Pos_Pixel(312);
 		change_flag1 = 0;
 		change_flag2 = 0;
 	}
@@ -258,6 +262,3 @@ void UART3_IRQHandler(void)
 	DL_UART_clearInterruptStatus(STEPPER_MOTOR_INST, DL_UART_INTERRUPT_RX);
 }
 
-void Slider_Set_Pos_Pixel(const uint16_t pix_pos) {
-	slide_target_x = (float)pix_pos;
-}
