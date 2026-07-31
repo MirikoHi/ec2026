@@ -10,12 +10,12 @@
 #define CHASSIS_STRAIGHT_DIST_M 1.50f									/* AB/CD直线长度，单位m。 */
 #define CHASSIS_ARC_RADIUS_M 0.50f										/* 赛道半圆几何半径，单位m。 */
 #define CHASSIS_TRACK_WIDTH_M 0.21f										/* 左右驱动轮接地点间距，单位m。 */
-#define CHASSIS_TRACE_FORWARD_OFFSET_M 0.22f							/* 驱动轴中点到探头的前向距离，单位m。 */
+#define CHASSIS_TRACE_FORWARD_OFFSET_M 0.18f							/* 驱动轴中点到探头的前向距离，单位m。 */
 #define CHASSIS_AXLE_TO_CENTER_FORWARD_M 0.0f							/* 车体中心在驱动轴前方为正，单位m。 */
 #define CHASSIS_TRACE_TO_CENTER_M (CHASSIS_TRACE_FORWARD_OFFSET_M - CHASSIS_AXLE_TO_CENTER_FORWARD_M) /* 探头过线后轴线到A线的补偿距离，单位m。 */
 #define CHASSIS_B_TURN_PREVIEW_M 0.00f									/* B点提前切换距离，单位m；调大可抵消差速建立延迟。 */
 #define CHASSIS_ARC_DRIVE_RADIUS_M 0.60f								/* 实车差速控制半径，单位m；调小会转得更紧。 */
-#define CHASSIS_FINISH_DETECT_RATIO 0.85f								/* DA弧线完成该比例后才允许识别A线。 */
+#define CHASSIS_FINISH_DETECT_RATIO 0.95f								/* DA弧线完成该比例后才允许识别A线。 */
 #define CHASSIS_ARC1_EXIT_ANGLE_DEG 170.0f								/* BC弧线状态的退出角度，单位deg。 */
 #define CHASSIS_ARC_ANGLE_DEG 180.0f									/* 半圆理论转角，单位deg。 */
 #define CHASSIS_FINAL_APPROACH_SPEED 0.08f								/* 漏检时搜索A线的低速，单位m/s。 */

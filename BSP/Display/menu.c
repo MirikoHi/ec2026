@@ -171,8 +171,8 @@ MenuInitConfig_s second_menu_config[3]	={
 			.string={
 				[0] = "任务2 circle",
 				[1] = "任务3 ball",
-				[2] = "任务4",
-				[3] = "任务5",
+				[2] = "任务4 AB ball",
+				[3] = "任务5 ball circle",
 				[4]	= "任务6",
 				[5] = NULL,
 			},

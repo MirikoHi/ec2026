@@ -293,7 +293,8 @@ void Chassis(void)
 			Stop_Detect();
 			break;
 		case IMU_MODE:
-			if (chassis_cmd_receive.competition_task == H_TASK_2_FAST_LAP){
+			if (chassis_cmd_receive.competition_task == H_TASK_2_FAST_LAP
+				|| chassis_cmd_receive.competition_task == H_TASK_4_AB_BALL){
 				if (chassis_emergency_stop_requested != 0U)
 				{
 					chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
