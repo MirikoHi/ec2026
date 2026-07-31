@@ -13,6 +13,7 @@
 #include "dwt.h"
 #include "Servo.h"
 #include "chassis.h"
+#include "lichee_rec.h"
 
 static DCMotorInstance *motor_l,*motor_r;
 
@@ -27,7 +28,7 @@ pid_type_def gimbal_yaw_PID={0};
 pid_type_def gimbal_pitch_PID={0};
 pid_type_def gimbal_yaw_forwardfeed_PID = {0};
 gimbal_cmd_q gimbal_cmd_send ={0};
-
+static volatile Licheervnano_Frame LicheeRec_Frame;
 
 float x;
 float dt;
@@ -214,7 +215,8 @@ static uint8_t count2 = 0;
 void Gimbal(void)
 {   //ZDT_Emm_Pos_Control(1, 1, 190, 0, 0, 1, false);
 	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
-
+	//获取licheerv数据
+	LicheeRec_Frame = LicheeRec_GetFrame();
 	Slide_Control_Run();
 
 	// static uint16_t cntr = 0;
@@ -225,33 +227,37 @@ void Gimbal(void)
 	// 	if (cntr >= 200) cntr = 0;
 	// 	ZDT_Emm_Pos_Control(1, 0, 100, 0, 100, 1, false);
 	// }
-	if (gimbal_cmd_receive.task_flag == 3) {
-		if (!change_flag1) {
-			slide_target_x = 180;
-			change_flag1 = 1;
-		}
-		if (fabsf(x_raw - slide_target_x) < 30) {
-			count1++;
-			if (change_flag2) {
-				count2++;
+	switch (gimbal_cmd_receive.task_flag) {
+		case 0:    //复位模式
+			slide_target_x = 312;
+			change_flag1 = 0;
+			change_flag2 = 0;
+			break;
+		case 3:   //任务3，静止状态，使小球在+5——-5间折返
+			if (!change_flag1) {
+				slide_target_x = 180;
+				change_flag1 = 1;
 			}
-		}
-		if (count1 > 60 && change_flag1) {
-			count1 = 0;
-			slide_target_x = 440;
-			change_flag2 = 1;
-		}
-		if (count2 > 90  && change_flag2) {
-			car_stop = 1;
-			count2 = 0;
-		}
+			if (fabsf(x_raw - slide_target_x) < 30) {
+				count1++;
+				if (change_flag2) {
+					count2++;
+				}
+			}
+			if (count1 > 60 && change_flag1) {
+				count1 = 0;
+				slide_target_x = 440;
+				change_flag2 = 1;
+			}
+			if (count2 > 90  && change_flag2) {
+				car_stop = 1;
+				count2 = 0;
+			}
+			break;
+		case 6://任务6，钢球置于指定位置走一圈
+			slide_target_x = LicheeRec_Frame.relative_position * 600;
+			break;
 	}
-	else if (gimbal_cmd_receive.task_flag == 0) {  //不在执行任务三时将小球归中
-		slide_target_x = 312;
-		change_flag1 = 0;
-		change_flag2 = 0;
-	}
-
 }
 
 void Gimbal_Pid_Cal(void)

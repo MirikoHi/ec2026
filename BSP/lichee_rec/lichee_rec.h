@@ -14,8 +14,8 @@
 
 #define LICHEE_REC_FRAME_HEADER  0xA5U
 #define LICHEE_REC_CMD_ID        0x0AU     /* 固定命令ID */
-#define LICHEE_REC_DATA_SIZE     9U        /* cmd_id(1) + slider(4) + position(4) */
-#define LICHEE_REC_FRAME_SIZE    11U       /* header(1) + data(9) + crc8(1) */
+#define LICHEE_REC_DATA_SIZE     10U       /* header(1) + cmd_id(1) + slider(4) + position(4) */
+#define LICHEE_REC_FRAME_SIZE    11U       /* header(1) + cmd_id(1) + slider(4) + position(4) + crc8(1) */
 
 
 /* ── UART 实例映射 ─────────────────────────────────────────── */

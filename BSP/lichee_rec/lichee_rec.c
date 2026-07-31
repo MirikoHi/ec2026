@@ -2,7 +2,7 @@
  * @file lichee_rec.c
  * @brief LiChee 识别模块通信实现
  * @note  帧格式: 帧头(0xA5) + cmd_id(0x0A) + slider_length_cm(float32_LE) + relative_position(float32_LE) + crc8
- *        CRC8 计算范围: cmd_id + slider(4B) + position(4B) = 9字节
+ *        CRC8 计算范围: header + cmd_id + slider(4B) + position(4B) = 10字节
  *        使用 UART_2 (UART0外设, PA0-TX / PA1-RX, 115200bps)
  */
 
@@ -12,14 +12,11 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-
-
-
 // licheervnano当前状态
 LicheervnanoStatus_t host_status = OFFLINE;
 
 /* ── 静态变量 ──────────────────────────────────────────────── */
-static uint8_t       rx_buf[LICHEE_REC_DATA_SIZE];     /* CRC计算缓冲区 (9B)   */
+static uint8_t       rx_buf[LICHEE_REC_DATA_SIZE];     /* CRC计算缓冲区 (10B)   */
 static uint8_t       rx_state;                         /* 状态机当前状态       */
 static uint8_t       rx_data_index;                    /* CRC缓冲写入索引      */
 static FloatBytes_u  rx_slider;                        /* 滑槽长度 float 数据   */
@@ -93,8 +90,8 @@ void LicheeRec_Send(float slider_length_cm, float relative_position)
     buf[8] = fb_pos.bytes[2];
     buf[9] = fb_pos.bytes[3];
 
-    /* CRC8 校验: 计算 cmd_id + slider(4B) + position(4B) (9字节) */
-    crc     = crc8_maxim(&buf[1], LICHEE_REC_DATA_SIZE);
+    /* CRC8 校验: header + cmd_id + slider(4B) + position(4B) = 10字节 */
+    crc     = crc8_maxim(buf, LICHEE_REC_DATA_SIZE);
     buf[10] = crc;
 
     /* 阻塞发送 */
@@ -115,61 +112,62 @@ void LicheeRec_ReceiveByte(uint8_t data)
         case STATE_HEADER:
             if (data == LICHEE_REC_FRAME_HEADER)
             {
-                rx_state      = STATE_CMD_ID;
-                rx_data_index = 0;
+                rx_buf[0]      = data;             /* rx_buf[0] = 帧头 0xA5 */
+                rx_data_index  = 1;
+                rx_state       = STATE_CMD_ID;
             }
             break;
 
         case STATE_CMD_ID:
-            rx_buf[rx_data_index++] = data;        /* rx_buf[0] = cmd_id */
+            rx_buf[rx_data_index++] = data;        /* rx_buf[1] = cmd_id */
             rx_state               = STATE_DATA0;
             break;
 
         case STATE_DATA0:
             rx_slider.bytes[0] = data;
-            rx_buf[rx_data_index++] = data;        /* rx_buf[1] */
+            rx_buf[rx_data_index++] = data;        /* rx_buf[2] */
             rx_state               = STATE_DATA1;
             break;
 
         case STATE_DATA1:
             rx_slider.bytes[1] = data;
-            rx_buf[rx_data_index++] = data;        /* rx_buf[2] */
+            rx_buf[rx_data_index++] = data;        /* rx_buf[3] */
             rx_state               = STATE_DATA2;
             break;
 
         case STATE_DATA2:
             rx_slider.bytes[2] = data;
-            rx_buf[rx_data_index++] = data;        /* rx_buf[3] */
+            rx_buf[rx_data_index++] = data;        /* rx_buf[4] */
             rx_state               = STATE_DATA3;
             break;
 
         case STATE_DATA3:
             rx_slider.bytes[3] = data;
-            rx_buf[rx_data_index++] = data;        /* rx_buf[4] */
+            rx_buf[rx_data_index++] = data;        /* rx_buf[5] */
             rx_state               = STATE_DATA4;
             break;
 
         case STATE_DATA4:
             rx_position.bytes[0] = data;
-            rx_buf[rx_data_index++] = data;        /* rx_buf[5] */
+            rx_buf[rx_data_index++] = data;        /* rx_buf[6] */
             rx_state               = STATE_DATA5;
             break;
 
         case STATE_DATA5:
             rx_position.bytes[1] = data;
-            rx_buf[rx_data_index++] = data;        /* rx_buf[6] */
+            rx_buf[rx_data_index++] = data;        /* rx_buf[7] */
             rx_state               = STATE_DATA6;
             break;
 
         case STATE_DATA6:
             rx_position.bytes[2] = data;
-            rx_buf[rx_data_index++] = data;        /* rx_buf[7] */
+            rx_buf[rx_data_index++] = data;        /* rx_buf[8] */
             rx_state               = STATE_DATA7;
             break;
 
         case STATE_DATA7:
             rx_position.bytes[3] = data;
-            rx_buf[rx_data_index++] = data;        /* rx_buf[8] */
+            rx_buf[rx_data_index++] = data;        /* rx_buf[9] */
             rx_state               = STATE_CRC;
             break;
 
