@@ -52,9 +52,11 @@ ServoInstance*  servo_yaw;
 #define STEPPER_ADDR           1           /* 电机地址 */
 #define STEPPER_MAX_RPM        300         /* 最大转速 RPM */
 #define STEPPER_ACC            50          /* 加速度 */
-#define STEPPER_CENTER_CLK     0           /* 滑槽水平时的绝对脉冲位置 */
 #define STEPPER_MAX_CLK        800         /* 最大脉冲偏移量 (±800 ≈ ±90° @3200ppr) */
 #define STEPPER_UPDATE_DIV     4           /* 200Hz / 4 = 50Hz 下发频率 */
+
+static int32_t  stepper_center_clk = 0;    /* 上电后手动复位的位置 (运行时读取) */
+ZDT_Emm_Motor_t *stepper_motor = NULL;  /* 电机实例, 用于查询位置 */
 
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
 static float        slide_prev_x = 320;   /* 上一帧 X 位置 */
@@ -95,48 +97,49 @@ static void Slide_Control_Init(void)
  */
 static void Slide_Control_Run(void)
 {
-    if (!K230_Read(&steel_ball_movement_data)) return;
-
-    x  = (float)steel_ball_movement_data.x_position;
-    dt = steel_ball_movement_data.dt;
-
-    /* 保护: dt 异常时使用默认值 */
-    if (dt <= 0.0f || dt > 0.5f) {
-        dt = 0.05f;  /* 默认 50ms (20fps) */
-    }
-
-    /* ── 1. 速度估计 (利用 dt 精确计算) ── */
-    float raw_v = (x - slide_prev_x) / dt;
-    slide_prev_x = x;
-
-    /* 一阶低通滤波, 滤除视觉抖动 */
-    slide_velocity = slide_velocity * (1.0f - SLIDE_VEL_LPF_ALPHA)
-                   + raw_v * SLIDE_VEL_LPF_ALPHA;
-
-    /* ── 2. 位置 PID ── */
-    float error = SLIDE_TARGET_X - x;
-    PID_calc(&slide_ball_pid, 0.0f, error);
-
-    /* ── 3. 速度前馈 ──
-     * 球向右运动 (v>0) → 需要左倾来"接住"球 → 反方向补偿 */
-    float velocity_ff = -slide_velocity * SLIDE_VEL_FF_GAIN;
-
-    /* ── 4. 合成输出 → 限幅 ── */
-    float output = slide_ball_pid.out + velocity_ff;
-    if (output >  SLIDE_SERVO_RANGE)  output =  SLIDE_SERVO_RANGE;
-    if (output < -SLIDE_SERVO_RANGE)  output = -SLIDE_SERVO_RANGE;
-
-    /* ── 5. 转为电机脉冲 (绝对位置) ──
-     * output ±10 → 脉冲 ±800 (@3200ppr = ±90° 电机转角)
-     * raF=1: 绝对位置模式, 电机内部闭环自动到位 */
-    float scale = (float)STEPPER_MAX_CLK / (float)SLIDE_SERVO_RANGE;
-    int32_t target_clk = STEPPER_CENTER_CLK + (int32_t)(output * scale);
+    // if (!K230_Read(&steel_ball_movement_data)) return;
+    //
+    // x  = (float)steel_ball_movement_data.x_position;
+    // dt = steel_ball_movement_data.dt;
+    //
+    // /* 保护: dt 异常时使用默认值 */
+    // if (dt <= 0.0f || dt > 0.5f) {
+    //     dt = 0.05f;  /* 默认 50ms (20fps) */
+    // }
+    //
+    // /* ── 1. 速度估计 (利用 dt 精确计算) ── */
+    // float raw_v = (x - slide_prev_x) / dt;
+    // slide_prev_x = x;
+    //
+    // /* 一阶低通滤波, 滤除视觉抖动 */
+    // slide_velocity = slide_velocity * (1.0f - SLIDE_VEL_LPF_ALPHA)
+    //                + raw_v * SLIDE_VEL_LPF_ALPHA;
+    //
+    // /* ── 2. 位置 PID ── */
+    // float error = SLIDE_TARGET_X - x;
+    // PID_calc(&slide_ball_pid, 0.0f, error);
+    //
+    // /* ── 3. 速度前馈 ──
+    //  * 球向右运动 (v>0) → 需要左倾来"接住"球 → 反方向补偿 */
+    // float velocity_ff = -slide_velocity * SLIDE_VEL_FF_GAIN;
+    //
+    // /* ── 4. 合成输出 → 限幅 ── */
+    // float output = slide_ball_pid.out + velocity_ff;
+    // if (output >  SLIDE_SERVO_RANGE)  output =  SLIDE_SERVO_RANGE;
+    // if (output < -SLIDE_SERVO_RANGE)  output = -SLIDE_SERVO_RANGE;
+    //
+    // /* ── 5. 转为电机脉冲 (绝对位置) ──
+    //  * output ±10 → 脉冲 ±800 (@3200ppr = ±90° 电机转角)
+    //  * raF=1: 绝对位置模式, 电机内部闭环自动到位 */
+    // float scale = (float)STEPPER_MAX_CLK / (float)SLIDE_SERVO_RANGE;
+    // int32_t target_clk = stepper_center_clk + (int32_t)(output * scale);
 
     /* ── 6. 降频发送 (200Hz / 4 = 50Hz), 避免 UART 拥塞 ── */
+
     static uint8_t tick = 0;
     if (++tick >= STEPPER_UPDATE_DIV) {
         tick = 0;
-        ZDT_Emm_QPos_Control(STEPPER_ADDR, target_clk);
+        ZDT_Emm_QPos_Control(STEPPER_ADDR, 500);
     }
 }
 
@@ -208,7 +211,6 @@ void Gimbal_Init(void)
 	/* 使能电机 (rotate, addr=1) */
 	ZDT_Emm_En_Control(1, true, false);
 
-
 	Servo_Init_Config_s servo_yaw_config = {
 		.Servo_type = Servo180,
 		.inst = Servo_INST,
@@ -223,8 +225,22 @@ void Gimbal_Init(void)
 	/* 步进电机: 绝对位置模式参数 (raF=1), 只设置一次 */
 	ZDT_Emm_Set_QPos_Params(STEPPER_ADDR, STEPPER_MAX_RPM, STEPPER_ACC, 1, false);
 
-	/* 回到原点 */
-	ZDT_Emm_QPos_Control(STEPPER_ADDR, STEPPER_CENTER_CLK);
+	/*
+	 * 读取电机当前实时位置, 作为滑槽水平的中心参考.
+	 *
+	 * 使用方法:
+	 *   1. 上电后, 手动将滑槽拨到水平(目标)位置
+	 *   2. 复位 MCU, 程序启动时自动通过 ZDT_Emm_Motor_UpdatePosition
+	 *      读取当前编码器值存入 stepper_center_clk
+	 *   3. 后续所有绝对位置命令都以此为基准偏移
+	 *
+	 * 注意: UpdatePosition 读取的是编码器值 (CPOS, 0~65535),
+	 *       在闭环模式下与脉冲数 (CLKC) 同步, 可直接用作绝对位置参考.
+	 */
+	stepper_motor = ZDT_Emm_Motor_Create(STEPPER_ADDR);
+	if (stepper_motor != NULL && ZDT_Emm_Motor_UpdatePosition(stepper_motor)) {
+		stepper_center_clk = stepper_motor->raw_position;
+	}
 }
 
 

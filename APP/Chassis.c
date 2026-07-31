@@ -225,8 +225,10 @@ void Chassis(void)
 			// Chassis_State_Turn();
 			// 检测直行/转弯是否完成，并更新完成标志。
 			// Stop_Detect();
+
 			break;
 		case IMU_MODE:
+			Chassis_Trace_Cal();
 			Chassis_ImuModeAction();
 			break;
 		case NORMAL_MODE:
@@ -245,6 +247,9 @@ void Chassis(void)
  */
 static void Chassis_Trace_Cal(void) {
 	trace_compensation=Trace_task();
+	// DC_Motor_SetRef(motor_l,0.02f);
+	// DC_Motor_SetRef(motor_r,0.02f);
+
 	DCMotor_SetTraceCompensation(motor_l,-2*trace_compensation);
 	DCMotor_SetTraceCompensation(motor_r,2*trace_compensation);
 }
@@ -265,11 +270,10 @@ static void Chassis_Trace_Cal(void) {
  *            └────────────┘
  *               直线 1.5m
  */
-uint8_t result=0;
+
 static void Chassis_ImuModeAction(void)
 {
-
-
+	uint8_t result=0;
 	switch (chassis_imu_action_step)
 	{
 		case 0:
@@ -606,7 +610,7 @@ static uint8_t Chassis_SemiCircle(float radius_m, float speed_mps, int direction
 	yaw_error = Chassis_AngleNormalize(expected_yaw - Chassis_GetYawDeg());
 
 	/* 转向 PID, 限幅防止翻车 */
-	float turn_limit = abs_speed * 6.6f;
+	float turn_limit = abs_speed * 66.0f;
 	if (turn_limit < 0.1f) turn_limit = 0.1f;
 	chassis_turn_pid.max_out = turn_limit;
 	turn_compensation = PID_calc(&chassis_turn_pid, 0.0f, yaw_error);
