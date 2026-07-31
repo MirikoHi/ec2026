@@ -740,7 +740,7 @@ void menu_task(void)
 	uint8_t selected_idx;
 	static uint8_t run_screen_active = 0U;
 	static float run_screen_last_ms = 0.0f;
-	uint8_t timer_active = Chassis_IsRunTimerActive();
+	uint8_t timer_active = Chassis_IsRunTimerActive() | Gimbal_IsRunTimerActive();
 
 	/* 比赛任务运行时锁定计时页；停车后再刷新一次并保留最终成绩。 */
 	if (timer_active || run_screen_active)
@@ -754,12 +754,21 @@ void menu_task(void)
 		float now_ms = DWT_GetTimeline_ms();
 		if ((now_ms - run_screen_last_ms >= 100.0f) || !timer_active)
 		{
-			run_screen_last_ms = now_ms;
-			OLED_Clear();
-			OLED_ShowString(0, 0, timer_active ? "RUN" : "FINISH", OLED_8X16);
-			OLED_Printf(0, 20, OLED_8X16, "T:%5.2fs", Chassis_GetRunTimeSeconds());
-			OLED_Printf(0, 40, OLED_6X8, "STEP:%u", Chassis_GetStadiumStep());
-			OLED_Update();
+			if (Chassis_IsRunTimerActive()){
+				run_screen_last_ms = now_ms;
+				OLED_Clear();
+				OLED_ShowString(0, 0, timer_active ? "RUN" : "FINISH", OLED_8X16);
+				OLED_Printf(0, 20, OLED_8X16, "T:%5.2fs", Chassis_GetRunTimeSeconds());
+				OLED_Printf(0, 40, OLED_6X8, "STEP:%u", Chassis_GetStadiumStep());
+				OLED_Update();
+			}
+			if (Gimbal_IsRunTimerActive()){
+				run_screen_last_ms = now_ms;
+				OLED_Clear();
+				OLED_ShowString(0, 0, timer_active ? "RUN" : "FINISH", OLED_8X16);
+				OLED_Printf(0, 20, OLED_8X16, "T:%5.2fs", Gimbal_GetRunTimeSeconds());
+				OLED_Update();
+			}
 		}
 		run_screen_active = timer_active;
 		return;
