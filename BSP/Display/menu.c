@@ -168,15 +168,18 @@ MenuInitConfig_s second_menu_config[3]	={      //二级菜单
 		},
 		[2] = {
 			.string={
-				[0] = "任务二",
-				[1] = "任务三",
-				[2] = NULL,
-				[3] = NULL,
+				[0] = "Task II",
+				[1] = "Task III",
+				[2] = "Task IV",
+				[3] = "Task V",
 				[4]	= NULL,
 			},
 			.callback={
 				[0] = Task_Callback,
 				[1] = Task_Callback,
+				[2] = Task_Callback,
+				[3] = Task_Callback,
+				[4] = Task_Callback,
 			},
 			.next_menu_config={
 
@@ -218,10 +221,10 @@ MenuInitConfig_s second_menu_config[3]	={      //二级菜单
 	};
 MenuInitConfig_s first_menu_config={     //一级菜单
 		.string={
-				[0] = "电机控制",
-				[1] = "控制方式",
-				[2] = "任务",
-				[3] = "清除任务",
+				[0] = "Motor",
+				[1] = "Contorl",
+				[2] = "Task",
+				[3] = "Reset",
 				[4]	= NULL,
 				[5] = NULL,
 			},
@@ -729,6 +732,15 @@ void menu_task(void)
 	uint8_t item_count;
 	uint8_t selected_idx;
 
+	/* ── 底盘模式已选中 → 隐藏菜单, 仅响应后退键 ── */
+	if (chassis_mode_selected) {
+		if (Key_Check(1, KEY_SINGLE)) {   /* 按键 2 (后退) 返回菜单 */
+			chassis_mode_selected = false;
+			menu_redraw();
+		}
+		return;
+	}
+
 	menu_process_refresh_step();
 
 	if ((menu_animation_enabled != 0U) && OLED_AnimationBusy())
@@ -745,7 +757,7 @@ void menu_task(void)
 	}
 	item_count = menu_item_count(now_menu);
 	selected_idx = (uint8_t)(row_idx + upper_limit_row_idx);
-	
+
 	if(Key_Check(0,KEY_SINGLE))//前进
 	{
 		if(now_menu->next_menu[selected_idx]!=NULL)//不是最后一级，进入下一级菜单并更新相关参数

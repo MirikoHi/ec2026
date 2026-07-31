@@ -1,12 +1,15 @@
 #ifndef _CHASSIS_H_
 #define _CHASSIS_H_
 
+#include "dcmotor.h"
 #include "PID.h"
 #include "ti_msp_dl_config.h"
 #define CHASSIS_LENGTH_TO_CENTER 0.166 //PAW3395到车体中心的距离,单位m //PAW3395���������ľ���,��λm
 void Chassis(void);
 void Chassis_Init(void);
 
+DCMotorInstance *get_motor_l_instance();
+DCMotorInstance *get_motor_r_instance();
 void Motor_Cmd_CallBack(uint8_t i);
 
 void Chassis_get_init_angle(void);
@@ -15,8 +18,7 @@ uint8_t Chassis_MoveStraight(float distance_m, float speed_mps);
 uint8_t Chassis_TurnAngle(float angle_deg, float max_turn_speed);
 
 typedef enum {
-	Chassis_Line = 0,
-	Chassis_Turn,
+	Chassis_running,
 	Chassis_Stop,
 }Chassis_Move_State_e;
 
@@ -68,7 +70,7 @@ void Chassis_Set_Turn(void);
 static void Chassis_RemoteControl(void);
 static void Chassis_ClearRemoteSpeed(void);
 static void Chassis_RemoteLostDisable(void);
-static void Chassis_Trace_Cal(void);
+static void Chassis_Trace_Cal(float base_speed);
 static void Chassis_ImuModeAction(void);
 static void Motor_FeedForward_Update(void);
 static void Chassis_ResetEncoderOdom(void);

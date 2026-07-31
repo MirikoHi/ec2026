@@ -19,16 +19,19 @@ static CANCommInstance *chasiss_can_comm; // 双板通信CAN comm
 static Chassis_Ctrl_Cmd_s chassis_cmd_recv;         // 底盘接收到的控制命令
 static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数据
 
+static gimbal_cmd_q gimbal_cmd_send;  //向云台发送的控制命令
+
 QueueHandle_t chassis_cmd_queue = NULL,gimbal_cmd_queue =NULL;
 QueueHandle_t chassis_fetch_data_queue = NULL;
 QueueHandle_t trace_fetch_data_queue = NULL;
 chassis_cmd_q chassis_cmd_send={0};
 chassis_cmd_q last_chassis_cmd_send;         // 上一帧发送底盘的控制命令
 trace_fetch_data_q trace_fetch_data={0};
-
+extern Chassis_Move_State_e car_stop;
 
 float last_trace_imu_switch_s=0;
 float now_time=0;
+float elapsed=0;  //任务运行时间
 Control_mode robotcmd_control_state = MENU_CTL;
 
 /*  Lichee通信  */
@@ -114,18 +117,25 @@ void Robot_Cmd(void)
 
 	//通过队列向云台和底盘发送命令
 	xQueueSend(chassis_cmd_queue, &chassis_cmd_send, 0U);
-	// xQueueSend(gimbal_cmd_queue,&gimbal_cmd_send,0U);
+	xQueueSend(gimbal_cmd_queue,&gimbal_cmd_send,0U);
 
 	//CANCommSend(chasiss_can_comm, (void *)&chassis_feedback_data);
 
-	/* ── 任务信息 OLED 显示 ── */
-	if (task_display_id > 0) {
-		float elapsed = DWT_GetTimeline_s() - task_start_time_s;
-		OLED_ClearArea(0, 0, 128, 32);                          /* 清空前 4 页 */
-		OLED_ShowString(0, 0, "Task:", OLED_8X16);
-		OLED_ShowNum(56, 0, task_display_id, 1, OLED_8X16);
-		OLED_ShowString(0, 2, "Time:", OLED_8X16);
-		OLED_ShowFloatNum(56, 2, (double)elapsed, 4, 1, OLED_8X16);
+	/* ── 任务信息 OLED 显示 (约 20Hz 刷新, 避免 I2C 过载) ── */
+	if (chassis_mode_selected && task_display_id > 0) {
+		static uint8_t oled_tick = 0;
+		if (++oled_tick >= 10) {       /* 200Hz / 10 = 20Hz */
+			oled_tick = 0;
+			if (!car_stop) {
+				elapsed = DWT_GetTimeline_s() - task_start_time_s;
+			}
+			OLED_Clear();
+			OLED_ShowString(0, 0, "Task:", OLED_8X16);
+			OLED_ShowNum(56, 0, task_display_id, 1, OLED_8X16);
+			OLED_ShowString(0, 2, "Time:", OLED_8X16);
+			OLED_ShowFloatNum(56, 2, (double)elapsed, 3, 3, OLED_8X16);
+			OLED_Update();             /* 关键: 将帧缓冲通过 I2C 刷到 OLED 硬件 */
+		}
 	}
 }
 
@@ -147,8 +157,14 @@ void draw_sin(void)
 /**
 	各种底盘模式的回调函数
 **/
+volatile bool chassis_mode_selected = false;
+
 void Chassis_Mode_Switch_Callback(uint8_t i)  //选择底盘控制模式
 {
+	chassis_mode_selected = true;  /* 选中模式后隐藏菜单, 只显示任务信息 */
+	task_display_id   = i + 1;    /* 显示当前选中的模式编号 */
+	task_start_time_s = DWT_GetTimeline_s();
+
 	if(i == 0)
 	{
 		chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
@@ -170,6 +186,8 @@ void Chassis_Mode_Switch_Callback(uint8_t i)  //选择底盘控制模式
 
 void Task_Callback(uint8_t i)    //选择执行任务
 {
+	chassis_mode_selected = true;  /* 选中任务后同样隐藏菜单, 全屏显示任务信息 */
+
 	if(i==0)  //任务2，巡线走一圈
 	{
 		chassis_cmd_send.task_flag = 2;
@@ -181,6 +199,7 @@ void Task_Callback(uint8_t i)    //选择执行任务
 	else if(i==1)    //任务3，静止状态，使小球在+5——-5间折返
 	{
 		chassis_cmd_send.task_flag = 3;
+		gimbal_cmd_send.task_flag = 3;
 		task_display_id   = 3;
 		task_start_time_s = DWT_GetTimeline_s();
 	}
@@ -193,6 +212,7 @@ void Task_Callback(uint8_t i)    //选择执行任务
 	else if(i==3)    //任务5，钢球置于中心点走一圈
 	{
 		chassis_cmd_send.task_flag = 5;
+		chassis_cmd_send.Chassis_Mode = TRACE_MODE;
 		task_display_id   = 5;
 		task_start_time_s = DWT_GetTimeline_s();
 	}
@@ -206,8 +226,11 @@ void Task_Callback(uint8_t i)    //选择执行任务
 void Reset_task_callback(uint8_t i) {
 	if ( i==3 ) {
 		chassis_cmd_send.task_flag = 0;
+		gimbal_cmd_send.task_flag = 0;
 		chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
+		car_stop = 0;
 		task_display_id = 0;
 		task_start_time_s = 0;
+		elapsed=0;
 	}
 }
