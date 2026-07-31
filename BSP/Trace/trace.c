@@ -71,14 +71,19 @@ void Trace_FillDefaultParams(FlashParam_Data_s *params)
   * @param params 待应用参数结构体指针
   * @note 用法：上电初始化或屏幕端 FlashParam_Save() 成功后调用，使循迹 PID 立即生效
   */
-void Trace_ApplyParams(const FlashParam_Data_s *params)
+void Trace_ApplyParams(void)
 {
-    if (params == NULL)
-    {
-        return;
-    }
 
-    pid_init_config_s trace_config = params->trace_pid;
+    pid_init_config_s trace_config = {
+        .mode = PID_POSITION,
+        .Kp = 0.006f,
+        .Ki = 0.0f,
+        .Kd = 0.0f,
+        .max_out = 500.0f,
+        .max_iout = 200.0f,
+        .deadzone = 0.0f,
+        .ff_type = FF_None,
+    };;
     PID_init(&Trace_PID, &trace_config);
     Trace_ResetLineError();
 }
@@ -87,6 +92,7 @@ void Trace_Init(void)
 {
 #ifdef USE_GRAY_SERIAL
     Gray_Serial_Init();
+    Trace_ApplyParams();
 #else
 	NVIC_EnableIRQ(ADC1_INST_INT_IRQN);
 	// 初始化传感器并获取黑白值

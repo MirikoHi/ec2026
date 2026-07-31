@@ -65,3 +65,35 @@ bool Gray_Is_Line(uint8_t trace)
 
     return count>=6;
 }
+
+/**
+ * @brief  检测停止线 — 全部 8 路灰度同时检测到黑线
+ * @param  trace  灰度原始值 (0=黑, 1=白)
+ * @return true=检测到停止线, false=未检测到
+ * @note   停止线通常是一条横跨整个赛道的粗黑线,
+ *         需要全部 8 个通道都输出 0 (黑) 才判定有效。
+ *         threshold 可设为 7 或 8, 根据实际停止线宽度调整。
+ */
+bool Gray_Is_StopLine(uint8_t trace)
+{
+    uint8_t black = ~trace;  /* 按位取反: 黑(0) → 1, 白(1) → 0 */
+
+    uint8_t count = 0;
+    const uint8_t threshold = 4;  /* 4路见黑才判定停止线 */
+
+    for (int i = 0; i < 8; i++) {
+        if (black & (1 << i)) {
+            count++;
+        }
+    }
+
+    return count >= threshold;
+}
+
+/**
+ * @brief  检测是否所有通道均为黑色 (用于停止线确定)
+ */
+bool Gray_Is_All_Black(uint8_t trace)
+{
+    return trace == 0x00;  /* 全部 8 位为 0 = 全黑 */
+}

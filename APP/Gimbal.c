@@ -47,7 +47,7 @@ ServoInstance*  servo_yaw;
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
 
-float SLIDE_TARGET_X   =  310.00f ;    /* 目标位置: 画面中心 (640/2) */
+float SLIDE_TARGET_X   =  250.00f ;    /* 目标位置: 画面中心 (640/2) */
 uint32_t motor_zero_point =  0;
 #define SLIDE_SERVO_RANGE      60     /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */

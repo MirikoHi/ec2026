@@ -12,6 +12,7 @@
 #include "IMU_Mahony.h"
 #include "PID.h"
 #include "bsp_log.h"
+#include "gray_serial.h"
 #include "K230.h"
 
 static DCMotorInstance *motor_l,*motor_r;
@@ -224,8 +225,18 @@ void Chassis(void)
 			// 按设定路径执行巡线动作。
 			// Chassis_State_Turn();
 			// 检测直行/转弯是否完成，并更新完成标志。
+			uint8_t gray_data = Gray_Serial_Read();
+			if (fabs(imu_path_cumulative - 11.852f) < 0.6 ){
+				// 停止线 → 停车或执行下一动作
+				DC_Motor_SetRef(motor_l, 0.1f*fabs(11.852f - imu_path_cumulative ));
+				DC_Motor_SetRef(motor_r, 0.1f*fabs(11.852f - imu_path_cumulative));
+				if (fabs(imu_path_cumulative - 11.852f) < 0.1) {
+					DC_Motor_SetRef(motor_l, 0.0f);
+					DC_Motor_SetRef(motor_r, 0.0f);
+				}
+			}
+			imu_path_cumulative = motor_l->position_measure +  motor_r->position_measure;
 			// Stop_Detect();
-
 			break;
 		case IMU_MODE:
 			Chassis_Trace_Cal();
@@ -247,11 +258,16 @@ void Chassis(void)
  */
 static void Chassis_Trace_Cal(void) {
 	trace_compensation=Trace_task();
-	// DC_Motor_SetRef(motor_l,0.02f);
-	// DC_Motor_SetRef(motor_r,0.02f);
 
-	DCMotor_SetTraceCompensation(motor_l,-2*trace_compensation);
-	DCMotor_SetTraceCompensation(motor_r,2*trace_compensation);
+
+	DCMotor_Cmd(motor_l,ENABLE);
+	DCMotor_Cmd(motor_r,ENABLE);
+
+	DC_Motor_SetRef(motor_l,0.06f);
+	DC_Motor_SetRef(motor_r,0.06f);
+
+	DCMotor_SetTraceCompensation(motor_l, - trace_compensation);
+	DCMotor_SetTraceCompensation(motor_r,   trace_compensation);
 }
 /**
  * @brief IMU_MODE 下的测试动作：按边长 0.2m 的正方形循环行走

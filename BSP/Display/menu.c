@@ -168,8 +168,8 @@ MenuInitConfig_s second_menu_config[3]	={      //二级菜单
 		},
 		[2] = {
 			.string={
-				[0] = "任务一",
-				[1] = "任务二",
+				[0] = "任务二",
+				[1] = "任务三",
 				[2] = NULL,
 				[3] = NULL,
 				[4]	= NULL,

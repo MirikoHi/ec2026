@@ -59,8 +59,11 @@ typedef struct {
 
 		Motor_Loop_Mode loop_mode;
 		Motor_Speed_Filter_e filter;
-		float speed_measure;//rpm
-		float position_measure;
+		float speed_measure;       /* 当前速度 (m/s) */
+		float position_measure;    /* 当前位置 (m) */
+		float acceleration;        /* 加速度 (m/s²) */
+		float prev_speed;          /* 上一周期速度, 用于计算加速度 */
+		float dt;                  /* 两次回传数据间的时间间隔 (s) */
 		float Trace_Compensation;
 		State State;
 }__attribute__((aligned(4)))DCMotorInstance;

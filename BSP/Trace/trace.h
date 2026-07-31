@@ -6,6 +6,7 @@
 
 float Trace_task(void);
 void Trace_Init(void);
+void Trace_ApplyParams(void);
 void Trace_ResetLineError(void);
 float raw_transform_easy(uint8_t current_trace);
 float second_process(float raw_val);
