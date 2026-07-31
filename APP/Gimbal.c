@@ -52,7 +52,7 @@ ServoInstance*  servo_yaw;
 
 static float slide_target_x   =  250.00f ;    /* 目标位置: 画面中心 (640/2) */
 uint32_t motor_zero_point =  0;
-#define SLIDE_SERVO_RANGE      60    /* 最大角度范围，需保证一次循环能转完 */
+#define SLIDE_SERVO_RANGE      50    /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
 #define SLIDE_VEL_FF_GAIN      0.5f   /* 速度前馈增益 */
 #define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
@@ -60,9 +60,9 @@ uint32_t motor_zero_point =  0;
 
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
-	.Kp      = 0.1242f,     /* 比例: 每像素误差产生多少度倾角 */
-	.Kd      = 0.01235f,     /* 微分: 抑制震荡 */
-	.Ki      = 0.00163f,     /* 积分: 消除静差 */
+	.Kp      = 0.124538f,     /* 比例: 每像素误差产生多少度倾角 */
+	.Kd      = 0.0123565f,     /* 微分: 抑制震荡 */
+	.Ki      = 0.00165f,     /* 积分: 消除静差 */
 	.max_out = SLIDE_SERVO_RANGE,
 	.max_iout = 30.0f,
 };
