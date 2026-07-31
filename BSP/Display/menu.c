@@ -749,6 +749,7 @@ void menu_task(void)
 		if (timer_active && Key_Check(3, KEY_SINGLE | KEY_LONG))
 		{
 			Chassis_RequestEmergencyStop();
+			Gimbal_RequestEmergencyStop();
 		}
 		float now_ms = DWT_GetTimeline_ms();
 		if ((now_ms - run_screen_last_ms >= 100.0f) || !timer_active)

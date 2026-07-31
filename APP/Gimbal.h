@@ -4,6 +4,9 @@
 #include "ti_msp_dl_config.h"
 #include <stdint.h>
 
+/* ============ ballcontrol 已注释保留，恢复时取消 #if 0 即可（需同时恢复 Gimbal.c） ============ */
+#if 0
+
 /* ---------------- 必须根据实物标定的参数 ---------------- */
 /* K230 的 x=0 表示横梁中心，当前约定 1 个数据单位=1 mm。若发送像素坐标，必须修改该值。 */
 #define BALL_CAMERA_UNIT_TO_M       0.001f
@@ -37,13 +40,25 @@ typedef struct {
     BallControlState_e state;
 } BallControlTelemetry_t;
 
-/** 初始化 ZDT 串口和滚球控制器。上电前必须将横梁机械调平并确认电机零点。 */
-void Gimbal_Init(void);
-
-/** 200 Hz 周期函数：读取任务与相机数据，计算横梁角度并发送给 ZDT 电机。 */
-void Gimbal(void);
-
 /** 获取只读遥测快照，供 OLED 和调试器显示。 */
 BallControlTelemetry_t BallControl_GetTelemetry(void);
+
+#endif
+/* ============ ballcontrol 注释保留结束 ============ */
+
+/** 初始化 Gimbal 任务状态。 */
+void Gimbal_Init(void);
+
+/** 200 Hz 周期函数：接收任务命令，任务三时向 K230 发送 task_flag 并计时。 */
+void Gimbal(void);
+
+/** 返回任务三运行时长（秒）：计时中返回实时值，收到 K230 结束字节 0xAE 后返回冻结值。 */
+float Gimbal_GetRunTimeSeconds(void);
+
+/** 任务三计时是否进行中。 */
+uint8_t Gimbal_IsRunTimerActive(void);
+
+/** KEY4 等异步来源调用，请求立即停止任务三计时。 */
+void Gimbal_RequestEmergencyStop(void);
 
 #endif /* _GIMBAL_H_ */

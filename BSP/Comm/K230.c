@@ -9,6 +9,7 @@ static volatile uint8_t RxState = 0; // ����״̬��־λ
 static uint8_t RxIndex = 0;         // ������������
 K230_Data_t K230_data = {0};
 static volatile uint32_t K230_frame_id = 0;
+static volatile uint8_t K230_end_signal = 0U; // K230 end-of-task byte flag
 static void K230LostCallback(void *ptr);
 DaemonInstance* K230_daemon,*K230_Lost_Target_daemon;
 void Clear_UART_FIFO(void) {
@@ -56,6 +57,11 @@ void K230_ReceiveData(uint8_t RxData)
     }
     if (RxState == 0) // �ȴ���ͷ
     {
+        if (RxData == 0xAE) // K230 end-of-task byte
+        {
+            K230_end_signal = 1U;
+            return;
+        }
         if (RxData == 0x15)
         {
             RxBuffer[0] = RxData;
@@ -126,6 +132,24 @@ void K230_TransmitData(uint8_t Data)
 {
     while (DL_UART_isTXFIFOFull(K230_INST)); // 等待发送FIFO有空位，避免覆盖未发数据
     DL_UART_transmitData(K230_INST, Data);
+}
+
+/**
+ * @brief      K230 是否已发出任务完成结束字节 0xAE（粘滞标志，需显式清除）
+ * @retval     1=已收到结束字节
+ */
+uint8_t K230_IsEndSignal(void)
+{
+    return K230_end_signal;
+}
+
+/**
+ * @brief      清除 K230 结束字节标志（新任务开始时调用）
+ * @retval     无
+ */
+void K230_ClearEndSignal(void)
+{
+    K230_end_signal = 0U;
 }
 
 uint8_t K230_GetSnapshot(K230_Data_t *data, uint32_t *frame_id)

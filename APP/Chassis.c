@@ -330,6 +330,7 @@ void Chassis(void)
 
 			break;
 		case POSITION_MODE:
+#if 0 /* 任务三已由 Gimbal 代替（K230 task_flag 发送 + 0xAE 结束计时），本 case 无需实现 */
 			if (chassis_cmd_receive.competition_task == H_TASK_3_STATIC_BALL){
 				DCMotor_SetTraceCompensation(motor_l, 0.0f);
 				DCMotor_SetTraceCompensation(motor_r, 0.0f);
@@ -355,6 +356,7 @@ void Chassis(void)
 				}
 				return;
 			}
+#endif
 			break;
 		case REMOTE_MODE:
 			Chassis_RemoteControl();
