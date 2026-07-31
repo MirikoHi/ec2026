@@ -575,9 +575,21 @@ static uint8_t Chassis_StadiumStopCenterAtFinish(float curvature, float target_y
 	float remaining = CHASSIS_TRACE_TO_CENTER_M - traveled_after_line;
 	float target_speed;
 
-	/* 最后4 cm直接撤销速度给定，避免速度规划器的惯性拖过A线20~30 cm。 */
+	/* 最后4 cm直接撤销速度给定，避免速度规划器的惯性拖过A线20~30 cm。
+	 * 任务5/6：A点冻结计时但不在此停车，继续直行0.4m后减速停止。 */
 	if (remaining <= 0.04f)
 	{
+		if ((chassis_stadium_task == H_TASK_5_CENTER_BALL_LAP) ||
+		    (chassis_stadium_task == H_TASK_6_TARGET_BALL_LAP))
+		{
+			/* A点冻结计时，清除速度状态以便下一段重新规划。 */
+			chassis_stadium_elapsed_s = DWT_GetTimeline_s() - chassis_stadium_start_time_s;
+			chassis_stadium_timer_running = 0U;
+			chassis_stadium_speed_cmd = 0.0f;
+			chassis_stadium_accel_cmd = 0.0f;
+			Chassis_StadiumEnterStep(CHASSIS_STADIUM_FINISH_COAST);
+			return 1U;
+		}
 		DCMotor_SetTraceCompensation(motor_l, 0.0f);
 		DCMotor_SetTraceCompensation(motor_r, 0.0f);
 		DC_Motor_SetRef(motor_l, 0.0f);
@@ -869,6 +881,37 @@ static void Chassis_StadiumControl(void)
 			target_yaw = Chassis_AngleNormalize(chassis_stadium_initial_yaw +
 			                                    CHASSIS_CLOCKWISE_YAW_SIGN * arc_angle);
 			Chassis_StadiumSetDrive(center_speed, 1.0f / CHASSIS_ARC_DRIVE_RADIUS_M, target_yaw);
+			break;
+		}
+
+		case CHASSIS_STADIUM_FINISH_COAST:
+		{
+			/* 任务5/6专用：通过A点后继续直行，按平方根减速曲线逐渐减速停车。 */
+			float remaining = CHASSIS_TASK56_COAST_M - segment_distance;
+			float target_speed;
+
+			/* 最后4 cm直接撤销速度给定，避免速度规划器的惯性拖过停车点。 */
+			if (remaining <= 0.04f)
+			{
+				DCMotor_SetTraceCompensation(motor_l, 0.0f);
+				DCMotor_SetTraceCompensation(motor_r, 0.0f);
+				DC_Motor_SetRef(motor_l, 0.0f);
+				DC_Motor_SetRef(motor_r, 0.0f);
+				chassis_stadium_speed_cmd = 0.0f;
+				chassis_stadium_accel_cmd = 0.0f;
+				Chassis_StadiumStartFinishBeep(1U);
+				Chassis_StadiumEnterStep(CHASSIS_STADIUM_STOP);
+				break;
+			}
+
+			/* 平方根减速曲线；0.65系数给jerk限制和实车惯性留余量。 */
+			target_speed = 0.65f * sqrtf(2.0f * CHASSIS_STADIUM_MAX_DECEL * remaining);
+			if (target_speed > straight_speed) target_speed = straight_speed;
+			if (target_speed < CHASSIS_FAST_FINISH_SPEED) target_speed = CHASSIS_FAST_FINISH_SPEED;
+
+			/* 经jerk限制后的实际中心速度指令；过A后沿AB方向直行，曲率为0。 */
+			center_speed = Chassis_StadiumUpdateSpeed(target_speed);
+			Chassis_StadiumSetDrive(center_speed, 0.0f, chassis_stadium_initial_yaw);
 			break;
 		}
 
