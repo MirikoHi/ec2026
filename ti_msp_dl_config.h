@@ -192,22 +192,22 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define GPIO_I2C_1_IOMUX_SCL_FUNC                       IOMUX_PINCM9_PF_I2C1_SCL
 
 
-/* Defines for ELRS */
-#define ELRS_INST                                                          UART3
-#define ELRS_INST_FREQUENCY                                             80000000
-#define ELRS_INST_IRQHandler                                    UART3_IRQHandler
-#define ELRS_INST_INT_IRQN                                        UART3_INT_IRQn
-#define GPIO_ELRS_RX_PORT                                                  GPIOB
-#define GPIO_ELRS_TX_PORT                                                  GPIOB
-#define GPIO_ELRS_RX_PIN                                          DL_GPIO_PIN_13
-#define GPIO_ELRS_TX_PIN                                          DL_GPIO_PIN_12
-#define GPIO_ELRS_IOMUX_RX                                       (IOMUX_PINCM30)
-#define GPIO_ELRS_IOMUX_TX                                       (IOMUX_PINCM29)
-#define GPIO_ELRS_IOMUX_RX_FUNC                        IOMUX_PINCM30_PF_UART3_RX
-#define GPIO_ELRS_IOMUX_TX_FUNC                        IOMUX_PINCM29_PF_UART3_TX
-#define ELRS_BAUD_RATE                                                  (420000)
-#define ELRS_IBRD_80_MHZ_420000_BAUD                                        (11)
-#define ELRS_FBRD_80_MHZ_420000_BAUD                                        (58)
+/* Defines for STEPPER_MOTOR (ZDT motor UART) */
+#define STEPPER_MOTOR_INST                                                 UART3
+#define STEPPER_MOTOR_INST_FREQUENCY                                    40000000
+#define STEPPER_MOTOR_INST_IRQHandler                           UART3_IRQHandler
+#define STEPPER_MOTOR_INST_INT_IRQN                               UART3_INT_IRQn
+#define GPIO_STEPPER_MOTOR_RX_PORT                                         GPIOB
+#define GPIO_STEPPER_MOTOR_TX_PORT                                         GPIOB
+#define GPIO_STEPPER_MOTOR_RX_PIN                                 DL_GPIO_PIN_13
+#define GPIO_STEPPER_MOTOR_TX_PIN                                 DL_GPIO_PIN_12
+#define GPIO_STEPPER_MOTOR_IOMUX_RX                              (IOMUX_PINCM30)
+#define GPIO_STEPPER_MOTOR_IOMUX_TX                              (IOMUX_PINCM29)
+#define GPIO_STEPPER_MOTOR_IOMUX_RX_FUNC               IOMUX_PINCM30_PF_UART3_RX
+#define GPIO_STEPPER_MOTOR_IOMUX_TX_FUNC               IOMUX_PINCM29_PF_UART3_TX
+#define STEPPER_MOTOR_BAUD_RATE                                         (115200)
+#define STEPPER_MOTOR_IBRD_40_MHZ_115200_BAUD                               (21)
+#define STEPPER_MOTOR_FBRD_40_MHZ_115200_BAUD                               (45)
 /* Defines for K230 */
 #define K230_INST                                                          UART7
 #define K230_INST_FREQUENCY                                             40000000
@@ -240,6 +240,22 @@ bool SYSCFG_DL_SYSCTL_SYSPLL_init(void);
 #define UART_2_BAUD_RATE                                                (115200)
 #define UART_2_IBRD_40_MHZ_115200_BAUD                                      (21)
 #define UART_2_FBRD_40_MHZ_115200_BAUD                                      (45)
+/* Defines for Licheervnano (LiChee RV Nano K230 vision, shares UART0 with UART_2) */
+#define Licheervnano_INST                                                  UART0
+#define Licheervnano_INST_FREQUENCY                                     40000000
+#define Licheervnano_INST_IRQHandler                            UART0_IRQHandler
+#define Licheervnano_INST_INT_IRQN                                UART0_INT_IRQn
+#define GPIO_Licheervnano_RX_PORT                                          GPIOA
+#define GPIO_Licheervnano_TX_PORT                                          GPIOA
+#define GPIO_Licheervnano_RX_PIN                                   DL_GPIO_PIN_1
+#define GPIO_Licheervnano_TX_PIN                                   DL_GPIO_PIN_0
+#define GPIO_Licheervnano_IOMUX_RX                                (IOMUX_PINCM2)
+#define GPIO_Licheervnano_IOMUX_TX                                (IOMUX_PINCM1)
+#define GPIO_Licheervnano_IOMUX_RX_FUNC                 IOMUX_PINCM2_PF_UART0_RX
+#define GPIO_Licheervnano_IOMUX_TX_FUNC                 IOMUX_PINCM1_PF_UART0_TX
+#define Licheervnano_BAUD_RATE                                          (115200)
+#define Licheervnano_IBRD_40_MHZ_115200_BAUD                                (21)
+#define Licheervnano_FBRD_40_MHZ_115200_BAUD                                (45)
 /* Defines for g_code_uart */
 #define g_code_uart_INST                                                   UART1
 #define g_code_uart_INST_FREQUENCY                                      40000000
@@ -481,7 +497,7 @@ void SYSCFG_DL_dwt_init(void);
 void SYSCFG_DL_ZDT_MOTOR_TICK_init(void);
 void SYSCFG_DL_I2C_0_init(void);
 void SYSCFG_DL_I2C_1_init(void);
-void SYSCFG_DL_ELRS_init(void);
+void SYSCFG_DL_STEPPER_MOTOR_init(void);
 void SYSCFG_DL_K230_init(void);
 void SYSCFG_DL_UART_2_init(void);
 void SYSCFG_DL_g_code_uart_init(void);

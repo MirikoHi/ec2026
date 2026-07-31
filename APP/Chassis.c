@@ -19,6 +19,14 @@ static DCMotorInstance *motor_l,*motor_r;
 
 static chassis_cmd_q chassis_cmd_receive = {0};    // 来自 cmd 的底盘控制命令
 Chassis_Move_State_e Chassis_Move_State;           // 底盘当前移动状态
+Chassis_Move_State_e car_stop = 0;
+
+DCMotorInstance *get_motor_l_instance(void) {
+	return motor_l;
+}
+DCMotorInstance *get_motor_r_instance(void) {
+	return motor_r;
+}
 
 float trace_dt;					// 调试用，记录巡线任务耗时
 float trace_starttime;

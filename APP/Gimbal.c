@@ -1,187 +1,283 @@
 #include "Gimbal.h"
 
 #include "Chassis.h"
-#include "K230.h"
-#include "Robot_Cmd.h"
+#include "ZDT_Motor.h"
 #include "ZDT_Emm.h"
+#include "Robot_cmd.h"
+#include "math.h"
+#include "misc.h"
+#include "PID.h"
+#include "K230.h"
+#include "daemon.h"
+#include "dcmotor.h"
 #include "dwt.h"
-#include "fifo.h"
-#include <math.h>
-#include <string.h>
+#include "Servo.h"
+#include "chassis.h"
+#include "lichee_rec.h"
 
-/* ============ ballcontrol 已注释保留，恢复时取消 #if 0 即可 ============ */
-#if 0
+static DCMotorInstance *motor_l,*motor_r;
 
-#define BALL_CONTROL_PERIOD_S       0.005f
-#define BALL_COMMAND_PERIOD_S       0.020f
-#define BALL_CAMERA_TIMEOUT_S       0.20f
-#define BALL_FILTER_ALPHA           0.45f
-#define BALL_FILTER_BETA            0.08f
-#define BALL_POSITION_KP_DPS_PER_M  80.0f
-#define BALL_VELOCITY_KD_DPS_PER_MPS 24.0f
-#define GRAVITY_MPS2                9.80665f
-#define RAD_TO_DEG                  57.2957795f
+ZDT_Motor_t *yaw_motor,*pitch_motor;
+float angle_debug;
+static gimbal_cmd_q gimbal_cmd_receive={0};
 
-static BallControlTelemetry_t ball_telemetry;
-static uint32_t last_camera_frame;
-static float last_camera_time_s;
-static float last_control_time_s;
-static float last_command_time_s;
-static float task_start_time_s;
-static int32_t last_command_pulses;
+float relay_on_time;
+uint8_t relay_first_on_flag=0;
 
-static float ClampFloat(float value, float min_value, float max_value)
-{
-    if (value < min_value) return min_value;
-    if (value > max_value) return max_value;
-    return value;
-}
+pid_type_def gimbal_yaw_PID={0};
+pid_type_def gimbal_pitch_PID={0};
+pid_type_def gimbal_yaw_forwardfeed_PID = {0};
+static volatile Licheervnano_Frame LicheeRec_Frame;
+
+float x;
+float dt;
+
+float target_angle_deg = 0;
+float velocity_ff = 0.00f;
+
+steel_ball_movement_typedef steel_ball_movement_data;
+ServoInstance*  servo_yaw;
+extern Chassis_Move_State_e car_stop;
+/* ═══════════════════════════════════════════════════════════════════════
+ * Slide Ball Control — 滑槽小球位置闭环
+ *
+ *   - 滑槽一端合页固定，另一端连杆连接舵机
+ *   - 舵机角度控制滑槽倾角，从而控制小球位置
+ *   - 视觉回传 steel_ball_movement_data.x_position (0~640)
+ *   - 视觉回传 steel_ball_movement_data.dt (帧间隔, 秒)
+ *
+ *   控制策略:
+ *     PID(目标位置 - 当前位置) → 基础角度
+ *     + 速度前馈(dt 用于精确速度估计) → 预测性角度补偿
+ *     → 最终舵机角度
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+static float slide_target_x   =  312.00f ;    /* 目标位置: 画面中心 (640/2) */
+uint32_t motor_zero_point =  0;
+#define SLIDE_SERVO_RANGE      45    /* 最大角度范围，需保证一次循环能转完 */
+#define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
+#define SLIDE_VEL_FF_GAIN      0.5f   /* 速度前馈增益 */
+#define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
+#define SLIDE_ACC_GAIN         50.00f
+
+static pid_init_config_s cfg = {   //动态pid这一块
+	.mode    = PID_POSITION,
+	.Kp      = 0.1244f,     /* 比例: 每像素误差产生多少度倾角 */
+	.Kd      = 0.0137f,     /* 微分: 抑制震荡 */
+	.Ki      = 0.00001f,     /* 积分: 消除静差 */
+	.max_out = SLIDE_SERVO_RANGE,
+	.max_iout = 30.0f,
+};
+
+static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
+static float        slide_prev_x = 312;   /* 上一帧 X 位置 */
+int16_t        slide_velocity = 0;        /* 滤波后的小球速度 (px/s) */
+static float     stepper_current_clock = 0;
+
+/* 一阶低通滤波器状态 */
+static float slide_x_lpf_out = 312.0f;
+static float slide_v_lpf_out = 0.0f;
+
 
 static void Gimbal_ZDT_UART_Send(const uint8_t *data, uint8_t len)
 {
-    for (uint8_t i = 0; i < len; ++i) {
-        while (DL_UART_isBusy(ELRS_INST)) {}
-        DL_UART_Main_transmitData(ELRS_INST, data[i]);
-    }
+	for (uint8_t i = 0; i < len; i++) {
+		while (DL_UART_isBusy(STEPPER_MOTOR_INST)) {}
+		DL_UART_Main_transmitData(STEPPER_MOTOR_INST, data[i]);
+	}
 }
 
-/* 只在相机产生新帧时更新 alpha-beta 状态，避免重复使用同一帧制造虚假速度。 */
-static void BallControl_UpdateCamera(float now_s)
+
+static void Slide_Control_Init(void)
 {
-    K230_Data_t camera_data;
-    uint32_t frame_id;
-    if (!K230_GetSnapshot(&camera_data, &frame_id) || frame_id == last_camera_frame) return;
 
-    const float dt = ClampFloat(now_s - last_camera_time_s, 0.005f, 0.10f);
-    const float measured_m = (float)camera_data.x * BALL_CAMERA_UNIT_TO_M;
-    const float predicted_m = ball_telemetry.position_m + ball_telemetry.velocity_mps * dt;
-    const float residual_m = measured_m - predicted_m;
-
-    if (last_camera_frame == 0U) {
-        ball_telemetry.position_m = measured_m;
-        ball_telemetry.velocity_mps = 0.0f;
-    } else {
-        ball_telemetry.position_m = predicted_m + BALL_FILTER_ALPHA * residual_m;
-        ball_telemetry.velocity_mps += (BALL_FILTER_BETA / dt) * residual_m;
-    }
-    last_camera_frame = frame_id;
-    last_camera_time_s = now_s;
+    PID_init(&slide_ball_pid, &cfg);
+	motor_l = get_motor_l_instance();
+	motor_r = get_motor_r_instance();
+    /* 滤波器初始化 */
+    slide_x_lpf_out = slide_target_x;
+    slide_v_lpf_out = 0.0f;
+    slide_prev_x = slide_target_x;
 }
 
-/* 根据竞赛任务生成滚球目标。任务3按 O -> +5 cm -> -5 cm 执行。 */
-static float BallControl_GetTaskTarget(uint8_t task, float elapsed_s)
+/**
+ * @brief 滑槽小球闭环控制 (在 Gimbal 200Hz 循环中调用)
+ *
+ * 算法:
+ *   1. 从 K230 数据中取 x_position (0~640) 和 dt (帧间隔)
+ *   2. 原始坐标一阶低通滤波
+ *   3. 速度估计: v = Δx / dt, 再低通滤波
+ *   4. 位置误差 → PID → 基础舵机角度
+ *   5. 速度前馈: 球速越大 → 倾角补偿越大
+ *   6. 合成最终角度, 限幅后输出到步进电机
+ */
+float acc_r = 0;
+float acc_l = 0;
+float x_raw = 0;
+static void Slide_Control_Run(void)
 {
-    if (task == H_TASK_3_STATIC_BALL) {
-        ball_telemetry.state = BALL_CONTROL_STATIC_SEQUENCE;
-        if (elapsed_s < 0.40f) return 0.0f;
-        if (elapsed_s < 2.40f) return 0.05f;
-        return -0.05f;
+    if (!K230_Read(&steel_ball_movement_data)) return;
+
+	acc_r = motor_r -> acceleration;
+	acc_l = motor_l -> acceleration;
+	float acc_total = 0;
+	if ((acc_l / acc_r) >= 0.8 && (acc_l / acc_r) <= 1.2) {
+		acc_total = (acc_r >= acc_l) ? acc_r : acc_l;
+	}
+    /* 原始视觉坐标 */
+    x_raw  = (float)steel_ball_movement_data.x_position;
+
+    /* ========= X坐标一阶低通滤波 ========= */
+    slide_x_lpf_out = SLIDE_X_LPF_ALPHA * x_raw + (1.0f - SLIDE_X_LPF_ALPHA) * slide_x_lpf_out;
+    x = slide_x_lpf_out;
+    /* ===================================== */
+
+    dt = steel_ball_movement_data.dt;
+
+    /* 保护: dt 异常时使用默认值 */
+    if (dt <= 0.0f || dt > 0.5f) {
+        dt = 0.05f;  /* 默认 50ms (20fps) */
     }
-    if (task == H_TASK_4_AB_BALL || task == H_TASK_5_CENTER_BALL_LAP) {
-        ball_telemetry.state = BALL_CONTROL_CENTER;
-        return 0.0f;
-    }
-    if (task == H_TASK_6_TARGET_BALL_LAP) {
-        ball_telemetry.state = BALL_CONTROL_TARGET;
-        return gimbal_cmd_receive.aim_x;
-    }
-    ball_telemetry.state = BALL_CONTROL_IDLE;
-    return 0.0f;
+
+    /* ── 1. 速度估计 (利用 dt 精确计算) ── */
+    float raw_v = (x - slide_prev_x) / dt;
+    slide_prev_x = x;
+
+    /* 速度一阶低通滤波 */
+    slide_v_lpf_out = SLIDE_VEL_LPF_ALPHA * raw_v + (1.0f - SLIDE_VEL_LPF_ALPHA) * slide_v_lpf_out;
+    slide_velocity = (int16_t)(slide_v_lpf_out / 10.0f);
+
+    /* ── 2. 位置 PID ── */
+    float error = slide_target_x - x;
+    PID_calc(&slide_ball_pid, 0.0f, error);
+
+    /* ── 3. 速度前馈 ──
+     * 球向右运动 (v>0) → 需要左倾 (减小角度) 来"接住"球
+     * 球速越大 → 前馈幅度越大 → 电机提前动作 */
+    velocity_ff = (float)slide_velocity * SLIDE_VEL_FF_GAIN;
+	if (velocity_ff > 60.0f) {velocity_ff = 60.0f;}
+	else if (velocity_ff < -60.0f) {velocity_ff = -60.0f;}
+
+    /* ── 4. 合成角度 = PID输出 + 速度前馈 ── */
+	target_angle_deg = slide_ball_pid.out + velocity_ff + (acc_total * SLIDE_ACC_GAIN);
+
+	if (target_angle_deg >   SLIDE_SERVO_RANGE)  target_angle_deg =   SLIDE_SERVO_RANGE;
+	if (target_angle_deg < -(SLIDE_SERVO_RANGE)) target_angle_deg = -(SLIDE_SERVO_RANGE);
+
+	int32_t pulses = (int32_t)(target_angle_deg * 3200.0f / 360.0f);
+
+	uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
+	uint8_t dir = pulses >= 0 ? 1 : 0;
+
+	uint8_t speed = pulse_count >= 100 ? 30 : 20;
+
+    ZDT_Emm_Pos_Control(1, dir, speed, 0, (uint32_t)pulse_count, 1, false);
 }
 
-/* 将横梁角度转换为 ZDT 快速绝对位置命令，并限制命令发送频率。 */
-static void BallControl_SendBeamAngle(float beam_angle_deg, float now_s)
-{
-    const float motor_angle_deg = beam_angle_deg * BALL_MOTOR_TO_BEAM_RATIO * BALL_MOTOR_DIRECTION;
-    const int32_t pulses = (int32_t)lroundf(motor_angle_deg * BALL_MOTOR_PULSES_PER_REV / 360.0f);
-    if ((now_s - last_command_time_s) < BALL_COMMAND_PERIOD_S || pulses == last_command_pulses) return;
-
-    ZDT_Emm_QPos_Control(1U, pulses);
-    last_command_pulses = pulses;
-    last_command_time_s = now_s;
-}
 
 void Gimbal_Init(void)
 {
-    memset(&gimbal_cmd_receive, 0, sizeof(gimbal_cmd_receive));
-    memset(&ball_telemetry, 0, sizeof(ball_telemetry));
-    fifo_initQueue(&zdt_emm_rx_fifo);
-    ZDT_Emm_RegisterSendCallback(Gimbal_ZDT_UART_Send);
-    NVIC_ClearPendingIRQ(ELRS_INST_INT_IRQN);
-    NVIC_EnableIRQ(ELRS_INST_INT_IRQN);
+	/* RX FIFO */
+	fifo_initQueue(&zdt_emm_rx_fifo);
 
-    ZDT_Emm_En_Control(1U, true, false);
-    ZDT_Emm_Set_QPos_Params(1U, BALL_MOTOR_MAX_RPM, BALL_MOTOR_ACCEL, 1U, false);
-    last_control_time_s = DWT_GetTimeline_s();
-    last_camera_time_s = last_control_time_s;
-    last_command_time_s = last_control_time_s - BALL_COMMAND_PERIOD_S;
-    last_command_pulses = INT32_MIN;
+	/* UART 发送回调 */
+	ZDT_Emm_RegisterSendCallback(Gimbal_ZDT_UART_Send);
+
+	/* RX 中断 */
+	NVIC_ClearPendingIRQ(STEPPER_MOTOR_INST_INT_IRQN);
+	NVIC_EnableIRQ(STEPPER_MOTOR_INST_INT_IRQN);
+
+	/* 使能电机 (rotate, addr=1) */
+	ZDT_Emm_En_Control(1, true, false);
+
+
+	// Servo_Init_Config_s servo_yaw_config = {
+	// 	.Servo_type = Servo180,
+	// 	.inst = Servo_INST,
+	// 	.idx = 0,    //对应DL_TIMER_CC_0_INDEX，PA17
+	// };
+	// servo_yaw = ServoInit(&servo_yaw_config);
+	// Servo_Motor_Type_Select(servo_yaw, Free_Angle_mode);
+
+	/* 初始化滑槽小球位置闭环 */
+	Slide_Control_Init();
+
+	DWT_Delay(1);
+	//ZDT_Emm_Pos_Control(1, 1, 2000, 253, 0, 1, false);
+	ZDT_Emm_Origin_Trigger_Return(1, 0, 0);
 }
 
+static uint8_t change_flag1 = 0;
+static uint8_t change_flag2 = 0;
+static uint8_t count1 = 0;
+static uint8_t count2 = 0;
 void Gimbal(void)
-{
-    const float now_s = DWT_GetTimeline_s();
-    float dt = now_s - last_control_time_s;
-    last_control_time_s = now_s;
-    dt = ClampFloat(dt, 0.001f, 0.02f);
+{   //ZDT_Emm_Pos_Control(1, 1, 190, 0, 0, 1, false);
+	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
+	//获取licheerv数据
+	LicheeRec_Frame = LicheeRec_GetFrame();
+	Slide_Control_Run();
 
-    (void)xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 0U);
-    if ((gimbal_cmd_receive.task_flag != last_task) ||
-        (gimbal_cmd_receive.task_start_seq != last_task_start_seq)) {
-        last_task = gimbal_cmd_receive.task_flag;
-        last_task_start_seq = gimbal_cmd_receive.task_start_seq;
-        task_start_time_s = now_s;
-        ball_telemetry.max_abs_error_m = 0.0f;
-    }
-
-    BallControl_UpdateCamera(now_s);
-    ball_telemetry.camera_online = (uint8_t)(K230_IsOnline() &&
-        ((now_s - last_camera_time_s) <= BALL_CAMERA_TIMEOUT_S));
-    ball_telemetry.target_m = BallControl_GetTaskTarget(last_task, now_s - task_start_time_s);
-
-    float requested_angle_deg = 0.0f;
-    if (ball_telemetry.state != BALL_CONTROL_IDLE && ball_telemetry.camera_online) {
-        const float error_m = ball_telemetry.target_m - ball_telemetry.position_m;
-        const float abs_error_m = fabsf(error_m);
-        if (abs_error_m > ball_telemetry.max_abs_error_m) ball_telemetry.max_abs_error_m = abs_error_m;
-
-        /* 底盘纵向加速度前馈抵消惯性，PD 项负责小球位置和速度。 */
-        const float chassis_ff_deg = atanf(Chassis_GetCommandedAcceleration() / GRAVITY_MPS2) *
-                                     RAD_TO_DEG;
-        requested_angle_deg = BALL_POSITION_KP_DPS_PER_M * error_m -
-                              BALL_VELOCITY_KD_DPS_PER_MPS * ball_telemetry.velocity_mps +
-                              chassis_ff_deg;
-    } else if (ball_telemetry.state != BALL_CONTROL_IDLE) {
-        ball_telemetry.state = BALL_CONTROL_CAMERA_LOST;
-    }
-
-    requested_angle_deg = ClampFloat(requested_angle_deg,
-                                     -BALL_BEAM_MAX_ANGLE_DEG,
-                                     BALL_BEAM_MAX_ANGLE_DEG);
-    const float max_step_deg = BALL_BEAM_MAX_SLEW_DPS * dt;
-    const float angle_delta_deg = ClampFloat(requested_angle_deg - ball_telemetry.beam_angle_deg,
-                                             -max_step_deg, max_step_deg);
-    ball_telemetry.beam_angle_deg += angle_delta_deg;
-    BallControl_SendBeamAngle(ball_telemetry.beam_angle_deg, now_s);
+	// static uint16_t cntr = 0;
+	// cntr ++;
+	// if (cntr <= 100) {
+	// 	ZDT_Emm_Pos_Control(1, 1, 100, 0, 100, 1, false);
+	// } else if (cntr >= 100) {
+	// 	if (cntr >= 200) cntr = 0;
+	// 	ZDT_Emm_Pos_Control(1, 0, 100, 0, 100, 1, false);
+	// }
+	switch (gimbal_cmd_receive.task_flag) {
+		case 0:    //复位模式
+			slide_target_x = 312;
+			change_flag1 = 0;
+			change_flag2 = 0;
+			break;
+		case 3:   //任务3，静止状态，使小球在+5——-5间折返
+			if (!change_flag1) {
+				slide_target_x = 180;
+				change_flag1 = 1;
+			}
+			if (fabsf(x_raw - slide_target_x) < 30) {
+				count1++;
+				if (change_flag2) {
+					count2++;
+				}
+			}
+			if (count1 > 60 && change_flag1) {
+				count1 = 0;
+				slide_target_x = 440;
+				change_flag2 = 1;
+			}
+			if (count2 > 90  && change_flag2) {
+				car_stop = 1;
+				count2 = 0;
+			}
+			break;
+		case 6://任务6，钢球置于指定位置走一圈
+			slide_target_x = LicheeRec_Frame.relative_position * 600;
+			break;
+	}
 }
 
-BallControlTelemetry_t BallControl_GetTelemetry(void)
+void Gimbal_Pid_Cal(void)
 {
-    return ball_telemetry;
+	gimbal_cmd_receive.pitch +=gimbal_pitch_PID.out;
+}
+void Gimbal_Attitude_Solving(void)
+{
+	float aim_x = gimbal_cmd_receive.aim_x;
+	float aim_y = gimbal_cmd_receive.aim_y;
+	gimbal_cmd_receive.yaw = -atan2f(aim_x,GIMBAL_LENGTH_TO_CENTER)*180.0f/PI;
+	gimbal_cmd_receive.pitch = atan2f(aim_y,sqrtf(GIMBAL_LENGTH_TO_CENTER*GIMBAL_LENGTH_TO_CENTER+aim_x*aim_x))*180.0f/PI;
 }
 
-#endif
-/* ============ ballcontrol 注释保留结束 ============ */
-
-/* ===== RTOS 消息队列内容 ===== */
-static gimbal_cmd_q gimbal_cmd_receive;
-
-void Gimbal_Init(void)
+void UART3_IRQHandler(void)
 {
-    memset(&gimbal_cmd_receive, 0, sizeof(gimbal_cmd_receive));
+	uint8_t byte = DL_UART_receiveData(STEPPER_MOTOR_INST);
+	ZDT_Emm_RxPushByte(byte);
+	DL_UART_clearInterruptStatus(STEPPER_MOTOR_INST, DL_UART_INTERRUPT_RX);
 }
 
-void Gimbal(void)
-{
-    (void)xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 0U);
+void Slider_Set_Pos_Pixel(const uint16_t pix_pos) {
+	slide_target_x = (float)pix_pos;
 }

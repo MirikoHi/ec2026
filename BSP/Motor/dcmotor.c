@@ -112,6 +112,16 @@ void Hw_Motor_Task(void)
 		dcmotor_instance[i].speed_measure=(dcmotor_instance[i].Input_Dir==MOTOR_REVERSAL? -1:1)*(dcmotor_instance[i].encoder->count*ENCODER_TO_SPEED_MS);
 		//滤波
 		DCMotor_Speed_Filter(&dcmotor_instance[i].filter,dcmotor_instance[i].speed_measure);
+		/* 存储控制周期 dt */
+		dcmotor_instance[i].dt = control_period;
+
+		/* 计算加速度: (当前滤波速度 - 上一周期滤波速度) / dt */
+		if (control_period > 1e-6f) {
+			dcmotor_instance[i].acceleration =
+				(dcmotor_instance[i].filter.speed_filtered - dcmotor_instance[i].prev_speed)
+				/ control_period;
+		}
+		dcmotor_instance[i].prev_speed = dcmotor_instance[i].filter.speed_filtered;
 		if (dcmotor_instance[i].loop_mode == ANGLE_MODE) {
 			//计算角度环输出，角度环out和巡线补偿作为速度环ref
 			PID_calc(&dcmotor_instance[i].position_pid,dcmotor_instance[i].position_pid.Ref,dcmotor_instance[i].position_measure);

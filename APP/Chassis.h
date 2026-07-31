@@ -2,6 +2,7 @@
 #define _CHASSIS_H_
 
 #include "ti_msp_dl_config.h"
+#include "dcmotor.h"
 
 /* BC实际退出角度，单位deg；调小可减轻C点超调。 */
 #define CHASSIS_BC_EXIT_ANGLE_DEG 165.0f
@@ -54,6 +55,8 @@ typedef enum {
 #define CHASSIS_LENGTH_TO_CENTER 0.166 //PAW3395到车体中心的距离,单位m //PAW3395���������ľ���,��λm
 void Chassis(void);
 void Chassis_Init(void);
+DCMotorInstance *get_motor_l_instance(void);
+DCMotorInstance *get_motor_r_instance(void);
 
 void Motor_Cmd_CallBack(uint8_t i);
 

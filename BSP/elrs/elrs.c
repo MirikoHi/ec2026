@@ -24,13 +24,13 @@
 
 void ELRS_INST_IRQHandler(void)
 {
-    if (DL_UART_getPendingInterrupt(ELRS_INST) == DL_UART_IIDX_RX) {
-        /* 接收一个字节，推入 ZDT FIFO */
-        ZDT_Emm_RxPushByte((uint8_t)DL_UART_Main_receiveData(ELRS_INST));
-    }
+    // if (DL_UART_getPendingInterrupt(ELRS_INST) == DL_UART_IIDX_RX) {
+    //     /* 接收一个字节，推入 ZDT FIFO */
+    //     ZDT_Emm_RxPushByte((uint8_t)DL_UART_Main_receiveData(ELRS_INST));
+    // }
 
-    /* 清除接收中断标志 */
-    DL_UART_clearInterruptStatus(ELRS_INST, DL_UART_IIDX_RX);
+    // /* 清除接收中断标志 */
+    // DL_UART_clearInterruptStatus(ELRS_INST, DL_UART_IIDX_RX);
 }
 
 /* ============================================================

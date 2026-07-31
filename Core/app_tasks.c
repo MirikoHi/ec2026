@@ -82,6 +82,7 @@
 #include "Gimbal.h"
 #include "ZDT_Motor.h"
 #include "../BSP/Motor_DJIDM/motor_task.h"
+#include "K230.h"
 /* TI includes. */
 #include "ti_msp_dl_config.h"
 
@@ -119,6 +120,7 @@
 #define StepMotor_PARAMETER (0x14UL)
 #define MotorTask_PARAMETER (0x15UL)
 #define Menu_PARAMETER       (0x16UL)
+#define K230Read_PARAMETER   (0x17UL)
 
 
 // 是否打开栈水位监控功能 ： 1开启 0关闭   todo：在实际运行的时候看栈水位，优化大小节省sram空间
@@ -218,12 +220,6 @@ void app_tasks_init(void)
 			             (void *) HwMotor_PARAMETER, tskIDLE_PRIORITY+2,
 			             STACK_HANDLE(Hwmotor));
 			configASSERT(xResult == pdPASS);
-
-//			xResult=xTaskCreate(StepMotorTask, "StepMotor", 128,
-//            (void *) StepMotor_PARAMETER, tskIDLE_PRIORITY+2,
-//            NULL);
-// 			configASSERT(xResult == pdPASS);
-
 
 			xResult=xTaskCreate(RobotCmdTask, "RobotCmd", ROBOTCMD_TASK_STACK_DEPTH,
             (void *) RobotCmd_PARAMETER, tskIDLE_PRIORITY+2,
@@ -399,6 +395,19 @@ static void StepMotorTask(void *pvParameters)
 			
 		}
 }
+
+// static void k230ReadTask(void *pvParameters)
+// {
+// 	configASSERT(
+// 		((unsigned long) pvParameters) == K230Read_PARAMETER);
+// 	vTaskDelay(1000);
+// 	steel_ball_movement_typedef steel_ball_movement_data;
+// 	for (;;){
+// 		if (k230_data_valid) K230_Read(&steel_ball_movement_data);
+// 		vTaskDelay(pdMS_TO_TICKS(5));
+// 	}
+// }
+
 static void RobotCmdTask(void *pvParameters)
 {
 	configASSERT(

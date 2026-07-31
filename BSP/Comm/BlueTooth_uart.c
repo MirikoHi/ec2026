@@ -234,30 +234,30 @@ static void BlueToothUart_LostCallback(void *ptr)
 
 // ===== ISR 中断服务函数 =====
 
-void UART_2_INST_IRQHandler(void)
-{
-    uint32_t status = DL_UART_getEnabledInterruptStatus(UART_2_INST, BT_UART_HANDLED_INTERRUPTS);
+// void UART_7_INST_IRQHandler(void)
+// {
+//     uint32_t status = DL_UART_getEnabledInterruptStatus(UART_2_INST, BT_UART_HANDLED_INTERRUPTS);
 
-    if (status != 0U)
-    {
-        DL_UART_clearInterruptStatus(UART_2_INST, status);
-    }
+//     if (status != 0U)
+//     {
+//         DL_UART_clearInterruptStatus(UART_2_INST, status);
+//     }
 
-    // 错误中断：计数、复位状态、清 FIFO
-    if ((status & BT_UART_ERROR_INTERRUPTS) != 0U)
-    {
-        bt_uart_error_count++;
-        BlueToothUart_ResetRx();
-        BlueToothUart_ClearFifo();
-    }
+//     // 错误中断：计数、复位状态、清 FIFO
+//     if ((status & BT_UART_ERROR_INTERRUPTS) != 0U)
+//     {
+//         bt_uart_error_count++;
+//         BlueToothUart_ResetRx();
+//         BlueToothUart_ClearFifo();
+//     }
 
-    // RX 中断：排空 FIFO
-    if ((status & BT_UART_RX_INTERRUPTS) != 0U)
-    {
-        while (!DL_UART_isRXFIFOEmpty(UART_2_INST))
-        {
-            uint8_t byte = DL_UART_receiveData(UART_2_INST);
-            BlueToothUart_FeedByte(byte);
-        }
-    }
-}
+//     // RX 中断：排空 FIFO
+//     if ((status & BT_UART_RX_INTERRUPTS) != 0U)
+//     {
+//         while (!DL_UART_isRXFIFOEmpty(UART_2_INST))
+//         {
+//             uint8_t byte = DL_UART_receiveData(UART_2_INST);
+//             BlueToothUart_FeedByte(byte);
+//         }
+//     }
+// }

@@ -90,9 +90,13 @@ electric-competition-training/
 │   │   ├── oledfont.h          # 字库数据
 │   │   └── bsp_oled.c/h        # 备用 OLED 驱动（旧版）
 │   ├── Comm/                   # 通信
-│   │   ├── K230.c/h            # K230 AI 视觉模块 (UART)
+│   │   ├── K230.c/h            # K230 AI 视觉模块 (UART, steel_ball_movement)
 │   │   ├── NRF24L01.c/h        # NRF24L01 2.4G 无线模块
 │   │   └── Emm_V5.c/h          # EMM V5 模块
+├── lichee_rec/             # LiChee RV Nano 识别模块
+│   │   ├── lichee_rec.c/h      # LiChee 通信协议解析 (0xA5/CRC8)
+├── Algorithm/              # 算法库
+│   │   ├── crc8.c/h            # CRC-8 校验 (含 CRC-8/MAXIM)
 │   ├── Control/                # 控制算法
 │   │   ├── PID.c/h             # 通用 PID 控制器
 │   │   └── bsp_pid.c/h         # 速度 PI 控制器（旧版）
@@ -307,7 +311,7 @@ Flash (0x00000000 - 0x00020000, 128KB):
 
 | 功能 | 引脚 | 外设 |
 |------|------|------|
-| K230 UART RX/TX | PB16/PB15 | UART2, 115200 |
+| K230 UART RX/TX | PB16/PB15 | UART2, 115200 |   //这个是准的  代码里面的逻辑也没有问题  即插即用
 | UART1 RX/TX | PB7/PB6 | UART1, 115200 |
 | UART0 RX/TX | PB13/PB12 | UART0, 115200 |
 
@@ -512,45 +516,37 @@ typedef enum {
 
 ---
 
-#### 7.1.3 Gimbal — 云台控制
+#### 7.1.3 Gimbal — 云台控制 (ZDT 电机滑槽小球闭环)
 
 **文件**: `APP/Gimbal.c`, `APP/Gimbal.h`
 
-**职责**: 二轴云台（偏航 Yaw / 俯仰 Pitch）的步进电机控制，包含视觉伺服跟踪和自动射击逻辑。
+**职责**: 基于 ZDT_Emm 步进电机的滑槽小球位置闭环控制。通过 K230 视觉回传的钢球位置数据，经 PID 控制器 + 速度前馈 + 底盘加速度前馈，计算舵机/步进电机角度，控制滑槽倾角使小球保持在目标位置。
 
-**常量**:
+**控制策略**:
+1. `K230_Read()` 获取钢球位置 `x_position` (0~640) 和帧间隔 `dt`
+2. 坐标一阶低通滤波 → 速度估计 (Δx/dt) → 速度低通滤波
+3. 位置误差 → PID (Kp=0.1244, Kd=0.0137, Ki=0.00001) → 基础角度
+4. 速度前馈 (SLIDE_VEL_FF_GAIN=0.5) + 底盘加速度前馈 (SLIDE_ACC_GAIN=50)
+5. 合成角度限幅 ±45° → ZDT_Emm_Pos_Control 输出脉冲
 
-```c
-#define GIMBAL_LENGTH_TO_CENTER 0.66  // 云台旋转中心到目标的距离 (米)
-```
+**任务模式** (`task_flag` 驱动):
+| 任务 | 行为 |
+|------|------|
+| 0 | 复位模式: 目标位置 = 312 (画面中心) |
+| 3 | 静态滚球 ±5cm: 目标在 180/440 间切换, 到位后触 `car_stop` |
+| 6 | 指定位置: 从 LiCheeRec 获取 `relative_position` 作为目标 |
 
 **API**:
 
 | 函数 | 说明 |
 |------|------|
-| `void Gimbal_Init(void)` | 初始化偏航/俯仰 ZDT 步进电机 + 步进定时器 |
-| `void Gimbal(void)` | 云台主控制循环 (由 GimbalTask 每 5ms 调用) |
-| `static void Gimbal_Attitude_Solving(void)` | 笛卡尔坐标 → 云台角度逆运动学解算 |
-| `static void Gimbal_task_2(void)` | K230 视觉目标跟踪 + 继电器射击序列 |
+| `void Gimbal_Init(void)` | 初始化 ZDT_Emm 电机 UART + 滑槽 PID 控制器 |
+| `void Gimbal(void)` | 200 Hz 控制循环: 接收命令 + Slide_Control_Run |
+| `void Gimbal_Attitude_Solving(void)` | 笛卡尔坐标 → 云台角度逆运动学解算 |
+| `void Slider_Set_Pos_Pixel(uint16_t)` | 设置滑槽目标位置 (像素) |
+| `void UART3_IRQHandler(void)` | ZDT 步进电机 UART 接收中断 |
 
-**逆运动学解算** (`Gimbal_Attitude_Solving`):
-
-```c
-yaw   = -atan2(aim_x, GIMBAL_LENGTH_TO_CENTER) * 180 / PI;
-pitch =  atan2(aim_y, sqrt(GIMBAL_LENGTH_TO_CENTER² + aim_x²)) * 180 / PI;
-```
-
-**视觉跟踪与射击序列** (`Gimbal_task_2`):
-1. 从命令队列获取目标角度，设置偏航/俯仰电机位置
-2. 检测 K230 视觉锁定条件：
-   - `|K230_err[0]| <= 1` (偏航误差 ≤ 1°)
-   - `|K230_err[1]| <= 1` (俯仰误差 ≤ 1°)
-   - `DaemonIsOnline(K230_daemon)` (K230 通信在线)
-   - `relay_first_on_flag == 0` (未触发过)
-3. 满足条件 → `relay_on_flag = 1`，记录触发时间
-4. 继电器保持 200ms 后自动断开
-
-**依赖**: `ZDT_Motor.h`, `K230.h`, `daemon.h`, `dwt.h`, `math.h`
+**依赖**: `ZDT_Emm.h`, `ZDT_Motor.h`, `K230.h`, `lichee_rec.h`, `dcmotor.h`, `PID.h`, `dwt.h`
 
 ---
 
@@ -828,41 +824,99 @@ typedef struct { float x; float y; float z; } xyz_f_t;
 
 #### 7.2.8 K230 — AI 视觉模块
 
-**文件**: `BSP/K230.c`, `BSP/K230.h`
+**文件**: `BSP/Comm/K230.c`, `BSP/Comm/K230.h`
 
-**职责**: K230 AI 视觉模块的 UART 通信协议解析。
+**职责**: K230 AI 视觉模块的 UART 通信协议解析，接收钢球位置数据。
 
-**数据包格式** (7 字节):
+**数据包格式** (8 字节):
 
 ```
-[0x15] [0x11] [data_low] [data_high] [data_low] [data_high] [checksum]
- 帧头    类型    Yaw_Err_L   Yaw_Err_H   Pitch_Err_L Pitch_Err_H  和校验
+[0xA5] [x_low] [x_high] [dt_byte0] [dt_byte1] [dt_byte2] [dt_byte3] [crc8]
+ 帧头   位置X (uint16_LE)   时间间隔 dt (float32_LE)            CRC-8/MAXIM
 ```
 
-**导出变量**:
+**导出变量/类型**:
 
 ```c
-extern int16_t K230_err[2];                 // [0]=Yaw误差, [1]=Pitch误差 (度)
-extern DaemonInstance* K230_daemon;         // 通信心跳 (reload=11)
-extern DaemonInstance* K230_Lost_Target_daemon; // 目标丢失检测 (reload=50)
+typedef struct {
+    uint16_t x_position;
+    float    dt;
+} steel_ball_movement_typedef;
+
+extern volatile uint8_t k230_data_valid;
 ```
 
 **API**:
 
 | 函数 | 说明 |
 |------|------|
-| `void K230_Init(void)` | 清 UART FIFO + 使能 RX 中断 + 注册守护进程 |
-| `void K230_ReceiveData(uint8_t RxData)` | 状态机解析 (3 态: 等待帧头→等待类型→收数据) |
+| `void K230_Init(void)` | 清 UART FIFO + 使能 RX 中断 |
+| `void K230_ReceiveData(const uint8_t RxData)` | 状态机解析 (2 态: 等待帧头→接收数据) |
+| `uint8_t K230_Read(steel_ball_movement_typedef *data)` | 读取最新有效帧 (消费后 k230_data_valid 清零) |
 
 **解析状态机**:
-1. 等待 0x15 (帧头)
-2. 等待 0x11 (数据类型)
-3. 收 5 字节数据 + 校验
-4. 校验通过 → 提取 `K230_err[0/1]` + 重载守护进程
+1. 等待 0xA5 (帧头) → 进入接收状态
+2. 接收 7 字节数据 → CRC-8/MAXIM 校验
+3. 校验通过 → 提取 x_position (uint16) + dt (float32) → `k230_data_valid = 1`
+4. 帧头在接收中途出现时自动重新同步
 
 ---
 
-#### 7.2.9 trace — 灰度巡线传感器
+#### 7.2.9 lichee_rec — LiChee RV Nano 识别模块
+
+**文件**: `BSP/lichee_rec/lichee_rec.c`, `BSP/lichee_rec/lichee_rec.h`
+
+**职责**: LiChee RV Nano 视觉识别模块的 UART 通信协议解析，接收滑槽长度和钢球相对位置数据。
+
+**数据包格式** (11 字节):
+
+```
+[0xA5] [0x0A] [slider_len float32_LE] [relative_pos float32_LE] [crc8]
+ 帧头   cmd_id  滑槽长度 (cm)           相对位置 (cm)            CRC-8/MAXIM
+```
+
+**导出类型/变量**:
+
+```c
+typedef enum { OFFLINE = 0, ONLINE = 1 } LicheervnanoStatus_t;
+
+typedef struct {
+    float slider_length_cm;
+    float relative_position;
+} Licheervnano_Frame;
+
+extern LicheervnanoStatus_t host_status;
+```
+
+**API**:
+
+| 函数 | 说明 |
+|------|------|
+| `void LicheeRec_Init(void)` | 清 UART FIFO + 使能 RX 中断 |
+| `void LicheeRec_ReceiveData(uint8_t RxData)` | 状态机解析 (3 态: 帧头→cmd_id→数据) |
+| `uint8_t LicheeRec_GetFrame(Licheervnano_Frame *frame)` | 读取最近有效帧 (消费后清零) |
+
+**依赖**: `crc8.h` (CRC-8/MAXIM 校验)
+
+---
+
+#### 7.2.10 CRC8 — CRC-8 校验算法
+
+**文件**: `BSP/Algorithm/crc8.c`, `BSP/Algorithm/crc8.h`
+
+**职责**: 提供两种 CRC-8 算法，供 K230 和 LiChee 通信协议使用。
+
+**API**:
+
+| 函数 | 说明 |
+|------|------|
+| `uint8_t crc_8(const uint8_t *data, uint16_t num_bytes)` | CRC-8/SHT75 (左移, 查表法) |
+| `uint8_t update_crc_8(uint8_t crc, uint8_t val)` | CRC-8/SHT75 增量更新 |
+| `uint8_t crc8_maxim(const uint8_t *data, size_t len)` | CRC-8/MAXIM (右移, 反射多项式 0x8C, 初值 0x00) |
+
+---
+
+#### 7.2.11 trace — 灰度巡线传感器
 
 **文件**: `BSP/trace.c`, `BSP/trace.h`, `BSP/No_Mcu_Ganv_Grayscale_Sensor.c/.h`
 
@@ -1179,7 +1233,13 @@ void IMU_getYawPitchRoll(float *ypr);                      // ypr[0]=Yaw, [1]=Pi
 
 // K230 AI 视觉
 void K230_Init(void);
-extern int16_t K230_err[2];                                // [0]=Yaw误差, [1]=Pitch误差
+uint8_t K230_Read(steel_ball_movement_typedef *data);          // 读取钢球位置数据
+extern volatile uint8_t k230_data_valid;
+
+// LiChee RV Nano
+void LicheeRec_Init(void);
+uint8_t LicheeRec_GetFrame(Licheervnano_Frame *frame);         // 读取滑槽识别帧
+extern LicheervnanoStatus_t host_status;
 
 // 灰度巡线
 void Trace_Init(void);
@@ -1245,8 +1305,8 @@ void delay_ms(unsigned long ms);
 
 ---
 
-> 文档生成日期: 2026-06-22
-> 项目分支: `clion`
+> 文档生成日期: 2026-08-01
+> 项目分支: `master` (合并 clion_merge 的 ZDT 电机控制与 K230 通信代码)
 
 
 

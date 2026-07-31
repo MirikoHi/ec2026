@@ -44,7 +44,7 @@ DL_TimerA_backupConfig gServoBackup;
 DL_TimerG_backupConfig gPWM_0Backup;
 DL_TimerA_backupConfig gTIMER_TICKBackup;
 DL_TimerG_backupConfig gZDT_MOTOR_TICKBackup;
-DL_UART_Main_backupConfig gELRSBackup;
+DL_UART_Main_backupConfig gSTEPPER_MOTORBackup;
 DL_SPI_backupConfig gICM42688Backup;
 DL_SPI_backupConfig gSPI_FLASHBackup;
 
@@ -66,7 +66,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_ZDT_MOTOR_TICK_init();
     SYSCFG_DL_I2C_0_init();
     SYSCFG_DL_I2C_1_init();
-    SYSCFG_DL_ELRS_init();
+    SYSCFG_DL_STEPPER_MOTOR_init();
     SYSCFG_DL_K230_init();
     SYSCFG_DL_UART_2_init();
     SYSCFG_DL_g_code_uart_init();
@@ -80,7 +80,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
 	gPWM_0Backup.backupRdy 	= false;
 	gTIMER_TICKBackup.backupRdy 	= false;
 	gZDT_MOTOR_TICKBackup.backupRdy 	= false;
-	gELRSBackup.backupRdy 	= false;
+	gSTEPPER_MOTORBackup.backupRdy 	= false;
 	gICM42688Backup.backupRdy 	= false;
 	gSPI_FLASHBackup.backupRdy 	= false;
 
@@ -98,7 +98,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_saveConfiguration(void)
 	retStatus &= DL_TimerG_saveConfiguration(PWM_0_INST, &gPWM_0Backup);
 	retStatus &= DL_TimerA_saveConfiguration(TIMER_TICK_INST, &gTIMER_TICKBackup);
 	retStatus &= DL_TimerG_saveConfiguration(ZDT_MOTOR_TICK_INST, &gZDT_MOTOR_TICKBackup);
-	retStatus &= DL_UART_Main_saveConfiguration(ELRS_INST, &gELRSBackup);
+	retStatus &= DL_UART_Main_saveConfiguration(STEPPER_MOTOR_INST, &gSTEPPER_MOTORBackup);
 	retStatus &= DL_SPI_saveConfiguration(ICM42688_INST, &gICM42688Backup);
 	retStatus &= DL_SPI_saveConfiguration(SPI_FLASH_INST, &gSPI_FLASHBackup);
 
@@ -114,7 +114,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_restoreConfiguration(void)
 	retStatus &= DL_TimerG_restoreConfiguration(PWM_0_INST, &gPWM_0Backup, false);
 	retStatus &= DL_TimerA_restoreConfiguration(TIMER_TICK_INST, &gTIMER_TICKBackup, false);
 	retStatus &= DL_TimerG_restoreConfiguration(ZDT_MOTOR_TICK_INST, &gZDT_MOTOR_TICKBackup, false);
-	retStatus &= DL_UART_Main_restoreConfiguration(ELRS_INST, &gELRSBackup);
+	retStatus &= DL_UART_Main_restoreConfiguration(STEPPER_MOTOR_INST, &gSTEPPER_MOTORBackup);
 	retStatus &= DL_SPI_restoreConfiguration(ICM42688_INST, &gICM42688Backup);
 	retStatus &= DL_SPI_restoreConfiguration(SPI_FLASH_INST, &gSPI_FLASHBackup);
 
@@ -133,7 +133,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_TimerG_reset(ZDT_MOTOR_TICK_INST);
     DL_I2C_reset(I2C_0_INST);
     DL_I2C_reset(I2C_1_INST);
-    DL_UART_Main_reset(ELRS_INST);
+    DL_UART_Main_reset(STEPPER_MOTOR_INST);
     DL_UART_Main_reset(K230_INST);
     DL_UART_Main_reset(UART_2_INST);
     DL_UART_Main_reset(g_code_uart_INST);
@@ -153,7 +153,7 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_TimerG_enablePower(ZDT_MOTOR_TICK_INST);
     DL_I2C_enablePower(I2C_0_INST);
     DL_I2C_enablePower(I2C_1_INST);
-    DL_UART_Main_enablePower(ELRS_INST);
+    DL_UART_Main_enablePower(STEPPER_MOTOR_INST);
     DL_UART_Main_enablePower(K230_INST);
     DL_UART_Main_enablePower(UART_2_INST);
     DL_UART_Main_enablePower(g_code_uart_INST);
@@ -207,9 +207,9 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_enableHiZ(GPIO_I2C_1_IOMUX_SCL);
 
     DL_GPIO_initPeripheralOutputFunction(
-        GPIO_ELRS_IOMUX_TX, GPIO_ELRS_IOMUX_TX_FUNC);
+        GPIO_STEPPER_MOTOR_IOMUX_TX, GPIO_STEPPER_MOTOR_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
-        GPIO_ELRS_IOMUX_RX, GPIO_ELRS_IOMUX_RX_FUNC);
+        GPIO_STEPPER_MOTOR_IOMUX_RX, GPIO_STEPPER_MOTOR_IOMUX_RX_FUNC);
     DL_GPIO_initPeripheralOutputFunction(
         GPIO_K230_IOMUX_TX, GPIO_K230_IOMUX_TX_FUNC);
     DL_GPIO_initPeripheralInputFunction(
@@ -775,12 +775,12 @@ SYSCONFIG_WEAK void SYSCFG_DL_I2C_1_init(void) {
 
 }
 
-static const DL_UART_Main_ClockConfig gELRSClockConfig = {
+static const DL_UART_Main_ClockConfig gSTEPPER_MOTORClockConfig = {
     .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,
     .divideRatio = DL_UART_MAIN_CLOCK_DIVIDE_RATIO_1
 };
 
-static const DL_UART_Main_Config gELRSConfig = {
+static const DL_UART_Main_Config gSTEPPER_MOTORConfig = {
     .mode        = DL_UART_MAIN_MODE_NORMAL,
     .direction   = DL_UART_MAIN_DIRECTION_TX_RX,
     .flowControl = DL_UART_MAIN_FLOW_CONTROL_NONE,
@@ -789,26 +789,26 @@ static const DL_UART_Main_Config gELRSConfig = {
     .stopBits    = DL_UART_MAIN_STOP_BITS_ONE
 };
 
-SYSCONFIG_WEAK void SYSCFG_DL_ELRS_init(void)
+SYSCONFIG_WEAK void SYSCFG_DL_STEPPER_MOTOR_init(void)
 {
-    DL_UART_Main_setClockConfig(ELRS_INST, (DL_UART_Main_ClockConfig *) &gELRSClockConfig);
+    DL_UART_Main_setClockConfig(STEPPER_MOTOR_INST, (DL_UART_Main_ClockConfig *) &gSTEPPER_MOTORClockConfig);
 
-    DL_UART_Main_init(ELRS_INST, (DL_UART_Main_Config *) &gELRSConfig);
+    DL_UART_Main_init(STEPPER_MOTOR_INST, (DL_UART_Main_Config *) &gSTEPPER_MOTORConfig);
     /*
      * Configure baud rate by setting oversampling and baud rate divisors.
-     *  Target baud rate: 420000
-     *  Actual baud rate: 419947.51
+     *  Target baud rate: 115200
+     *  Actual baud rate: 114942.53
      */
-    DL_UART_Main_setOversampling(ELRS_INST, DL_UART_OVERSAMPLING_RATE_16X);
-    DL_UART_Main_setBaudRateDivisor(ELRS_INST, ELRS_IBRD_80_MHZ_420000_BAUD, ELRS_FBRD_80_MHZ_420000_BAUD);
+    DL_UART_Main_setOversampling(STEPPER_MOTOR_INST, DL_UART_OVERSAMPLING_RATE_16X);
+    DL_UART_Main_setBaudRateDivisor(STEPPER_MOTOR_INST, STEPPER_MOTOR_IBRD_40_MHZ_115200_BAUD, STEPPER_MOTOR_FBRD_40_MHZ_115200_BAUD);
 
 
     /* Configure Interrupts */
-    DL_UART_Main_enableInterrupt(ELRS_INST,
+    DL_UART_Main_enableInterrupt(STEPPER_MOTOR_INST,
                                  DL_UART_MAIN_INTERRUPT_RX);
 
 
-    DL_UART_Main_enable(ELRS_INST);
+    DL_UART_Main_enable(STEPPER_MOTOR_INST);
 }
 static const DL_UART_Main_ClockConfig gK230ClockConfig = {
     .clockSel    = DL_UART_MAIN_CLOCK_BUSCLK,

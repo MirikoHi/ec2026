@@ -64,6 +64,9 @@ typedef struct {
 		float position_measure;
 		/* 上层规划器基础轮速；与PID内部实际Ref分离，避免两个任务交替覆盖。 */
 		float Speed_Ref_Command;
+		float acceleration;        /* 加速度 (m/s²) */
+		float prev_speed;          /* 上一周期速度, 用于计算加速度 */
+		float dt;                  /* 两次回传数据间的时间间隔 (s) */
 		float Trace_Compensation;
 		State State;
 }__attribute__((aligned(4)))DCMotorInstance;
