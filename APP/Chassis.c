@@ -199,6 +199,8 @@ void Chassis_Init(void)
 /**
  * @brief 底盘主任务，根据菜单模式执行对应动作
  */
+uint16_t acc_count = 0;
+uint8_t acc_count_change_flag = 0;
 void Chassis(void)
 {
 	// 接收 Robot_Cmd 发来的底盘控制命令。
@@ -231,43 +233,37 @@ void Chassis(void)
 			imu_path_cumulative = motor_l->position_measure +  motor_r->position_measure;  //行驶里程
 
 			float current_speed = (motor_l->speed_measure + motor_r->speed_measure) / 2.0f;
-			float remain = imu_path_cumulative - 11.610f;  //剩余里程
-			float base_speed = 0.005f;  //行驶速度
+			float remain = 11.4678f - imu_path_cumulative;  //剩余里程
+			float base_speed = 0.0f;  //行驶速度
 			switch (chassis_cmd_receive.task_flag) {
 				case 2:  //任务二
 					Chassis_Trace_Cal(0.1f);
 					break;
-				case 5:  //任务五
-					float count = 0;
+				case 5:  //任务5，钢球置于中心点走一圈
 					//起步加速阶段
-					if (current_speed < 0.6f && fabsf(imu_path_cumulative) < 2.6f) {
-						base_speed += 0.01f;
+					if (acc_count_change_flag == 0) {
+						acc_count++;
+						base_speed = 0.0005f * acc_count;
 					}
-					// if (fabsf(imu_path_cumulative) < 0.1f) {
-					// 	if (count < 40.0f) {
-					// 		base_speed = 2.0f * count * imu_path_cumulative;
-					// 	}
-					// 	else if (count > 40.0f && count < 50.0f) {
-					// 		base_speed = 0.05f * 40 * imu_path_cumulative;
-					// 	}
-					// 	else if (count > 50.0f) {
-					// 		count = 0;
-					// 	}
-					// }
+					if (acc_count > 160) {
+						acc_count_change_flag = 1;
+						// acc_count = 0;
+						base_speed = 0.08f;
+					}
 					//匀速行驶阶段
-					if (fabsf(imu_path_cumulative) >= 0.2f && fabsf(remain) >= 0.6f) {
-						base_speed = 0.06f;
+					if (fabsf(imu_path_cumulative) >= 5.2f && fabsf(remain) >= 0.8f) {
+						base_speed = 0.08f;
 					}
 					//缓停，停车段
-					else if (fabsf(remain) < 0.6 ){
+					if (fabsf(remain) < 0.8 ){
 						// 停止线 → 停车或执行下一动作
 						base_speed = 0.1f*fabsf(remain);
-						if (Gray_Is_StopLine(gray_data) && fabsf(remain) < 0.2f) {
+						if (Gray_Is_StopLine(gray_data) && fabsf(remain) < 0.01f) {
 							car_stop = 1;
 							base_speed = 0.0f;
 						}
 					}
-					base_speed = (base_speed > 0.6f) ? 0.6f : base_speed;
+					base_speed = (base_speed > 0.08f) ? 0.08f : base_speed;
 					Chassis_Trace_Cal(base_speed);
 					break;
 				default:
