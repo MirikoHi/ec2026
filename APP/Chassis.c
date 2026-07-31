@@ -34,6 +34,7 @@ static uint8_t remote_mode_active = 0;
 
 #define CHASSIS_ACTION_DONE          1U
 #define CHASSIS_ACTION_RUNNING       0U
+
 static pid_type_def chassis_line_yaw_pid;
 static pid_type_def chassis_turn_pid;
 static Chassis_Mode_e chassis_last_mode = NORMAL_MODE;
@@ -229,17 +230,32 @@ void Chassis(void)
 			uint8_t gray_data = Gray_Serial_Read();
 			imu_path_cumulative = motor_l->position_measure +  motor_r->position_measure;  //行驶里程
 
-			float remain = imu_path_cumulative - 11.592f;  //剩余里程
-			float base_speed = 0.0f;  //行驶速度
+			float current_speed = (motor_l->speed_measure + motor_r->speed_measure) / 2.0f;
+			float remain = imu_path_cumulative - 11.610f;  //剩余里程
+			float base_speed = 0.005f;  //行驶速度
 			switch (chassis_cmd_receive.task_flag) {
 				case 2:  //任务二
 					Chassis_Trace_Cal(0.1f);
 					break;
 				case 5:  //任务五
-					if (fabsf(imu_path_cumulative) < 0.06f) {
-						base_speed = 0.1f * imu_path_cumulative;
+					float count = 0;
+					//起步加速阶段
+					if (current_speed < 0.6f && fabsf(imu_path_cumulative) < 2.6f) {
+						base_speed += 0.01f;
 					}
-					else if (fabsf(imu_path_cumulative) >= 0.06f && fabsf(remain) > 11.592f) {
+					// if (fabsf(imu_path_cumulative) < 0.1f) {
+					// 	if (count < 40.0f) {
+					// 		base_speed = 2.0f * count * imu_path_cumulative;
+					// 	}
+					// 	else if (count > 40.0f && count < 50.0f) {
+					// 		base_speed = 0.05f * 40 * imu_path_cumulative;
+					// 	}
+					// 	else if (count > 50.0f) {
+					// 		count = 0;
+					// 	}
+					// }
+					//匀速行驶阶段
+					if (fabsf(imu_path_cumulative) >= 0.2f && fabsf(remain) >= 0.6f) {
 						base_speed = 0.06f;
 					}
 					//缓停，停车段
@@ -251,6 +267,7 @@ void Chassis(void)
 							base_speed = 0.0f;
 						}
 					}
+					base_speed = (base_speed > 0.6f) ? 0.6f : base_speed;
 					Chassis_Trace_Cal(base_speed);
 					break;
 				default:
@@ -263,6 +280,8 @@ void Chassis(void)
 			break;
 		case NORMAL_MODE:
 			// Chassis_Set_Turn();
+			DC_Motor_SetRef(motor_l , 0.0f);
+			DC_Motor_SetRef(motor_r , 0.0f);
 			break;
 		case REMOTE_MODE:
 			// Chassis_RemoteControl();

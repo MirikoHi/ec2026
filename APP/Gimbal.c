@@ -50,7 +50,7 @@ extern Chassis_Move_State_e car_stop;
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
 
-static float slide_target_x   =  250.00f ;    /* 目标位置: 画面中心 (640/2) */
+static float slide_target_x   =  312.00f ;    /* 目标位置: 画面中心 (640/2) */
 uint32_t motor_zero_point =  0;
 #define SLIDE_SERVO_RANGE      60    /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
@@ -68,12 +68,12 @@ static pid_init_config_s cfg = {   //动态pid这一块
 };
 
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
-static float        slide_prev_x = 320;   /* 上一帧 X 位置 */
+static float        slide_prev_x = 312;   /* 上一帧 X 位置 */
 int16_t        slide_velocity = 0;        /* 滤波后的小球速度 (px/s) */
 static float     stepper_current_clock = 0;
 
 /* 一阶低通滤波器状态 */
-static float slide_x_lpf_out = 320.0f;
+static float slide_x_lpf_out = 312.0f;
 static float slide_v_lpf_out = 0.0f;
 
 
@@ -109,9 +109,9 @@ static void Slide_Control_Init(void)
  *   5. 速度前馈: 球速越大 → 倾角补偿越大
  *   6. 合成最终角度, 限幅后输出到步进电机
  */
-
 float acc_r = 0;
 float acc_l = 0;
+float x_raw = 0;
 static void Slide_Control_Run(void)
 {
     if (!K230_Read(&steel_ball_movement_data)) return;
@@ -213,7 +213,7 @@ void Gimbal(void)
 	Slide_Control_Run();
 	if (gimbal_cmd_receive.task_flag == 3) {
 		if (!change_flag1) {
-			slide_target_x = 182;
+			slide_target_x = 180;
 			change_flag1 = 1;
 		}
 		if (fabsf(x_raw - slide_target_x) < 30) {
@@ -222,17 +222,17 @@ void Gimbal(void)
 				count2++;
 			}
 		}
-		if (count1 > 80 && change_flag1) {
+		if (count1 > 60 && change_flag1) {
 			count1 = 0;
-			slide_target_x = 478;
+			slide_target_x = 432;
 			change_flag2 = 1;
 		}
-		if (count2 > 80  && change_flag2) {
+		if (count2 > 90  && change_flag2) {
 			car_stop = 1;
 		}
 	}
-	else if (gimbal_cmd_receive.task_flag == 0) {
-		slide_target_x = 320;
+	else if (gimbal_cmd_receive.task_flag == 0) {  //不在执行任务三时将小球归中
+		slide_target_x = 312;
 		change_flag1 = 0;
 		change_flag2 = 0;
 	}

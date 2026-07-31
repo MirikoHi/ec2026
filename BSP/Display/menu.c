@@ -732,11 +732,21 @@ void menu_task(void)
 	uint8_t item_count;
 	uint8_t selected_idx;
 
-	/* ── 底盘模式已选中 → 隐藏菜单, 仅响应后退键 ── */
+	/* ── 底盘模式已选中 → 隐藏菜单, 绘制任务信息, 仅响应后退键 ── */
 	if (chassis_mode_selected) {
 		if (Key_Check(1, KEY_SINGLE)) {   /* 按键 2 (后退) 返回菜单 */
 			chassis_mode_selected = false;
 			menu_redraw();
+			return;
+		}
+		/* 在 MenuTask 中做 OLED 更新, 避免阻塞 200Hz 控制任务 */
+		if (task_display_id > 0) {
+			OLED_ClearArea(0, 0, 128, 32);
+			OLED_ShowString(0, 0, "Task:", OLED_8X16);
+			OLED_ShowNum(56, 0, task_display_id, 1, OLED_8X16);
+			OLED_ShowString(0, 2, "Time:", OLED_8X16);
+			OLED_ShowFloatNum(56, 2, (double)elapsed, 3, 3, OLED_8X16);
+			OLED_UpdateArea(0, 0, 128, 32);
 		}
 		return;
 	}
