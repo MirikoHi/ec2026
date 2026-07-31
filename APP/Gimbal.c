@@ -162,6 +162,10 @@ static void Slide_Control_Run(void)
     /* ── 4. 合成角度 = PID输出 + 速度前馈 ── */
 	target_angle_deg = slide_ball_pid.out + velocity_ff + (acc_total * SLIDE_ACC_GAIN);
 
+	Chassis_State_Flag_To_Gimbal_e chassis_current_state = get_chassis_current_state();
+
+	if (chassis_current_state == Chassis_Launching) target_angle_deg += 3;
+
 	if (target_angle_deg >   SLIDE_SERVO_RANGE)  target_angle_deg =   SLIDE_SERVO_RANGE;
 	if (target_angle_deg < -(SLIDE_SERVO_RANGE)) target_angle_deg = -(SLIDE_SERVO_RANGE);
 
