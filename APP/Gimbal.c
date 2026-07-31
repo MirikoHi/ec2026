@@ -28,7 +28,6 @@ pid_type_def gimbal_pitch_PID={0};
 pid_type_def gimbal_yaw_forwardfeed_PID = {0};
 gimbal_cmd_q gimbal_cmd_send ={0};
 
-
 float x;
 float dt;
 
