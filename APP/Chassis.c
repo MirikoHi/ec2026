@@ -60,6 +60,12 @@ volatile JY901s_IMU_Data_s* JY901s_IMU_Data;
 
 extern State robotcmd_control_state;
 
+DCMotorInstance *get_motor_l_instance() {
+	return motor_l;
+}
+DCMotorInstance *get_motor_r_instance() {
+	return motor_r;
+}
 
 /**
  * @brief 初始化底盘左右电机和 IMU

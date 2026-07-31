@@ -1,4 +1,6 @@
 #include "Gimbal.h"
+
+#include "Chassis.h"
 #include "ZDT_Motor.h"
 #include "ZDT_Emm.h"
 #include "Robot_cmd.h"
@@ -7,10 +9,11 @@
 #include "PID.h"
 #include "K230.h"
 #include "daemon.h"
+#include "dcmotor.h"
 #include "dwt.h"
 #include "Servo.h"
 
-
+static DCMotorInstance *motor_l,*motor_r;
 
 ZDT_Motor_t *yaw_motor,*pitch_motor;
 float angle_debug;
@@ -47,12 +50,13 @@ ServoInstance*  servo_yaw;
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
 
-float SLIDE_TARGET_X   =  250.00f ;    /* 目标位置: 画面中心 (640/2) */
+static float slide_target_x   =  250.00f ;    /* 目标位置: 画面中心 (640/2) */
 uint32_t motor_zero_point =  0;
-#define SLIDE_SERVO_RANGE      60     /* 最大角度范围，需保证一次循环能转完 */
+#define SLIDE_SERVO_RANGE      100     /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.25f   /* 速度前馈增益 */
+#define SLIDE_VEL_FF_GAIN      0.3f   /* 速度前馈增益 */
 #define SLIDE_X_LPF_ALPHA      0.25f   /* X坐标低通滤波系数，越小越平滑 */
+#define SLIDE_ACC_GAIN         50.00f
 
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
@@ -86,11 +90,12 @@ static void Slide_Control_Init(void)
 {
 
     PID_init(&slide_ball_pid, &cfg);
-
+	motor_l = get_motor_l_instance();
+	motor_r = get_motor_r_instance();
     /* 滤波器初始化 */
-    slide_x_lpf_out = SLIDE_TARGET_X;
+    slide_x_lpf_out = slide_target_x;
     slide_v_lpf_out = 0.0f;
-    slide_prev_x = SLIDE_TARGET_X;
+    slide_prev_x = slide_target_x;
 }
 
 /**
@@ -104,10 +109,18 @@ static void Slide_Control_Init(void)
  *   5. 速度前馈: 球速越大 → 倾角补偿越大
  *   6. 合成最终角度, 限幅后输出到步进电机
  */
+float acc_r = 0;
+float acc_l = 0;
 static void Slide_Control_Run(void)
 {
     if (!K230_Read(&steel_ball_movement_data)) return;
 
+	acc_r = motor_r -> acceleration;
+	acc_l = motor_l -> acceleration;
+	float acc_total = 0;
+	if ((acc_l / acc_r) >= 0.8 && (acc_l / acc_r) <= 1.2) {
+		acc_total = (acc_r >= acc_l) ? acc_r : acc_l;
+	}
     /* 原始视觉坐标 */
     float x_raw  = (float)steel_ball_movement_data.x_position;
 
@@ -132,7 +145,7 @@ static void Slide_Control_Run(void)
     slide_velocity = (int16_t)(slide_v_lpf_out / 10.0f);
 
     /* ── 2. 位置 PID ── */
-    float error = SLIDE_TARGET_X - x;
+    float error = slide_target_x - x;
     PID_calc(&slide_ball_pid, 0.0f, error);
 
     /* ── 3. 速度前馈 ──
@@ -143,7 +156,7 @@ static void Slide_Control_Run(void)
 	else if (velocity_ff < -60.0f) {velocity_ff = -60.0f;}
 
     /* ── 4. 合成角度 = PID输出 + 速度前馈 ── */
-	target_angle_deg = slide_ball_pid.out + velocity_ff;
+	target_angle_deg = slide_ball_pid.out + velocity_ff + (acc_total * SLIDE_ACC_GAIN);
 
 	if (target_angle_deg >   SLIDE_SERVO_RANGE)  target_angle_deg =   SLIDE_SERVO_RANGE;
 	if (target_angle_deg < -(SLIDE_SERVO_RANGE)) target_angle_deg = -(SLIDE_SERVO_RANGE);
@@ -153,7 +166,7 @@ static void Slide_Control_Run(void)
 	uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
 	uint8_t dir = pulses >= 0 ? 1 : 0;
 
-    ZDT_Emm_Pos_Control(1, dir, 2000, 254, (uint32_t)pulse_count, 1, false);
+    ZDT_Emm_Pos_Control(1, dir, 20, 0, (uint32_t)pulse_count, 1, false);
 }
 
 
@@ -211,4 +224,8 @@ void UART3_IRQHandler(void)
 	uint8_t byte = DL_UART_receiveData(STEPPER_MOTOR_INST);
 	ZDT_Emm_RxPushByte(byte);
 	DL_UART_clearInterruptStatus(STEPPER_MOTOR_INST, DL_UART_INTERRUPT_RX);
+}
+
+void Slider_Set_Pos_Pixel(const uint16_t pix_pos) {
+	slide_target_x = (float)pix_pos;
 }

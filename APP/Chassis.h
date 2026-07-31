@@ -1,12 +1,15 @@
 #ifndef _CHASSIS_H_
 #define _CHASSIS_H_
 
+#include "dcmotor.h"
 #include "PID.h"
 #include "ti_msp_dl_config.h"
 #define CHASSIS_LENGTH_TO_CENTER 0.166 //PAW3395到车体中心的距离,单位m //PAW3395���������ľ���,��λm
 void Chassis(void);
 void Chassis_Init(void);
 
+DCMotorInstance *get_motor_l_instance();
+DCMotorInstance *get_motor_r_instance();
 void Motor_Cmd_CallBack(uint8_t i);
 
 void Chassis_get_init_angle(void);
