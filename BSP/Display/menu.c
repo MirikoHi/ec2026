@@ -169,11 +169,11 @@ MenuInitConfig_s second_menu_config[3]	={
 		},
 		[2] = {
 			.string={
-				[0] = "任务2 circle",
-				[1] = "任务3 ball",
-				[2] = "任务4 AB ball",
-				[3] = "任务5 ball circle",
-				[4]	= "任务6",
+				[0] = "任务2 FAST_LAP",
+				[1] = "任务3 STATIC_BALL",
+				[2] = "任务4 AB_BALL",
+				[3] = "任务5 BALL_LAP",
+				[4]	= "任务6 TARGET_LAP",
 				[5] = NULL,
 			},
 			.callback={
