@@ -107,4 +107,9 @@ void Control_Switch_Callback(uint8_t i);
 void Task_Callback(uint8_t i);
 void Chassis_Mode_Switch_Callback(uint8_t i);
 void Reset_task_callback(uint8_t i);
+
+/* 供 menu_task 读取以绘制任务 OLED 显示 */
+extern uint8_t task_display_id;
+extern float   task_start_time_s;
+extern float   elapsed;
 #endif

@@ -34,6 +34,7 @@ static uint8_t remote_mode_active = 0;
 
 #define CHASSIS_ACTION_DONE          1U
 #define CHASSIS_ACTION_RUNNING       0U
+
 static pid_type_def chassis_line_yaw_pid;
 static pid_type_def chassis_turn_pid;
 static Chassis_Mode_e chassis_last_mode = NORMAL_MODE;
@@ -56,9 +57,9 @@ static float imu_path_cumulative = 0;              /* 已完成步骤的累计�
 static float imu_path_step_entry_odom = 0;         /* 当前步骤开始时的全局里程 */
 
 float IMU_data[3] = {0};
-volatile JY901s_IMU_Data_s* JY901s_IMU_Data;
 
 extern State robotcmd_control_state;
+Chassis_Move_State_e car_stop=0;
 
 DCMotorInstance *get_motor_l_instance() {
 	return motor_l;
@@ -226,30 +227,61 @@ void Chassis(void)
 	switch(chassis_cmd_receive.Chassis_Mode)
 	{
 		case TRACE_MODE:
-			// 计算并设置巡线补偿量。
-			Chassis_Trace_Cal();
-			// 按设定路径执行巡线动作。
-			// Chassis_State_Turn();
-			// 检测直行/转弯是否完成，并更新完成标志。
 			uint8_t gray_data = Gray_Serial_Read();
-			if (fabs(imu_path_cumulative - 11.852f) < 0.6 ){
-				// 停止线 → 停车或执行下一动作
-				DC_Motor_SetRef(motor_l, 0.1f*fabs(11.852f - imu_path_cumulative ));
-				DC_Motor_SetRef(motor_r, 0.1f*fabs(11.852f - imu_path_cumulative));
-				if (fabs(imu_path_cumulative - 11.852f) < 0.1) {
-					DC_Motor_SetRef(motor_l, 0.0f);
-					DC_Motor_SetRef(motor_r, 0.0f);
-				}
+			imu_path_cumulative = motor_l->position_measure +  motor_r->position_measure;  //行驶里程
+
+			float current_speed = (motor_l->speed_measure + motor_r->speed_measure) / 2.0f;
+			float remain = imu_path_cumulative - 11.610f;  //剩余里程
+			float base_speed = 0.005f;  //行驶速度
+			switch (chassis_cmd_receive.task_flag) {
+				case 2:  //任务二
+					Chassis_Trace_Cal(0.1f);
+					break;
+				case 5:  //任务五
+					float count = 0;
+					//起步加速阶段
+					if (current_speed < 0.6f && fabsf(imu_path_cumulative) < 2.6f) {
+						base_speed += 0.01f;
+					}
+					// if (fabsf(imu_path_cumulative) < 0.1f) {
+					// 	if (count < 40.0f) {
+					// 		base_speed = 2.0f * count * imu_path_cumulative;
+					// 	}
+					// 	else if (count > 40.0f && count < 50.0f) {
+					// 		base_speed = 0.05f * 40 * imu_path_cumulative;
+					// 	}
+					// 	else if (count > 50.0f) {
+					// 		count = 0;
+					// 	}
+					// }
+					//匀速行驶阶段
+					if (fabsf(imu_path_cumulative) >= 0.2f && fabsf(remain) >= 0.6f) {
+						base_speed = 0.06f;
+					}
+					//缓停，停车段
+					else if (fabsf(remain) < 0.6 ){
+						// 停止线 → 停车或执行下一动作
+						base_speed = 0.1f*fabsf(remain);
+						if (Gray_Is_StopLine(gray_data) && fabsf(remain) < 0.2f) {
+							car_stop = 1;
+							base_speed = 0.0f;
+						}
+					}
+					base_speed = (base_speed > 0.6f) ? 0.6f : base_speed;
+					Chassis_Trace_Cal(base_speed);
+					break;
+				default:
+					break;
 			}
-			imu_path_cumulative = motor_l->position_measure +  motor_r->position_measure;
-			// Stop_Detect();
 			break;
 		case IMU_MODE:
-			Chassis_Trace_Cal();
+			Chassis_Trace_Cal(0.01f);
 			Chassis_ImuModeAction();
 			break;
 		case NORMAL_MODE:
 			// Chassis_Set_Turn();
+			DC_Motor_SetRef(motor_l , 0.0f);
+			DC_Motor_SetRef(motor_r , 0.0f);
 			break;
 		case REMOTE_MODE:
 			// Chassis_RemoteControl();
@@ -262,15 +294,14 @@ void Chassis(void)
 /**
  * @brief 计算并更新巡线补偿量
  */
-static void Chassis_Trace_Cal(void) {
+static void Chassis_Trace_Cal(float base_speed) {
 	trace_compensation=Trace_task();
-
 
 	DCMotor_Cmd(motor_l,ENABLE);
 	DCMotor_Cmd(motor_r,ENABLE);
 
-	DC_Motor_SetRef(motor_l,0.06f);
-	DC_Motor_SetRef(motor_r,0.06f);
+	DC_Motor_SetRef(motor_l,base_speed);
+	DC_Motor_SetRef(motor_r,base_speed);
 
 	DCMotor_SetTraceCompensation(motor_l, - trace_compensation);
 	DCMotor_SetTraceCompensation(motor_r,   trace_compensation);
