@@ -1,4 +1,6 @@
 #include "Gimbal.h"
+
+#include "Chassis.h"
 #include "ZDT_Motor.h"
 #include "ZDT_Emm.h"
 #include "Robot_cmd.h"
@@ -26,6 +28,7 @@ pid_type_def gimbal_pitch_PID={0};
 pid_type_def gimbal_yaw_forwardfeed_PID = {0};
 gimbal_cmd_q gimbal_cmd_send ={0};
 
+
 float x;
 float dt;
 
@@ -51,10 +54,10 @@ extern Chassis_Move_State_e car_stop;
 
 static float slide_target_x   =  250.00f ;    /* 目标位置: 画面中心 (640/2) */
 uint32_t motor_zero_point =  0;
-#define SLIDE_SERVO_RANGE      60     /* 最大角度范围，需保证一次循环能转完 */
+#define SLIDE_SERVO_RANGE      100     /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.5f   /* 速度前馈增益 */
-#define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
+#define SLIDE_VEL_FF_GAIN      0.3f   /* 速度前馈增益 */
+#define SLIDE_X_LPF_ALPHA      0.25f   /* X坐标低通滤波系数，越小越平滑 */
 #define SLIDE_ACC_GAIN         50.00f
 
 static pid_init_config_s cfg = {   //动态pid这一块
@@ -110,7 +113,6 @@ static void Slide_Control_Init(void)
  */
 float acc_r = 0;
 float acc_l = 0;
-float x_raw = 0;
 static void Slide_Control_Run(void)
 {
     if (!K230_Read(&steel_ball_movement_data)) return;
