@@ -54,8 +54,8 @@ extern Chassis_Move_State_e car_stop;
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
 #define SLIDE_ORIGIN_POS        312
-#define SLIDE_5CM_POS           190
-#define SLIDE_D5CM_POS        440
+#define SLIDE_5CM_POS           450   /* 实测 +5cm 处像素 */
+#define SLIDE_D5CM_POS        173   /* 实测 -5cm 处像素 */
 static float slide_target_x   =  SLIDE_ORIGIN_POS ;    /* 目标位置: 画面中心 (640/2) */
  float slide_target_debug = 312;
 uint32_t motor_zero_point =  0;
@@ -160,7 +160,8 @@ static void Slide_Control_Run(void)
     slide_velocity = (int16_t)(slide_v_lpf_out / 10.0f);
 
     /* ── 2. 位置 PID ── */
-    float error = slide_target_x - x;
+    volatile float error = slide_target_x - x;
+
 	//float error = slide_target_debug - x;
     PID_calc(&slide_ball_pid, 0.0f, error);
 

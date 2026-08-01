@@ -136,7 +136,7 @@
 #define TRACE_TASK_STACK_DEPTH     192
 
 #if ENABLE_STACK_MONITOR  //开启时占用栈比较多
-#define DAEMON_TASK_STACK_DEPTH    256
+#define DAEMON_TASK_STACK_DEPTH    320
 #else  //关闭栈水位功能，占用的栈减小
 #define DAEMON_TASK_STACK_DEPTH    128
 #endif
