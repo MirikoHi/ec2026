@@ -228,6 +228,12 @@ static uint8_t change_flag1 = 0;
 static uint8_t change_flag2 = 0;
 static uint8_t count1 = 0;
 static uint8_t count2 = 0;
+uint8_t disable_pid_flag = 0;
+uint8_t enable_pid_flag = 0;
+uint8_t set_zero_cmd_flag = 0;
+uint8_t go_to_zero_cmd_flag = 0;
+uint8_t forward_cmd_flag = 0;
+uint8_t reverse_cmd_flag = 0;
 void Gimbal(void)
 {   //ZDT_Emm_Pos_Control(1, 1, 190, 0, 0, 1, false);
 	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
@@ -250,6 +256,7 @@ void Gimbal(void)
 
 	static uint8_t cmd217_done_flag = 0;
 	static uint8_t cmd216_done_flag = 0;
+
 	switch (gimbal_cmd_receive.task_flag) {
 		case 0:    //复位模式
 			slide_target_x = SLIDE_ORIGIN_POS;
@@ -278,7 +285,7 @@ void Gimbal(void)
 				count2 = 0;
 			}
 			break;
-		case 216://任务6，钢球置于指定位置走一圈
+		case 216:
 			//slide_target_x = 600 - LicheeRec_Frame.relative_position * 600;
 			if (cmd216_done_flag == 0) {
 				if_run_PID = 0;
@@ -299,6 +306,57 @@ void Gimbal(void)
 		case 218:
 			cmd216_done_flag = 0;
 			cmd217_done_flag = 0;
+			break;
+		case 77:
+			if_run_PID = 0;
+			if (disable_pid_flag ==0) {
+				ZDT_Emm_En_Control(1, false, false);
+				disable_pid_flag = 1;
+			}
+			break;
+		case 78:
+			if (set_zero_cmd_flag == 0) {
+				if_run_PID = 0;
+				ZDT_Emm_En_Control(1, true, false);
+				DWT_Delay(1);
+				ZDT_Emm_Origin_Set_O(1, 1);
+				set_zero_cmd_flag = 1;
+			}
+			break;
+		case 79:
+			if (go_to_zero_cmd_flag == 0) {
+				if_run_PID = 0;
+				ZDT_Emm_En_Control(1, true, false);
+				DWT_Delay(1);
+				ZDT_Emm_Origin_Trigger_Return(1, 0, 0);
+				go_to_zero_cmd_flag = 1;
+			}
+			break;
+		case 80:
+			if (enable_pid_flag == 0) {
+				ZDT_Emm_En_Control(1, false, false);
+				DWT_Delay(1);
+				ZDT_Emm_En_Control(1, true, false);
+				enable_pid_flag = 1;
+				if_run_PID = 1;
+			}
+			break;
+		case 81:
+			if (forward_cmd_flag == 0) {
+				if_run_PID = 0;
+				ZDT_Emm_Pos_Control(1, 1, 1000, 0, 2, 0, false);\
+				forward_cmd_flag = 1;
+			}
+			break;
+		case 82:
+			if (reverse_cmd_flag == 0) {
+				if_run_PID = 0;
+				ZDT_Emm_Pos_Control(1, 0, 1000, 0, 2, 0, false);
+				reverse_cmd_flag = 1;
+			}
+
+
+			break;
 		default:
 			break;
 	}
