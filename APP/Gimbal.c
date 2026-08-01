@@ -82,6 +82,7 @@ static float     stepper_current_clock = 0;
 static float slide_x_lpf_out = SLIDE_ORIGIN_POS;
 static float slide_v_lpf_out = 0.0f;
 
+void Slider_Set_Pos_Pixel(const uint16_t pix_pos);
 
 static void Gimbal_ZDT_UART_Send(const uint8_t *data, uint8_t len)
 {
@@ -225,7 +226,8 @@ void Gimbal(void)
 	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
 	//获取licheerv数据
 	LicheeRec_Frame = LicheeRec_GetFrame();
-	Slide_Control_Run();
+	static uint8_t if_run_PID = 1;
+	if (if_run_PID) Slide_Control_Run();
 
 	// static uint16_t cntr = 0;
 	// cntr ++;
@@ -235,6 +237,8 @@ void Gimbal(void)
 	// 	if (cntr >= 200) cntr = 0;
 	// 	ZDT_Emm_Pos_Control(1, 0, 100, 0, 100, 1, false);
 	// }
+	static uint8_t cmd217_done_flag = 0;
+	static uint8_t cmd216_done_flag = 0;
 	switch (gimbal_cmd_receive.task_flag) {
 		case 0:    //复位模式
 			slide_target_x = SLIDE_ORIGIN_POS;
@@ -252,7 +256,7 @@ void Gimbal(void)
 					count2++;
 				}
 			}
-			if (count1 > 60 && change_flag1) {
+			if (count1 > 40 && change_flag1) {
 				count1 = 0;
 				slide_target_x = SLIDE_D5CM_POS;
 				change_flag2 = 1;
@@ -262,8 +266,28 @@ void Gimbal(void)
 				count2 = 0;
 			}
 			break;
-		case 6://任务6，钢球置于指定位置走一圈
-			slide_target_x = 600 - LicheeRec_Frame.relative_position * 600;
+		case 216://任务6，钢球置于指定位置走一圈
+			//slide_target_x = 600 - LicheeRec_Frame.relative_position * 600;
+			if (cmd216_done_flag == 0) {
+				if_run_PID = 0;
+				ZDT_Emm_Origin_Trigger_Return(1, 0, 0);
+				cmd216_done_flag = 1;
+			}
+			cmd217_done_flag = 0;
+			break;
+		case 217:
+			if (cmd217_done_flag == 0) {
+				if_run_PID = 1;
+				while (!K230_Read(&steel_ball_movement_data)){};
+				Slider_Set_Pos_Pixel(steel_ball_movement_data.x_position);
+				cmd217_done_flag = 1;
+			}
+			cmd216_done_flag = 0;
+			break;
+		case 218:
+			cmd216_done_flag = 0;
+			cmd217_done_flag = 0;
+		default:
 			break;
 	}
 }
