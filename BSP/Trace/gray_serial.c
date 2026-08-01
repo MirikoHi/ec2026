@@ -79,7 +79,7 @@ bool Gray_Is_StopLine(uint8_t trace)
     uint8_t black = ~trace;  /* 按位取反: 黑(0) → 1, 白(1) → 0 */
 
     uint8_t count = 0;
-    const uint8_t threshold = 3;  /* 3路见黑才判定停止线 */
+    const uint8_t threshold = 2;  /* 2路见黑才判定停止线 */
 
     for (int i = 0; i < 8; i++) {
         if (black & (1 << i)) {
