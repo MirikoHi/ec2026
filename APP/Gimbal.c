@@ -62,16 +62,16 @@ uint32_t motor_zero_point =  0;
 
 #define SLIDE_SERVO_RANGE      45    /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.48f   /* 速度前馈增益 */
+#define SLIDE_VEL_FF_GAIN      0.4f   /* 速度前馈增益 */
 #define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
 #define SLIDE_ACC_GAIN         50.00f
 #define ANGLE_COMPENSATION     3
 
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
-	.Kp      = 0.1f,     /* 比例: 每像素误差产生多少度倾角 */
-	.Kd      = 0.009f,     /* 微分: 抑制震荡 */
-	.Ki      = 0.01f,     /* 积分: 消除静差 */
+	.Kp      = 0.1112f,     /* 比例: 每像素误差产生多少度倾角 */
+	.Kd      = 0.0142f,     /* 微分: 抑制震荡 */
+	.Ki      = 0.001f,     /* 积分: 消除静差 */
 	.max_out = SLIDE_SERVO_RANGE,
 	.max_iout = 10.0f,
 };
@@ -79,7 +79,6 @@ static pid_init_config_s cfg = {   //动态pid这一块
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
 static float        slide_prev_x = SLIDE_ORIGIN_POS;   /* 上一帧 X 位置 */
 int16_t        slide_velocity = 0;        /* 滤波后的小球速度 (px/s) */
-static float     stepper_current_clock = 0;
 
 /* 一阶低通滤波器状态 */
 static float slide_x_lpf_out = SLIDE_ORIGIN_POS;
@@ -122,9 +121,12 @@ static void Slide_Control_Init(void)
 float acc_r = 0;
 float acc_l = 0;
 float x_raw = 0;
+uint16_t speed = 0;
 static void Slide_Control_Run(void)
 {
     if (!K230_Read(&steel_ball_movement_data)) return;
+	static float dt_pid = 0;
+	float last_time = DWT_GetTimeline_ms();
 
 	acc_r = motor_r -> acceleration;
 	acc_l = motor_l -> acceleration;
@@ -156,8 +158,8 @@ static void Slide_Control_Run(void)
     slide_velocity = (int16_t)(slide_v_lpf_out / 10.0f);
 
     /* ── 2. 位置 PID ── */
-    float error = slide_target_x - x;
-	//float error = slide_target_debug - x;
+    //float error = slide_target_x - x;
+	float error = slide_target_debug - x;
     PID_calc(&slide_ball_pid, 0.0f, error);
 
     /* ── 3. 速度前馈 ──
@@ -186,9 +188,13 @@ static void Slide_Control_Run(void)
 	uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
 	uint8_t dir = pulses >= 0 ? 1 : 0;
 
-	uint8_t speed = pulse_count >= 100 ? 25 : 18;
+	float time_minute = dt_pid / 6000.0f;
 
-    ZDT_Emm_Pos_Control(1, dir, speed, 0, (uint32_t)pulse_count, 1, false);
+	speed = dt_pid == 0 ? 40 : (uint16_t)(((float)pulse_count / 3200.0f) / time_minute);
+
+    ZDT_Emm_Pos_Control(1, dir, speed, 250, (uint32_t)pulse_count, 1, false);
+
+	dt_pid = DWT_GetTimeline_ms() - last_time;
 }
 
 
@@ -241,6 +247,9 @@ void Gimbal(void)
 	//获取licheerv数据
 	LicheeRec_Frame = LicheeRec_GetFrame();
 	static uint8_t if_run_PID = 1;
+
+
+
 	if (if_run_PID) Slide_Control_Run();
 
 	// static uint16_t cntr = 0;
