@@ -187,6 +187,7 @@ void Task_Callback(uint8_t i)    //选择执行任务
 	else if(i==2)    //任务4，钢球置于中心点走AB线段
 	{
 		chassis_cmd_send.task_flag = 4;
+		chassis_cmd_send.Chassis_Mode = TRACE_MODE;
 		task_display_id   = 4;
 		task_start_time_s = DWT_GetTimeline_s();
 	}
