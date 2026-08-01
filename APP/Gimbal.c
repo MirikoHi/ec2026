@@ -62,15 +62,15 @@ uint32_t motor_zero_point =  0;
 
 #define SLIDE_SERVO_RANGE      45    /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.4f   /* 速度前馈增益 */
+#define SLIDE_VEL_FF_GAIN      0.35f   /* 速度前馈增益 */
 #define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
 #define SLIDE_ACC_GAIN         50.00f
 #define ANGLE_COMPENSATION     3
 
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
-	.Kp      = 0.1112f,     /* 比例: 每像素误差产生多少度倾角 */
-	.Kd      = 0.0142f,     /* 微分: 抑制震荡 */
+	.Kp      = 0.112f,     /* 比例: 每像素误差产生多少度倾角 */
+	.Kd      = 0.012f,     /* 微分: 抑制震荡 */
 	.Ki      = 0.001f,     /* 积分: 消除静差 */
 	.max_out = SLIDE_SERVO_RANGE,
 	.max_iout = 10.0f,
@@ -158,8 +158,8 @@ static void Slide_Control_Run(void)
     slide_velocity = (int16_t)(slide_v_lpf_out / 10.0f);
 
     /* ── 2. 位置 PID ── */
-    //float error = slide_target_x - x;
-	float error = slide_target_debug - x;
+    float error = slide_target_x - x;
+	//float error = slide_target_debug - x;
     PID_calc(&slide_ball_pid, 0.0f, error);
 
     /* ── 3. 速度前馈 ──
@@ -234,6 +234,8 @@ static uint8_t change_flag1 = 0;
 static uint8_t change_flag2 = 0;
 static uint8_t count1 = 0;
 static uint8_t count2 = 0;
+static uint8_t change_flag_mid = 0;   // 新增：0位到达标志
+static uint8_t count_mid = 0;        // 新增：0位稳定计数
 uint8_t disable_pid_flag = 0;
 uint8_t enable_pid_flag = 0;
 uint8_t set_zero_cmd_flag = 0;
@@ -271,25 +273,43 @@ void Gimbal(void)
 			slide_target_x = SLIDE_ORIGIN_POS;
 			change_flag1 = 0;
 			change_flag2 = 0;
+			change_flag_mid = 0;
 			break;
 		case 3:   //任务3，静止状态，使小球在+5——-5间折返
 			if (!change_flag1) {
 				slide_ball_pid.Iout = 0;
-				slide_target_x = SLIDE_5CM_POS;
+				slide_target_x = SLIDE_5CM_POS;   // 先到 +5
 				change_flag1 = 1;
 			}
+			// 判断是否到达当前目标 (±30 像素内)
 			if (fabsf(x_raw - slide_target_x) < 30) {
-				count1++;
+				// 阶段1：到达 +5
+				if (change_flag1 && !change_flag_mid) {
+					count1++;
+				}
+				// 阶段2：到达 0
+				if (change_flag_mid && !change_flag2) {
+					count_mid++;
+				}
+				// 阶段3：到达 -5
 				if (change_flag2) {
 					count2++;
 				}
 			}
-			if (count1 > 40 && change_flag1) {
+			// 从 +5 切换到 0
+			if (count1 > 40 && change_flag1 && !change_flag_mid) {
 				count1 = 0;
-				slide_target_x = SLIDE_D5CM_POS;
+				slide_target_x = SLIDE_ORIGIN_POS;  // 去原点
+				change_flag_mid = 1;
+			}
+			// 从 0 切换到 -5
+			if (count_mid > 20 && change_flag_mid && !change_flag2) {
+				count_mid = 0;
+				slide_target_x = SLIDE_D5CM_POS;    // 去 -5
 				change_flag2 = 1;
 			}
-			if (count2 > 120  && change_flag2) {
+			// 到达 -5 后停车
+			if (count2 > 120 && change_flag2) {
 				car_stop = 1;
 				count2 = 0;
 			}
