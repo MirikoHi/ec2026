@@ -246,7 +246,13 @@ void Chassis(void)
 
 			switch (chassis_cmd_receive.task_flag) {
 				case 2:  //任务二
-					Chassis_Trace_Cal(0.1f);
+					base_speed = 0.1f;
+					if (imu_path_cumulative > 11.5470f) {
+						base_speed = 0.0f;
+						car_stop = 1;
+					}
+					Chassis_Trace_Cal(base_speed);
+
 					break;
 				case 4:  //任务4，钢球置于中心点走AB线段
 					remain4 = 5.8670f - imu_path_cumulative;  //剩余里程
@@ -263,12 +269,12 @@ void Chassis(void)
 						base_speed = 0.06f;
 					}
 					//匀速行驶阶段
-					if (fabsf(imu_path_cumulative) >= 5.2f && remain5 >= 1.8f) {
+					if (fabsf(imu_path_cumulative) >= 1.2f && remain5 >= 1.8f) {
 						base_speed = 0.06f;
 						acc_count = 0;
 					}
 					//缓停，停车段
-					if (remain5 < 2.0f && !car_stop){
+					if (remain5 < 1.8f && !car_stop){
 						Chassis_current_state = Chassis_Stoping;
 						// 停止线 → 停车或执行下一动作
 						if (!slow_count_change_flag) {
@@ -390,6 +396,7 @@ void Chassis(void)
 			slow_count_change_flag = 0;
 			remain4 = 0;
 			remain5 = 0;
+			imu_path_cumulative = 0;
 			DC_Motor_SetRef(motor_l , 0.0f);
 			DC_Motor_SetRef(motor_r , 0.0f);
 			break;
