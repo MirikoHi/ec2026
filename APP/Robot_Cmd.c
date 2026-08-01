@@ -242,3 +242,32 @@ void Reset_task_callback(uint8_t i) {
 		elapsed=0;
 	}
 }
+
+extern volatile uint8_t set_zero_cmd_flag;
+extern volatile uint8_t go_to_zero_cmd_flag;
+extern volatile uint8_t disable_pid_flag;
+extern volatile uint8_t enable_pid_flag;
+extern volatile uint8_t forward_cmd_flag;
+extern volatile uint8_t reverse_cmd_flag;
+
+void Calib_Callback(uint8_t i) {
+	if (i == 0) {
+		gimbal_cmd_send.task_flag = 77;
+		disable_pid_flag = 0;
+	} else if (i == 1) {
+		gimbal_cmd_send.task_flag = 78;
+		set_zero_cmd_flag = 0;
+	} else if (i == 2) {
+		gimbal_cmd_send.task_flag = 79;
+		go_to_zero_cmd_flag = 0;
+	} else if (i == 3) {
+		gimbal_cmd_send.task_flag = 80;
+		enable_pid_flag = 0;
+	} else if (i == 4) {
+		gimbal_cmd_send.task_flag = 81;
+		forward_cmd_flag = 0;
+	} else if (i == 5) {
+		gimbal_cmd_send.task_flag = 82;
+		reverse_cmd_flag = 0;
+	}
+}

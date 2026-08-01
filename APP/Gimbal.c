@@ -62,16 +62,16 @@ uint32_t motor_zero_point =  0;
 
 #define SLIDE_SERVO_RANGE      45    /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.48f   /* 速度前馈增益 */
+#define SLIDE_VEL_FF_GAIN      0.35f   /* 速度前馈增益 */
 #define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
 #define SLIDE_ACC_GAIN         50.00f
 #define ANGLE_COMPENSATION     0
 
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
-	.Kp      = 0.1f,     /* 比例: 每像素误差产生多少度倾角 */
-	.Kd      = 0.009f,     /* 微分: 抑制震荡 */
-	.Ki      = 0.01f,     /* 积分: 消除静差 */
+	.Kp      = 0.112f,     /* 比例: 每像素误差产生多少度倾角 */
+	.Kd      = 0.012f,     /* 微分: 抑制震荡 */
+	.Ki      = 0.001f,     /* 积分: 消除静差 */
 	.max_out = SLIDE_SERVO_RANGE,
 	.max_iout = 10.0f,
 };
@@ -79,7 +79,6 @@ static pid_init_config_s cfg = {   //动态pid这一块
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
 static float        slide_prev_x = SLIDE_ORIGIN_POS;   /* 上一帧 X 位置 */
 int16_t        slide_velocity = 0;        /* 滤波后的小球速度 (px/s) */
-static float     stepper_current_clock = 0;
 
 /* 一阶低通滤波器状态 */
 static float slide_x_lpf_out = SLIDE_ORIGIN_POS;
@@ -122,9 +121,12 @@ static void Slide_Control_Init(void)
 float acc_r = 0;
 float acc_l = 0;
 float x_raw = 0;
+uint16_t speed = 0;
 static void Slide_Control_Run(void)
 {
     if (!K230_Read(&steel_ball_movement_data)) return;
+	static float dt_pid = 0;
+	float last_time = DWT_GetTimeline_ms();
 
 	acc_r = motor_r -> acceleration;
 	acc_l = motor_l -> acceleration;
@@ -188,9 +190,13 @@ static void Slide_Control_Run(void)
 	uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
 	uint8_t dir = pulses >= 0 ? 1 : 0;
 
-	uint8_t speed = pulse_count >= 100 ? 25 : 18;
+	float time_minute = dt_pid / 6000.0f;
 
-    ZDT_Emm_Pos_Control(1, dir, speed, 0, (uint32_t)pulse_count, 1, false);
+	speed = dt_pid == 0 ? 40 : (uint16_t)(((float)pulse_count / 3200.0f) / time_minute);
+
+    ZDT_Emm_Pos_Control(1, dir, speed, 250, (uint32_t)pulse_count, 1, false);
+
+	dt_pid = DWT_GetTimeline_ms() - last_time;
 }
 
 
@@ -231,6 +237,14 @@ static uint8_t change_flag1 = 0;
 static uint8_t change_flag2 = 0;
 static uint8_t count1 = 0;
 static uint8_t count2 = 0;
+static uint8_t change_flag_mid = 0;   // 新增：0位到达标志
+static uint8_t count_mid = 0;        // 新增：0位稳定计数
+uint8_t disable_pid_flag = 0;
+uint8_t enable_pid_flag = 0;
+uint8_t set_zero_cmd_flag = 0;
+uint8_t go_to_zero_cmd_flag = 0;
+uint8_t forward_cmd_flag = 0;
+uint8_t reverse_cmd_flag = 0;
 void Gimbal(void)
 {   //ZDT_Emm_Pos_Control(1, 1, 190, 0, 0, 1, false);
 	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
@@ -238,6 +252,9 @@ void Gimbal(void)
 	//获取licheerv数据
 	LicheeRec_Frame = LicheeRec_GetFrame();
 	static uint8_t if_run_PID = 1;
+
+
+
 	if (if_run_PID) Slide_Control_Run();
 
 	// static uint16_t cntr = 0;
@@ -253,35 +270,54 @@ void Gimbal(void)
 
 	static uint8_t cmd217_done_flag = 0;
 	static uint8_t cmd216_done_flag = 0;
+
 	switch (gimbal_cmd_receive.task_flag) {
 		case 0:    //复位模式
 			slide_target_x = SLIDE_ORIGIN_POS;
 			change_flag1 = 0;
 			change_flag2 = 0;
+			change_flag_mid = 0;
 			break;
 		case 3:   //任务3，静止状态，使小球在+5——-5间折返
 			if (!change_flag1) {
 				slide_ball_pid.Iout = 0;
-				slide_target_x = SLIDE_5CM_POS;
+				slide_target_x = SLIDE_5CM_POS;   // 先到 +5
 				change_flag1 = 1;
 			}
+			// 判断是否到达当前目标 (±30 像素内)
 			if (fabsf(x_raw - slide_target_x) < 30) {
-				count1++;
+				// 阶段1：到达 +5
+				if (change_flag1 && !change_flag_mid) {
+					count1++;
+				}
+				// 阶段2：到达 0
+				if (change_flag_mid && !change_flag2) {
+					count_mid++;
+				}
+				// 阶段3：到达 -5
 				if (change_flag2) {
 					count2++;
 				}
 			}
-			if (count1 > 40 && change_flag1) {
+			// 从 +5 切换到 0
+			if (count1 > 40 && change_flag1 && !change_flag_mid) {
 				count1 = 0;
-				slide_target_x = SLIDE_D5CM_POS;
+				slide_target_x = SLIDE_ORIGIN_POS;  // 去原点
+				change_flag_mid = 1;
+			}
+			// 从 0 切换到 -5
+			if (count_mid > 20 && change_flag_mid && !change_flag2) {
+				count_mid = 0;
+				slide_target_x = SLIDE_D5CM_POS;    // 去 -5
 				change_flag2 = 1;
 			}
-			if (count2 > 120  && change_flag2) {
+			// 到达 -5 后停车
+			if (count2 > 120 && change_flag2) {
 				car_stop = 1;
 				count2 = 0;
 			}
 			break;
-		case 216://任务6，钢球置于指定位置走一圈
+		case 216:
 			//slide_target_x = 600 - LicheeRec_Frame.relative_position * 600;
 			if (cmd216_done_flag == 0) {
 				if_run_PID = 0;
@@ -302,6 +338,57 @@ void Gimbal(void)
 		case 218:
 			cmd216_done_flag = 0;
 			cmd217_done_flag = 0;
+			break;
+		case 77:
+			if_run_PID = 0;
+			if (disable_pid_flag ==0) {
+				ZDT_Emm_En_Control(1, false, false);
+				disable_pid_flag = 1;
+			}
+			break;
+		case 78:
+			if (set_zero_cmd_flag == 0) {
+				if_run_PID = 0;
+				ZDT_Emm_En_Control(1, true, false);
+				DWT_Delay(1);
+				ZDT_Emm_Origin_Set_O(1, 1);
+				set_zero_cmd_flag = 1;
+			}
+			break;
+		case 79:
+			if (go_to_zero_cmd_flag == 0) {
+				if_run_PID = 0;
+				ZDT_Emm_En_Control(1, true, false);
+				DWT_Delay(1);
+				ZDT_Emm_Origin_Trigger_Return(1, 0, 0);
+				go_to_zero_cmd_flag = 1;
+			}
+			break;
+		case 80:
+			if (enable_pid_flag == 0) {
+				ZDT_Emm_En_Control(1, false, false);
+				DWT_Delay(1);
+				ZDT_Emm_En_Control(1, true, false);
+				enable_pid_flag = 1;
+				if_run_PID = 1;
+			}
+			break;
+		case 81:
+			if (forward_cmd_flag == 0) {
+				if_run_PID = 0;
+				ZDT_Emm_Pos_Control(1, 1, 1000, 0, 2, 0, false);\
+				forward_cmd_flag = 1;
+			}
+			break;
+		case 82:
+			if (reverse_cmd_flag == 0) {
+				if_run_PID = 0;
+				ZDT_Emm_Pos_Control(1, 0, 1000, 0, 2, 0, false);
+				reverse_cmd_flag = 1;
+			}
+
+
+			break;
 		default:
 			break;
 	}

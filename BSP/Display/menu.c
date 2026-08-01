@@ -129,7 +129,7 @@ void MenuInit(void)
 			.pre_idx=4,
 		},
 };
-MenuInitConfig_s second_menu_config[3]	={      //二级菜单
+MenuInitConfig_s second_menu_config[4]	={      //二级菜单
 		[0] = {
 			.string={
 				[0] = "使能",
@@ -185,6 +185,28 @@ MenuInitConfig_s second_menu_config[3]	={      //二级菜单
 			},
 			.pre_idx=2,
 		},
+			[3] = {
+			.string={
+				[0] = "Disable PID",
+				[1] = "Set Zero",
+				[2] = "Go to Zero",
+				[3] = "Enable PID",
+				[4] = "Forward 1c",
+				[5] = "Reverse 1c",
+			},
+			.callback={
+				[0] = Calib_Callback,
+				[1] = Calib_Callback,
+				[2] = Calib_Callback,
+				[3] = Calib_Callback,
+				[4] = Calib_Callback,
+				[5] = Calib_Callback,
+			},
+			.next_menu_config={
+
+			},
+			.pre_idx=3,
+		},
 //		[3] = {
 //			.string={
 //				[0] = "李",
@@ -224,7 +246,7 @@ MenuInitConfig_s first_menu_config={     //一级菜单
 				[1] = "Contorl",
 				[2] = "Task",
 				[3] = "Reset",
-				[4]	= NULL,
+				[4]	= "Calib",
 				[5] = NULL,
 			},
 			.callback={
@@ -234,7 +256,7 @@ MenuInitConfig_s first_menu_config={     //一级菜单
 				[0] = &second_menu_config[0],
 				[1] = &second_menu_config[1],
 				[2] = &second_menu_config[2],
-				[4] = NULL,
+				[4] = &second_menu_config[3],
 			},
 			.pre_idx=0,
 	};
