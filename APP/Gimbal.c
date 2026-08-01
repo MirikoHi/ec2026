@@ -20,6 +20,7 @@ static DCMotorInstance *motor_l,*motor_r;
 ZDT_Motor_t *yaw_motor,*pitch_motor;
 float angle_debug;
 static gimbal_cmd_q gimbal_cmd_receive={0};
+static chassis_cmd_q chassis_cmd_receive = {0};    // 来自 cmd 的底盘控制命令
 
 float relay_on_time;
 uint8_t relay_first_on_flag=0;
@@ -170,8 +171,11 @@ static void Slide_Control_Run(void)
 
 	Chassis_State_Flag_To_Gimbal_e chassis_current_state = get_chassis_current_state();
 
-	if (chassis_current_state == Chassis_Launching) target_angle_deg += 2.6f;
-	else if (chassis_current_state == Chassis_Stoping) target_angle_deg -= 3;
+	if (chassis_current_state == Chassis_Launching && chassis_cmd_receive.task_flag == 4) target_angle_deg += 2.6f;
+	else if (chassis_current_state == Chassis_Stoping && chassis_cmd_receive.task_flag == 4) target_angle_deg -= 5;
+
+	if (chassis_current_state == Chassis_Launching && chassis_cmd_receive.task_flag == 5) target_angle_deg += 2.6f;
+	else if (chassis_current_state == Chassis_Stoping && chassis_cmd_receive.task_flag == 5) target_angle_deg -= 3;
 
 	if (target_angle_deg >   SLIDE_SERVO_RANGE)  target_angle_deg =   SLIDE_SERVO_RANGE;
 	if (target_angle_deg < -(SLIDE_SERVO_RANGE)) target_angle_deg = -(SLIDE_SERVO_RANGE);
@@ -226,6 +230,7 @@ static uint8_t count2 = 0;
 void Gimbal(void)
 {   //ZDT_Emm_Pos_Control(1, 1, 190, 0, 0, 1, false);
 	xQueueReceive(gimbal_cmd_queue, &gimbal_cmd_receive, 1);
+	xQueueReceive(chassis_cmd_queue, &chassis_cmd_receive, 1);
 	//获取licheerv数据
 	LicheeRec_Frame = LicheeRec_GetFrame();
 	static uint8_t if_run_PID = 1;
