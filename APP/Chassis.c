@@ -271,19 +271,20 @@ void Chassis(void)
 						base_speed = 0.06f;
 					}
 					//匀速行驶阶段
-					if (fabsf(imu_path_cumulative) >= 1.2f && remain5 >= 1.8f) {
-						base_speed = 0.06f;
-						acc_count = 0;
-					}
+					// if (fabsf(imu_path_cumulative) >= 1.2f && remain5 >= 1.8f) {
+					// 	base_speed = 0.06f;
+					// 	acc_count = 0;
+					// }
 					//缓停，停车段
 					if (remain5 < 1.8f && !car_stop){
 						Chassis_current_state = Chassis_Stoping;
+						acc_count = 0;
 						// 停止线 → 停车或执行下一动作
 						if (!slow_count_change_flag) {
 							slow_count++;
-							base_speed = 0.06f - 0.000051f * slow_count;  //0.0000155f
+							base_speed = 0.06f - 0.0001875f * slow_count;  //0.0000155f
 						}
-						if (slow_count > 1177 ) {
+						if (slow_count > 320 ) {
 							car_stop = 1;
 							base_speed = 0.0f;
 							acc_count = 0;
