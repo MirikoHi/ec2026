@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file    menu.c
  * @brief   多级OLED菜单系统实现
  * @details 实现了基于递归初始化的多级菜单框架，支持导航（前/后/上/下）、
@@ -110,26 +110,24 @@ static void menu_flush_all_pending(void);
  */
 void MenuInit(void)
 {
-// MenuInitConfig_s third_menu_config[1] = {    //三级菜单
-// 			[0] = {
-// 			.string={
-// 				[0] = "普通",
-// 				[1] = "巡线",
-// 				[2] = "陀螺仪",
-// 				[3] = "位置",
-// 				[4]	= NULL,
-// 			},
-// 			.callback={
-// 				[0] = Chassis_Mode_Switch_Callback,
-// 				[1] = Chassis_Mode_Switch_Callback,
-// 				[2] = Chassis_Mode_Switch_Callback,
-// 				[3] = Chassis_Mode_Switch_Callback,
-// 			},
-// 			.next_menu_config={
-// 			},
-// 			.pre_idx=1,
-// 		},
-// };
+	static MenuInitConfig_s third_menu_config[1] = {    //三级菜单: Task VI
+		[0] = {
+			.string={
+				[0] = "send_flag",
+				[1] = "start",
+				[2] = NULL,
+				[3] = NULL,
+				[4]	= NULL,
+			},
+			.callback={
+				[0] = Task_VI_Callback,
+				[1] = Task_VI_Callback,
+			},
+			.next_menu_config={
+			},
+			.pre_idx=4,
+		},
+};
 MenuInitConfig_s second_menu_config[3]	={      //二级菜单
 		[0] = {
 			.string={
@@ -172,17 +170,17 @@ MenuInitConfig_s second_menu_config[3]	={      //二级菜单
 				[1] = "Task III",
 				[2] = "Task IV",
 				[3] = "Task V",
-				[4]	= NULL,
+				[4]	= "Task VI",
 			},
 			.callback={
 				[0] = Task_Callback,
 				[1] = Task_Callback,
 				[2] = Task_Callback,
 				[3] = Task_Callback,
-				[4] = Task_Callback,
+				// [4] = Task_Callback,
 			},
 			.next_menu_config={
-
+				[4] = &third_menu_config[0],
 			},
 			.pre_idx=2,
 		},
@@ -685,14 +683,14 @@ static MenuInstance* single_menu_init(MenuInitConfig_s *config,MenuInstance *pre
 		
 	}
 	memset(menu, 0, sizeof(MenuInstance));
+	menu->pre_menu = pre_menu;
+	menu->pre_idx = config->pre_idx;
 	for(uint8_t i=0;i<MAX_MENU_NUM;i++)
 	{
 		menu->string[i] = config->string[i];
 		//LOGERROR("%s","man!");
 		menu->callback[i] = config->callback[i];
-		menu->pre_menu = pre_menu;
 		menu->CharNum[i] = count_chars((char *)config->string[i]);
-		menu->pre_idx = config->pre_idx;
 		if(config->next_menu_config[i]!=NULL)
 		{
 			menu->next_menu[i] = single_menu_init(config->next_menu_config[i],menu);
@@ -777,6 +775,7 @@ void menu_task(void) {
 				now_menu->callback[selected_idx](selected_idx);
 			}
 			now_menu = now_menu->next_menu[selected_idx];
+			now_menu->pre_idx = selected_idx;
 			menu_set_selection(0U);
 			if (!chassis_mode_selected) { menu_redraw(); }
 		}

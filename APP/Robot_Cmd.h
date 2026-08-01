@@ -104,6 +104,7 @@ typedef struct
 #pragma pack()
 
 void Control_Switch_Callback(uint8_t i);
+void Task_VI_Callback(uint8_t i);
 void Task_Callback(uint8_t i);
 void Chassis_Mode_Switch_Callback(uint8_t i);
 void Reset_task(void);
