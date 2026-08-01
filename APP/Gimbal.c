@@ -63,7 +63,7 @@ uint32_t motor_zero_point =  0;
 #define SLIDE_SERVO_RANGE      45    /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
 #define SLIDE_VEL_FF_GAIN      0.517f   /* 速度前馈增益 */
-#define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
+#define SLIDE_X_LPF_ALPHA      0.1f   /* X坐标低通滤波系数，越小越平滑 */
 #define SLIDE_ACC_GAIN         50.00f
 
 static pid_init_config_s cfg = {   //动态pid这一块
@@ -136,7 +136,9 @@ static void Slide_Control_Run(void)
 
     /* ========= X坐标一阶低通滤波 ========= */
     slide_x_lpf_out = SLIDE_X_LPF_ALPHA * x_raw + (1.0f - SLIDE_X_LPF_ALPHA) * slide_x_lpf_out;
-    x = slide_x_lpf_out;
+    // x = slide_x_lpf_out;
+	// 不进行滤波
+	x = x_raw;
     /* ===================================== */
 
     dt = steel_ball_movement_data.dt;
@@ -220,6 +222,7 @@ void Gimbal_Init(void)
 
 	DWT_Delay(1);
 	//ZDT_Emm_Pos_Control(1, 1, 2000, 253, 0, 1, false);
+	// ZDT_Emm_Origin_Set_O(1, true);
 	ZDT_Emm_Origin_Trigger_Return(1, 0, 0);
 }
 
