@@ -153,7 +153,7 @@ void Chassis_Mode_Switch_Callback(uint8_t i)  //选择底盘控制模式
 }
 
 void Task_VI_Callback(uint8_t i) {
-	chassis_mode_selected = true;  /* 选中任务后同样隐藏菜单, 全屏显示任务信息 */
+	// chassis_mode_selected = true;  /* 选中任务后同样隐藏菜单, 全屏显示任务信息 */
 
 	if (i == 0) {
 		gimbal_cmd_send.task_flag = 6;
