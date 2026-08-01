@@ -56,18 +56,19 @@ extern Chassis_Move_State_e car_stop;
 #define SLIDE_5CM_POS           180
 #define SLIDE_D5CM_POS        440
 static float slide_target_x   =  SLIDE_ORIGIN_POS ;    /* 目标位置: 画面中心 (640/2) */
+ float slide_target_debug = 312;
 uint32_t motor_zero_point =  0;
 
 #define SLIDE_SERVO_RANGE      45    /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
-#define SLIDE_VEL_FF_GAIN      0.5f   /* 速度前馈增益 */
+#define SLIDE_VEL_FF_GAIN      0.535f   /* 速度前馈增益 */
 #define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
 #define SLIDE_ACC_GAIN         50.00f
 
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
-	.Kp      = 0.1244f,     /* 比例: 每像素误差产生多少度倾角 */
-	.Kd      = 0.0137f,     /* 微分: 抑制震荡 */
+	.Kp      = 0.12435f,     /* 比例: 每像素误差产生多少度倾角 */
+	.Kd      = 0.014785f,     /* 微分: 抑制震荡 */
 	.Ki      = 0.00001f,     /* 积分: 消除静差 */
 	.max_out = SLIDE_SERVO_RANGE,
 	.max_iout = 30.0f,
@@ -153,7 +154,8 @@ static void Slide_Control_Run(void)
     slide_velocity = (int16_t)(slide_v_lpf_out / 10.0f);
 
     /* ── 2. 位置 PID ── */
-    float error = slide_target_x - x;
+    //float error = slide_target_x - x;
+	float error = slide_target_debug - x;
     PID_calc(&slide_ball_pid, 0.0f, error);
 
     /* ── 3. 速度前馈 ──
@@ -231,12 +233,15 @@ void Gimbal(void)
 
 	// static uint16_t cntr = 0;
 	// cntr ++;
-	// if (cntr <= 100) {
-	// 	ZDT_Emm_Pos_Control(1, 1, 100, 0, 100, 1, false);
-	// } else if (cntr >= 100) {
-	// 	if (cntr >= 200) cntr = 0;
-	// 	ZDT_Emm_Pos_Control(1, 0, 100, 0, 100, 1, false);
+	// if (cntr <= 500) {
+	// 	slide_target_debug = 312;
+	// } else if (cntr >= 500 && cntr < 700) {
+	// 	slide_target_debug = 180;
+	// } else if (cntr >= 700) {
+	// 	slide_target_debug = 440;
+	// 	if (cntr >= 1200) {cntr = 0;}
 	// }
+
 	static uint8_t cmd217_done_flag = 0;
 	static uint8_t cmd216_done_flag = 0;
 	switch (gimbal_cmd_receive.task_flag) {
