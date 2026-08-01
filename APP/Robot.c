@@ -17,9 +17,6 @@ void Robot_Init(void)
 	size_t free_heap = 0;
 	__disable_irq();
 	DWT_Init(80);
-	MenuInit();
-	free_heap = xPortGetFreeHeapSize();
-	LOGWARNING("heap after MenuInit: %u", (uint32_t)free_heap);
 	Chassis_Init();
 	free_heap = xPortGetFreeHeapSize();
 	LOGWARNING("heap after Chassis_Init: %u", (uint32_t)free_heap);
@@ -33,6 +30,9 @@ void Robot_Init(void)
 	K230_Init();
 	free_heap = xPortGetFreeHeapSize();
 	LOGWARNING("heap after K230_Init: %u", (uint32_t)free_heap);
+	MenuInit();
+	free_heap = xPortGetFreeHeapSize();
+	LOGWARNING("heap after MenuInit: %u", (uint32_t)free_heap);
 	__enable_irq();
 	vTaskStartScheduler();
 }

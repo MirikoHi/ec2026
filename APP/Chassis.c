@@ -45,6 +45,8 @@ static float chassis_action_target_yaw = 0.0f;
 static float chassis_action_target_distance = 0.0f;
 static uint8_t chassis_imu_action_step = 0U;
 
+int8_t gray_data;
+
 /* ── 路径级梯形加减速 ────────────────────────────────────────── */
 #define IMU_PATH_LINE_M        0.5f//1.70f
 #define IMU_PATH_RADIUS_M      0.6f
@@ -234,7 +236,7 @@ void Chassis(void)
 	switch(chassis_cmd_receive.Chassis_Mode)
 	{
 		case TRACE_MODE:
-			uint8_t gray_data = Gray_Serial_Read();
+			gray_data = Gray_Serial_Read();
 			imu_path_cumulative = motor_l->position_measure +  motor_r->position_measure;  //行驶里程
 
 			float current_speed = (motor_l->speed_measure + motor_r->speed_measure) / 2.0f;
