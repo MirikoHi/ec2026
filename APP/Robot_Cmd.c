@@ -153,13 +153,25 @@ void Chassis_Mode_Switch_Callback(uint8_t i)  //选择底盘控制模式
 }
 
 void Task_VI_Callback(uint8_t i) {
-	chassis_mode_selected = true;  /* 选中任务后同样隐藏菜单, 全屏显示任务信息 */
+	// chassis_mode_selected = true;  /* 选中任务后同样隐藏菜单, 全屏显示任务信息 */
 
+	// if (i == 0) {
+	// 	gimbal_cmd_send.task_flag = 6;
+	// 	chassis_cmd_send.task_flag = 6;
+	// }
+	// else if (i == 1) {
+	// 	chassis_cmd_send.Chassis_Mode = TRACE_MODE;
+	// 	task_display_id   = 6;
+	// 	task_start_time_s = DWT_GetTimeline_s();
+	// }
 	if (i == 0) {
-		gimbal_cmd_send.task_flag = 6;
+		gimbal_cmd_send.task_flag = 216;
+		chassis_cmd_send.task_flag = 0;
+	} else if (i == 1) {
+		gimbal_cmd_send.task_flag = 217;
 		chassis_cmd_send.task_flag = 6;
-	}
-	else if (i == 1) {
+	} else if (i == 2) {
+		gimbal_cmd_send.task_flag = 218;
 		chassis_cmd_send.Chassis_Mode = TRACE_MODE;
 		task_display_id   = 6;
 		task_start_time_s = DWT_GetTimeline_s();
@@ -187,6 +199,7 @@ void Task_Callback(uint8_t i)    //选择执行任务
 	else if(i==2)    //任务4，钢球置于中心点走AB线段
 	{
 		chassis_cmd_send.task_flag = 4;
+		chassis_cmd_send.Chassis_Mode = TRACE_MODE;
 		task_display_id   = 4;
 		task_start_time_s = DWT_GetTimeline_s();
 	}

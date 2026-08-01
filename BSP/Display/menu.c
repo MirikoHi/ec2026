@@ -113,15 +113,16 @@ void MenuInit(void)
 	static MenuInitConfig_s third_menu_config[1] = {    //三级菜单: Task VI
 		[0] = {
 			.string={
-				[0] = "send_flag",
-				[1] = "start",
-				[2] = NULL,
+				[0] = "put ball",
+				[1] = "set target",
+				[2] = "start",
 				[3] = NULL,
 				[4]	= NULL,
 			},
 			.callback={
 				[0] = Task_VI_Callback,
 				[1] = Task_VI_Callback,
+				[2] = Task_VI_Callback,
 			},
 			.next_menu_config={
 			},
