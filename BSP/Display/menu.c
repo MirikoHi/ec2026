@@ -167,11 +167,11 @@ MenuInitConfig_s second_menu_config[4]	={      //二级菜单
 		},
 		[2] = {
 			.string={
-				[0] = "Task II",
-				[1] = "Task III",
-				[2] = "Task IV",
-				[3] = "Task V",
-				[4]	= "Task VI",
+				[0] = "Task 2",
+				[1] = "Task 3",
+				[2] = "Task 4",
+				[3] = "Task 5",
+				[4]	= "Task 6",
 			},
 			.callback={
 				[0] = Task_Callback,
