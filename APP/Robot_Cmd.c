@@ -21,7 +21,7 @@ static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数�
 
 static gimbal_cmd_q gimbal_cmd_send;  //向云台发送的控制命令
 
-QueueHandle_t chassis_cmd_queue = NULL,gimbal_cmd_queue =NULL;
+QueueHandle_t chassis_cmd_queue = NULL,gimbal_cmd_queue =NULL,chassis_cmd_2gimbal = NULL;
 QueueHandle_t chassis_fetch_data_queue = NULL;
 QueueHandle_t trace_fetch_data_queue = NULL;
 chassis_cmd_q chassis_cmd_send={0};
@@ -52,6 +52,7 @@ void RobotCmd_Init(void)
 	chassis_cmd_queue = xQueueCreate(4, sizeof(chassis_cmd_q));
 	trace_fetch_data_queue = xQueueCreate(4, sizeof(trace_fetch_data_q));
 	gimbal_cmd_queue = xQueueCreate(4,sizeof(gimbal_cmd_q));
+	// chassis_cmd_2gimbal = xQueueCreate(4,sizeof(chassis_cmd_q));
 	BSPLogInit();
 
 	chassis_cmd_send.Chassis_Mode = NORMAL_MODE;  // 上电默认 IMU 测试模式
@@ -200,6 +201,7 @@ void Task_Callback(uint8_t i)    //选择执行任务
 	{
 		chassis_cmd_send.task_flag = 4;
 		chassis_cmd_send.Chassis_Mode = TRACE_MODE;
+		gimbal_cmd_send.task_flag = 4;
 		task_display_id   = 4;
 		task_start_time_s = DWT_GetTimeline_s();
 	}
@@ -207,12 +209,15 @@ void Task_Callback(uint8_t i)    //选择执行任务
 	{
 		chassis_cmd_send.task_flag = 5;
 		chassis_cmd_send.Chassis_Mode = TRACE_MODE;
+		gimbal_cmd_send.task_flag = 5;
 		task_display_id   = 5;
 		task_start_time_s = DWT_GetTimeline_s();
 	}
 	else if(i==4)    //任务6，钢球置于指定位置走一圈
 	{
 		chassis_cmd_send.task_flag = 6;
+		chassis_cmd_send.Chassis_Mode = TRACE_MODE;
+		gimbal_cmd_send.task_flag = 6;
 		task_display_id   = 6;
 		task_start_time_s = DWT_GetTimeline_s();
 	}

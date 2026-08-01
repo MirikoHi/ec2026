@@ -65,7 +65,7 @@ uint32_t motor_zero_point =  0;
 #define SLIDE_VEL_FF_GAIN      0.48f   /* 速度前馈增益 */
 #define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
 #define SLIDE_ACC_GAIN         50.00f
-#define ANGLE_COMPENSATION     3
+#define ANGLE_COMPENSATION     0
 
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
@@ -174,11 +174,11 @@ static void Slide_Control_Run(void)
 
 	Chassis_State_Flag_To_Gimbal_e chassis_current_state = get_chassis_current_state();
 
-	if (chassis_current_state == Chassis_Launching && chassis_cmd_receive.task_flag == 4) target_angle_deg += 2.6f;
-	else if (chassis_current_state == Chassis_Stoping && chassis_cmd_receive.task_flag == 4) target_angle_deg -= 5;
+	if (chassis_current_state == Chassis_Launching && gimbal_cmd_receive.task_flag == 4) target_angle_deg += 6.6f;
+	else if (chassis_current_state == Chassis_Stoping && gimbal_cmd_receive.task_flag == 4) target_angle_deg -= 3;
 
-	if (chassis_current_state == Chassis_Launching && chassis_cmd_receive.task_flag == 5) target_angle_deg += 2.6f;
-	else if (chassis_current_state == Chassis_Stoping && chassis_cmd_receive.task_flag == 5) target_angle_deg -= 3;
+	if (chassis_current_state == Chassis_Launching && gimbal_cmd_receive.task_flag == 5) target_angle_deg += 2.6f;
+	else if (chassis_current_state == Chassis_Stoping && gimbal_cmd_receive.task_flag == 5) target_angle_deg -= 3;
 
 	if (target_angle_deg >   SLIDE_SERVO_RANGE)  target_angle_deg =   SLIDE_SERVO_RANGE;
 	if (target_angle_deg < -(SLIDE_SERVO_RANGE)) target_angle_deg = -(SLIDE_SERVO_RANGE);
