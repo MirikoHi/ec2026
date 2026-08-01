@@ -1,4 +1,4 @@
-#include "Chassis.h"
+﻿#include "Chassis.h"
 #include "trace.h"
 #include "dcmotor.h"
 #include "Robot_Cmd.h"
@@ -205,8 +205,12 @@ void Chassis_Init(void)
  * @brief 底盘主任务，根据菜单模式执行对应动作
  */
 uint16_t acc_count = 0;
-uint8_t acc_count_change_flag1 = 0;
-uint8_t acc_count_change_flag2 = 0;
+uint16_t slow_count = 0;
+uint8_t acc_count_change_flag = 0;
+uint8_t slow_count_change_flag = 0;
+float remain4 = 0;
+float remain5 = 0;
+float base_speed = 0;
 void Chassis(void)
 {
 	// 接收 Robot_Cmd 发来的底盘控制命令。
@@ -239,42 +243,52 @@ void Chassis(void)
 			imu_path_cumulative = motor_l->position_measure +  motor_r->position_measure;  //行驶里程
 
 			float current_speed = (motor_l->speed_measure + motor_r->speed_measure) / 2.0f;
-			float remain = 11.6678f - imu_path_cumulative;  //剩余里程
-			float base_speed = 0.0f;  //行驶速度
+
 			switch (chassis_cmd_receive.task_flag) {
 				case 2:  //任务二
 					Chassis_Trace_Cal(0.1f);
 					break;
 				case 4:  //任务4，钢球置于中心点走AB线段
+					remain4 = 5.4478f - imu_path_cumulative;  //剩余里程
 					//起步加速阶段
-					if (acc_count_change_flag1 == 0) {
+					if (!acc_count_change_flag) {
+						Chassis_current_state = Chassis_Launching;
 						acc_count++;
-						base_speed = 0.000091f * acc_count;
+						base_speed = 0.000125f * acc_count;
 					}
-					if (acc_count > 440) {
-						acc_count_change_flag1 = 1;
+					if (acc_count > 320) {
+						Chassis_current_state = Chassis_Moving;
+						acc_count_change_flag = 1;
 						// acc_count = 0;
 						base_speed = 0.04f;
 					}
 					//匀速行驶阶段
-					if (fabsf(imu_path_cumulative) >= 3.2f && fabsf(remain) >= 1.2f) {
-						base_speed = 0.04f;
-					}
 					//缓停，停车段
-					if (fabsf(remain) < 1.2f ){
+					if (remain4 < 0.8f && !car_stop){
+						Chassis_current_state = Chassis_Stoping;
 						// 停止线 → 停车或执行下一动作
-						base_speed = 0.03333f*fabsf(remain);
-						if (Gray_Is_StopLine(gray_data) && fabsf(remain) < 0.005f) {
+						if (!slow_count_change_flag) {
+							slow_count++;
+							base_speed = 0.04f - 0.000125f * slow_count;  //0.0000155f
+						}
+						if (slow_count > 320 && fabsf(remain5) < 0.015f) {
 							car_stop = 1;
 							base_speed = 0.0f;
+							acc_count = 0;
+							slow_count = 0;
+							Chassis_current_state = Chassis_IDLE;
+						}
+						else if (slow_count > 320 && fabsf(remain5) > 0.015f) {
+							base_speed = 0.005f;
 						}
 					}
 					base_speed = (base_speed > 0.04f) ? 0.04f : base_speed;
 					Chassis_Trace_Cal(base_speed);
 					break;
 				case 5:  //任务5，钢球置于中心点走一圈
+					remain5 = 11.8670f - imu_path_cumulative;  //剩余里程
 					//起步加速阶段
-					if (acc_count_change_flag == 0) {
+					if (!acc_count_change_flag) {
 						Chassis_current_state = Chassis_Launching;
 						acc_count++;
 						base_speed = 0.000125f * acc_count;
@@ -286,30 +300,73 @@ void Chassis(void)
 						base_speed = 0.06f;
 					}
 					//匀速行驶阶段
-					if (fabsf(imu_path_cumulative) >= 5.2f && fabsf(remain) >= 1.2f) {
+					if (fabsf(imu_path_cumulative) >= 5.2f && remain5 >= 1.8f) {
 						base_speed = 0.06f;
 						acc_count = 0;
 					}
 					//缓停，停车段
-					if (fabsf(remain) < 1.2 ){
-						// 停止线 → 停车或执行下一动作\
-						if (!acc_count_change_flag1) {
-							acc_count++;
-							base_speed = 0.06f - 0.000125f * acc_count;
-						}
-						if (base_speed < 0.0f){
-							base_speed = 0.0f;
+					if (remain5 < 2.0f && !car_stop){
 						Chassis_current_state = Chassis_Stoping;
 						// 停止线 → 停车或执行下一动作
-						base_speed = 0.05f*fabsf(remain);
-						if (Gray_Is_StopLine(gray_data) && fabsf(remain) < 0.01f) {
+						if (!slow_count_change_flag) {
+							slow_count++;
+							base_speed = 0.06f - 0.000051f * slow_count;  //0.0000155f
+						}
+						if (slow_count > 1177 ) {
 							car_stop = 1;
 							base_speed = 0.0f;
 							acc_count = 0;
+							slow_count = 0;
 							Chassis_current_state = Chassis_IDLE;
 						}
+						// else if (slow_count > 480 && remain5 > 0.015f) {
+						// 	base_speed = 0.01f;
+						// }
 					}
 					base_speed = (base_speed > 0.06f) ? 0.06f : base_speed;
+					base_speed = (base_speed < 0.0f) ? 0.0f : base_speed;
+					Chassis_Trace_Cal(base_speed);
+					break;
+				case 6:
+					remain5 = 11.4376f - imu_path_cumulative;  //剩余里程
+					//起步加速阶段
+					if (!acc_count_change_flag) {
+						Chassis_current_state = Chassis_Launching;
+						acc_count++;
+						base_speed = 0.000125f * acc_count;
+					}
+					if (acc_count > 480) {
+						Chassis_current_state = Chassis_Moving;
+						acc_count_change_flag = 1;
+						// acc_count = 0;
+						base_speed = 0.06f;
+					}
+					//匀速行驶阶段
+					if (fabsf(imu_path_cumulative) >= 5.2f && remain5 >= 1.8f) {
+						base_speed = 0.06f;
+						acc_count = 0;
+					}
+					//缓停，停车段
+					if (remain5 < 1.8f && !car_stop){
+						Chassis_current_state = Chassis_Stoping;
+						// 停止线 → 停车或执行下一动作
+						if (!slow_count_change_flag) {
+							slow_count++;
+							base_speed = 0.06f - 0.0000425f * slow_count;  //0.0000155f
+						}
+						if (slow_count > 480 && remain5 < 0.04f) {
+							car_stop = 1;
+							base_speed = 0.0f;
+							acc_count = 0;
+							slow_count = 0;
+							Chassis_current_state = Chassis_IDLE;
+						}
+						// else if (slow_count > 480 && remain5 > 0.015f) {
+						// 	base_speed = 0.01f;
+						// }
+					}
+					base_speed = (base_speed > 0.06f) ? 0.06f : base_speed;
+					base_speed = (base_speed < 0.0f) ? 0.0f : base_speed;
 					Chassis_Trace_Cal(base_speed);
 					break;
 				default:
@@ -317,8 +374,8 @@ void Chassis(void)
 			}
 			break;
 		case IMU_MODE:
-			Chassis_Trace_Cal(0.01f);
-			Chassis_ImuModeAction();
+			// Chassis_Trace_Cal(0.01f);
+			// Chassis_ImuModeAction();
 			break;
 		case NORMAL_MODE:
 			// Chassis_Set_Turn();

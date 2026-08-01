@@ -52,9 +52,12 @@ extern Chassis_Move_State_e car_stop;
  *     + 速度前馈(dt 用于精确速度估计) → 预测性角度补偿
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
-
-static float slide_target_x   =  312.00f ;    /* 目标位置: 画面中心 (640/2) */
+#define SLIDE_ORIGIN_POS        317
+#define SLIDE_5CM_POS           180
+#define SLIDE_D5CM_POS        440
+static float slide_target_x   =  SLIDE_ORIGIN_POS ;    /* 目标位置: 画面中心 (640/2) */
 uint32_t motor_zero_point =  0;
+
 #define SLIDE_SERVO_RANGE      45    /* 最大角度范围，需保证一次循环能转完 */
 #define SLIDE_VEL_LPF_ALPHA    0.3f    /* 速度低通滤波系数 */
 #define SLIDE_VEL_FF_GAIN      0.5f   /* 速度前馈增益 */
@@ -71,12 +74,12 @@ static pid_init_config_s cfg = {   //动态pid这一块
 };
 
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
-static float        slide_prev_x = 312;   /* 上一帧 X 位置 */
+static float        slide_prev_x = SLIDE_ORIGIN_POS;   /* 上一帧 X 位置 */
 int16_t        slide_velocity = 0;        /* 滤波后的小球速度 (px/s) */
 static float     stepper_current_clock = 0;
 
 /* 一阶低通滤波器状态 */
-static float slide_x_lpf_out = 312.0f;
+static float slide_x_lpf_out = SLIDE_ORIGIN_POS;
 static float slide_v_lpf_out = 0.0f;
 
 
@@ -164,7 +167,8 @@ static void Slide_Control_Run(void)
 
 	Chassis_State_Flag_To_Gimbal_e chassis_current_state = get_chassis_current_state();
 
-	if (chassis_current_state == Chassis_Launching) target_angle_deg += 3;
+	if (chassis_current_state == Chassis_Launching) target_angle_deg += 2.6f;
+	else if (chassis_current_state == Chassis_Stoping) target_angle_deg -= 3;
 
 	if (target_angle_deg >   SLIDE_SERVO_RANGE)  target_angle_deg =   SLIDE_SERVO_RANGE;
 	if (target_angle_deg < -(SLIDE_SERVO_RANGE)) target_angle_deg = -(SLIDE_SERVO_RANGE);
@@ -233,13 +237,13 @@ void Gimbal(void)
 	// }
 	switch (gimbal_cmd_receive.task_flag) {
 		case 0:    //复位模式
-			slide_target_x = 312;
+			slide_target_x = SLIDE_ORIGIN_POS;
 			change_flag1 = 0;
 			change_flag2 = 0;
 			break;
 		case 3:   //任务3，静止状态，使小球在+5——-5间折返
 			if (!change_flag1) {
-				slide_target_x = 180;
+				slide_target_x = SLIDE_5CM_POS;
 				change_flag1 = 1;
 			}
 			if (fabsf(x_raw - slide_target_x) < 30) {
@@ -250,16 +254,16 @@ void Gimbal(void)
 			}
 			if (count1 > 60 && change_flag1) {
 				count1 = 0;
-				slide_target_x = 440;
+				slide_target_x = SLIDE_D5CM_POS;
 				change_flag2 = 1;
 			}
-			if (count2 > 90  && change_flag2) {
+			if (count2 > 120  && change_flag2) {
 				car_stop = 1;
 				count2 = 0;
 			}
 			break;
 		case 6://任务6，钢球置于指定位置走一圈
-			slide_target_x = LicheeRec_Frame.relative_position * 600;
+			slide_target_x = 600 - LicheeRec_Frame.relative_position * 600;
 			break;
 	}
 }

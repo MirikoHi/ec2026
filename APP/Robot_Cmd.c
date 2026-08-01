@@ -78,21 +78,21 @@ void Robot_Cmd(void) {
 	Licheervnano_status = Licheervnano_CheckOnline(LicheeRec_Frame.slider_length_cm,
 	                                                LicheeRec_Frame.relative_position);
 
-	if (Licheervnano_status == ONLINE) {
-		chassis_cmd_send.remote_lost = 0;
-		robotcmd_control_state = REMOTE_CTL;
-		chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
-		last_chassis_cmd_send.Chassis_Mode = chassis_cmd_send.Chassis_Mode;
-
-		/* 使用滑槽长度和相对位置进行遥控控制 */
-		chassis_cmd_send.remote_forward = LicheeRec_Frame.relative_position;
-	}
-	else {
+	// if (Licheervnano_status == ONLINE) {
+	// 	chassis_cmd_send.remote_lost = 0;
+	// 	robotcmd_control_state = REMOTE_CTL;
+	// 	chassis_cmd_send.Chassis_Mode = REMOTE_MODE;
+	// 	last_chassis_cmd_send.Chassis_Mode = chassis_cmd_send.Chassis_Mode;
+	//
+	// 	/* 使用滑槽长度和相对位置进行遥控控制 */
+	// 	chassis_cmd_send.remote_forward = LicheeRec_Frame.relative_position;
+	// }
+	// else {
 		chassis_cmd_send.remote_lost = 1;
 		last_chassis_cmd_send.Chassis_Mode = NORMAL_MODE;
 		chassis_cmd_send.remote_forward = 0.0f;
 		robotcmd_control_state = MENU_CTL;
-	}
+	// }
 
 	// draw_sin();
 
@@ -152,6 +152,19 @@ void Chassis_Mode_Switch_Callback(uint8_t i)  //选择底盘控制模式
 	}
 }
 
+void Task_VI_Callback(uint8_t i) {
+	chassis_mode_selected = true;  /* 选中任务后同样隐藏菜单, 全屏显示任务信息 */
+
+	if (i == 0) {
+		gimbal_cmd_send.task_flag = 6;
+		chassis_cmd_send.task_flag = 6;
+	}
+	else if (i == 1) {
+		chassis_cmd_send.Chassis_Mode = TRACE_MODE;
+		task_display_id   = 6;
+		task_start_time_s = DWT_GetTimeline_s();
+	}
+}
 void Task_Callback(uint8_t i)    //选择执行任务
 {
 	chassis_mode_selected = true;  /* 选中任务后同样隐藏菜单, 全屏显示任务信息 */
@@ -159,8 +172,8 @@ void Task_Callback(uint8_t i)    //选择执行任务
 	if(i==0)  //任务2，巡线走一圈
 	{
 		chassis_cmd_send.task_flag = 2;
-		// chassis_cmd_send.Chassis_Mode = TRACE_MODE;
-		chassis_cmd_send.Chassis_Mode = IMU_MODE;
+		chassis_cmd_send.Chassis_Mode = TRACE_MODE;
+		// chassis_cmd_send.Chassis_Mode = IMU_MODE;
 		task_display_id   = 2;
 		task_start_time_s = DWT_GetTimeline_s();
 	}
