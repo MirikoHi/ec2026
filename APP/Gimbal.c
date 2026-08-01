@@ -54,7 +54,7 @@ extern Chassis_Move_State_e car_stop;
  *     → 最终舵机角度
  * ═══════════════════════════════════════════════════════════════════════ */
 #define SLIDE_ORIGIN_POS        312
-#define SLIDE_5CM_POS           200
+#define SLIDE_5CM_POS           180
 #define SLIDE_D5CM_POS        440
 static float slide_target_x   =  SLIDE_ORIGIN_POS ;    /* 目标位置: 画面中心 (640/2) */
  float slide_target_debug = 312;
@@ -65,6 +65,7 @@ uint32_t motor_zero_point =  0;
 #define SLIDE_VEL_FF_GAIN      0.517f   /* 速度前馈增益 */
 #define SLIDE_X_LPF_ALPHA      0.3f   /* X坐标低通滤波系数，越小越平滑 */
 #define SLIDE_ACC_GAIN         50.00f
+#define ANGLE_COMPENSATION     7
 
 static pid_init_config_s cfg = {   //动态pid这一块
 	.mode    = PID_POSITION,
@@ -72,7 +73,7 @@ static pid_init_config_s cfg = {   //动态pid这一块
 	.Kd      = 0.01837f,     /* 微分: 抑制震荡 */
 	.Ki      = 0.03f,     /* 积分: 消除静差 */
 	.max_out = SLIDE_SERVO_RANGE,
-	.max_iout = 30.0f,
+	.max_iout = 10.0f,
 };
 
 static pid_type_def slide_ball_pid;       /* 位置PID控制器 */
@@ -167,7 +168,7 @@ static void Slide_Control_Run(void)
 	else if (velocity_ff < -60.0f) {velocity_ff = -60.0f;}
 
     /* ── 4. 合成角度 = PID输出 + 速度前馈 ── */
-	target_angle_deg = slide_ball_pid.out + velocity_ff + (acc_total * SLIDE_ACC_GAIN) + 0.2;
+	target_angle_deg = slide_ball_pid.out + velocity_ff + (acc_total * SLIDE_ACC_GAIN);
 
 	Chassis_State_Flag_To_Gimbal_e chassis_current_state = get_chassis_current_state();
 
@@ -179,7 +180,7 @@ static void Slide_Control_Run(void)
 
 	if (target_angle_deg >   SLIDE_SERVO_RANGE)  target_angle_deg =   SLIDE_SERVO_RANGE;
 	if (target_angle_deg < -(SLIDE_SERVO_RANGE)) target_angle_deg = -(SLIDE_SERVO_RANGE);
-
+	target_angle_deg += ANGLE_COMPENSATION;
 	int32_t pulses = (int32_t)(target_angle_deg * 3200.0f / 360.0f);
 
 	uint32_t pulse_count = (uint32_t)((pulses >= 0) ? pulses : -pulses);
